@@ -832,11 +832,16 @@
 
   <!-- JS -->
   <script>
-    const prefersApiMode = ["localhost", "127.0.0.1"].includes(window.location.hostname);
+    const isLocalhost = ["localhost", "127.0.0.1"].includes(window.location.hostname);
+    // Opcional para frontend estatico (ex.: GitHub Pages):
+    // window.__FISCALIZACOES_API_BASE_URL__ = "https://meu-servidor.com/api";
+    const externalApiBaseUrl = String(window.__FISCALIZACOES_API_BASE_URL__ || "").trim();
+    const resolvedApiBaseUrl = isLocalhost ? "/api" : externalApiBaseUrl;
+
     window.APP_BACKEND_CONFIG = {
-      baseUrl: "/api",
+      baseUrl: resolvedApiBaseUrl,
       token: "",
-      mode: prefersApiMode ? "api" : "local"
+      mode: resolvedApiBaseUrl ? "api" : "local"
     };
   </script>
   <script src="./js/storage.js"></script>
