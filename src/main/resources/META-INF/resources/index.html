@@ -830,10 +830,11 @@
 
   <!-- JS -->
   <script>
+    const prefersApiMode = ["localhost", "127.0.0.1"].includes(window.location.hostname);
     window.APP_BACKEND_CONFIG = {
       baseUrl: "/api",
       token: "",
-      mode: "api"
+      mode: prefersApiMode ? "api" : "local"
     };
   </script>
   <script src="./js/storage.js"></script>
