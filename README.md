@@ -1,6 +1,3 @@
-<<<<<<< HEAD
-# Fiscalizacao_ADASA
-=======
 # Fiscalizacoes (Quarkus)
 
 Aplicacao migrada para Quarkus com:
@@ -30,10 +27,24 @@ mvn quarkus:dev
 
 A aplicacao sobe em `http://localhost:8080`.
 
+## Deploy
+
+Para a API ficar disponivel no deploy, rode a aplicacao Java (Quarkus) em um host de backend
+(Render, Railway, Fly.io, etc.). Apenas subir os arquivos no GitHub/GitHub Pages nao executa API.
+
+Variaveis obrigatorias no ambiente:
+
+- `JDBC_DATABASE_URL`
+- `DB_USER`
+- `DB_PASSWORD`
+
+Porta:
+
+- A aplicacao usa `PORT` automaticamente (fallback `8080`).
+
 ## Endpoints
 
 - `GET /api/fiscalizacoes`
 - `POST /api/fiscalizacoes`
 - `PUT /api/fiscalizacoes/{id}`
 - `DELETE /api/fiscalizacoes/{id}`
->>>>>>> 0c2a4e9 (Atualizacoes, bd add, diretas apenas, CRUD)
