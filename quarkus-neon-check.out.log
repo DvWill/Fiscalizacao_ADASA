@@ -1,0 +1,32 @@
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] ------------------< com.fiscalizacoes:fiscalizacoes >-------------------
+[INFO] Building fiscalizacoes 1.0.0-SNAPSHOT
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] --- quarkus:3.15.3:dev (default-cli) @ fiscalizacoes ---
+[INFO] Invoking resources:3.4.0:resources (default-resources) @ fiscalizacoes
+[INFO] Copying 7 resources from src\main\resources to target\classes
+[INFO] Invoking quarkus:3.15.3:generate-code (default) @ fiscalizacoes
+[INFO] Invoking compiler:3.13.0:compile (default-compile) @ fiscalizacoes
+[INFO] Nothing to compile - all classes are up to date.
+[INFO] Invoking resources:3.4.0:testResources (default-testResources) @ fiscalizacoes
+[INFO] Copying 1 resource from src\test\resources to target\test-classes
+[INFO] Invoking quarkus:3.15.3:generate-code-tests (default) @ fiscalizacoes
+[INFO] Invoking compiler:3.13.0:testCompile (default-testCompile) @ fiscalizacoes
+[INFO] Nothing to compile - all classes are up to date.
+[WARNING] Changed debug port to 51867 because of a port conflict
+Listening for transport dt_socket at address: 51867
+Press [e] to edit command line args (currently ''), [h] for more options>
+Tests paused
+Press [e] to edit command line args (currently ''), [r] to resume testing, [h] for more options>
+Press [e] to edit command line args (currently ''), [r] to resume testing, [o] Toggle test output, [h] for more options>
+__  ____  __  _____   ___  __ ____  ______ 
+ --/ __ \/ / / / _ | / _ \/ //_/ / / / __/ 
+ -/ /_/ / /_/ / __ |/ , _/ ,< / /_/ /\ \   
+--\___\_\____/_/ |_/_/|_/_/|_|\____/___/   
+2026-03-09 18:33:30,342 INFO  [io.quarkus] (Quarkus Main Thread) fiscalizacoes 1.0.0-SNAPSHOT on JVM (powered by Quarkus 3.15.3) started in 3.252s. Listening on: http://localhost:8092
+2026-03-09 18:33:30,345 INFO  [io.quarkus] (Quarkus Main Thread) Profile dev activated. Live Coding activated.
+2026-03-09 18:33:30,346 INFO  [io.quarkus] (Quarkus Main Thread) Installed features: [agroal, cdi, jdbc-postgresql, narayana-jta, rest, rest-jackson, smallrye-context-propagation, vertx]
+2026-03-09 18:33:37,959 WARN  [io.agr.pool] (agroal-11) Datasource '<default>': ERROR: password authentication failed for user 'neondb_owner'

@@ -1,0 +1,13 @@
+{
+	"folders": [
+		{
+			"path": ".."
+		},
+		{
+			"path": "../../Automacao"
+		}
+	],
+	"settings": {
+		"liveServer.settings.multiRootWorkspaceName": "fiscalizacoes"
+	}
+}

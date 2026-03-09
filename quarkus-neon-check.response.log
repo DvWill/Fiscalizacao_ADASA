@@ -1,0 +1,5 @@
+﻿HTTP/1.1 500 Internal Server Error
+Content-Type: application/json;charset=UTF-8
+content-length: 44
+
+{"error":"Falha ao carregar fiscalizacoes."}

@@ -1,1 +1,7 @@
 node_modules/
+<<<<<<< HEAD
+=======
+target/
+.quarkus/
+.m2/
+>>>>>>> 0c2a4e9 (Atualizacoes, bd add, diretas apenas, CRUD)

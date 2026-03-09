@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 {
   "version": 1,
   "updatedAt": "2026-03-01T15:32:56.151Z",
@@ -1529,3 +1530,12 @@
     }
   ]
 }
+=======
+﻿{
+    "version":  1,
+    "updatedAt":  "2026-03-09T20:45:27.9476487Z",
+    "records":  [
+
+                ]
+}
+>>>>>>> 0c2a4e9 (Atualizacoes, bd add, diretas apenas, CRUD)
