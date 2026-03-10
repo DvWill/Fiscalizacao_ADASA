@@ -42,6 +42,16 @@ Porta:
 
 - A aplicacao usa `PORT` automaticamente (fallback `8080`).
 
+## Deploy no Vercel (Serverless)
+
+Este projeto tambem inclui uma funcao em `api/fiscalizacoes.js` para uso no Vercel.
+
+- Endpoint: `/api/fiscalizacoes`
+- Metodos: `GET`, `POST`, `PUT`, `DELETE`
+- Reescrita para ID: `vercel.json` mapeia `/api/fiscalizacoes/:id` para a funcao.
+
+Observacao: os dados dessa funcao sao em memoria (mock/prototipo) e podem reiniciar entre execucoes.
+
 ## Endpoints
 
 - `GET /api/fiscalizacoes`
