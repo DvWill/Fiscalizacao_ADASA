@@ -628,6 +628,28 @@
                   placeholder="Nome do destinatário">
               </div>
             </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+              <div>
+                <label class="block text-sm font-medium text-slate-300 mb-2">Imagem (opcional)</label>
+                <input
+                  type="file"
+                  id="form-imagem-file"
+                  accept="image/*"
+                  onchange="handleImagemSelected(event)"
+                  class="input-field w-full px-4 py-2.5 rounded-lg bg-slate-800 border border-slate-600 text-white focus:outline-none focus:border-blue-500"
+                >
+                <input type="hidden" id="form-imagem-data">
+                <p class="text-xs text-slate-500 mt-2">PNG/JPEG/WebP até 2MB. A imagem fica salva junto com a fiscalização.</p>
+                <div id="form-imagem-preview" class="hidden mt-3 rounded-lg overflow-hidden border border-slate-700 bg-slate-900/60">
+                  <img id="form-imagem-preview-img" alt="Previa da imagem" class="w-full object-cover max-h-64">
+                  <div class="flex items-center justify-between px-3 py-2 text-xs text-slate-300">
+                    <span id="form-imagem-name" class="truncate max-w-[70%]"></span>
+                    <button type="button" onclick="clearImagemField()" class="text-red-400 hover:text-red-300">Remover</button>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
           <!-- Constatações -->
@@ -925,11 +947,11 @@
   <script>
     const hostname = window.location.hostname;
     const isLocalhost = ["localhost", "127.0.0.1"].includes(hostname);
-    const isGitHubPages = hostname.endsWith("github.io");
     // Opcional para frontend estatico (ex.: GitHub Pages):
     // window.__FISCALIZACOES_API_BASE_URL__ = "https://meu-servidor.com/api";
     const externalApiBaseUrl = String(window.__FISCALIZACOES_API_BASE_URL__ || "").trim();
-    const resolvedApiBaseUrl = externalApiBaseUrl || (isLocalhost || !isGitHubPages ? "/api" : "");
+    // Sempre tenta falar com o backend em /api por padrão (ou valor externo configurado).
+    const resolvedApiBaseUrl = externalApiBaseUrl || "/api";
 
     window.APP_BACKEND_CONFIG = {
       baseUrl: resolvedApiBaseUrl,
