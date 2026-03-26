@@ -13,8 +13,10 @@ window.dataSdk = {
   async init(handler) {
     this._handler = handler;
 
+    const localRecords = this._loadStoredRecords();
     let records = [];
     let loadedFromBackend = false;
+    let syncedLocalToApi = false;
     const activeMode = this.getActiveMode();
 
     if (activeMode === "api") {
@@ -22,11 +24,22 @@ window.dataSdk = {
       if (remote) {
         records = remote;
         loadedFromBackend = true;
+
+        if (remote.length === 0 && localRecords.length > 0) {
+          const synced = await this._replaceRemoteRecords(localRecords);
+          if (synced) {
+            records = synced;
+            syncedLocalToApi = true;
+          } else {
+            records = localRecords;
+            loadedFromBackend = false;
+          }
+        }
       }
     }
 
     if (!loadedFromBackend) {
-      records = this._loadStoredRecords();
+      records = localRecords;
     }
 
     this._data = records.map((r) => ({
@@ -41,7 +54,8 @@ window.dataSdk = {
     return {
       isOk: loadedFromBackend || persisted,
       mode: activeMode,
-      source: loadedFromBackend ? "api" : "local"
+      source: loadedFromBackend ? "api" : "local",
+      syncedLocalToApi
     };
   },
 
@@ -162,22 +176,27 @@ window.dataSdk = {
   },
 
   getStorageMode() {
-    const config = this._getBackendConfig();
-    const storedMode = localStorage.getItem(this._modeKey);
-    const mode = storedMode || config.mode || "local";
-    return mode === "api" ? "api" : "local";
-  },
-
-  getActiveMode() {
-    if (this.getStorageMode() === "api" && this.isApiConfigured()) {
+    if (this.isApiConfigured()) {
+      try {
+        localStorage.setItem(this._modeKey, "api");
+      } catch {
+        // Ignore localStorage write issues; API remains the active mode.
+      }
       return "api";
     }
 
-    return "local";
+    const config = this._getBackendConfig();
+    const storedMode = localStorage.getItem(this._modeKey);
+    const mode = storedMode || config.mode || "local";
+    return mode === "api" && this.isApiConfigured() ? "api" : "local";
+  },
+
+  getActiveMode() {
+    return this.isApiConfigured() ? "api" : "local";
   },
 
   setStorageMode(mode) {
-    const nextMode = mode === "api" ? "api" : "local";
+    const nextMode = this.isApiConfigured() ? "api" : "local";
     localStorage.setItem(this._modeKey, nextMode);
     return nextMode;
   },
@@ -237,6 +256,17 @@ window.dataSdk = {
   async _fetchRemoteRecords() {
     const payload = await this._fetchJson(this._buildUrl("/fiscalizacoes"), {
       method: "GET"
+    });
+
+    if (Array.isArray(payload)) return payload;
+    if (Array.isArray(payload?.records)) return payload.records;
+    return null;
+  },
+
+  async _replaceRemoteRecords(records) {
+    const payload = await this._fetchJson(this._buildUrl("/fiscalizacoes"), {
+      method: "PUT",
+      body: JSON.stringify({ records })
     });
 
     if (Array.isArray(payload)) return payload;

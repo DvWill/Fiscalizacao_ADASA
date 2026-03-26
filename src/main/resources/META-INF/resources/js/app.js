@@ -16,6 +16,15 @@ let markers = {};
 let isSelectingLocation = false;
 let tempMarker = null;
 let deleteTarget = null;
+let allObras = [];
+let filteredObras = [];
+let currentObra = null;
+let currentView = 'fiscalizacoes';
+let pendingObrasUpload = [];
+let pendingObrasMeta = null;
+
+const OBRAS_STORAGE_KEY = 'obras_storage_v1';
+const VIEW_MODE_KEY = 'fiscalizacoes_data_view';
 
 const defaultConfig = {
   app_title: 'Sistema de Fiscalizações',
@@ -58,6 +67,364 @@ const regionCoordinates = {
   'Arniqueira': [-15.8500, -48.0333]
 };
 
+function normalizePlainText(value) {
+  return (value || '')
+    .toString()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
+function normalizeHeaderKey(value) {
+  return normalizePlainText(value)
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+}
+
+function hasMeaningfulRecordData(record) {
+  return Object.values(record || {}).some((value) => {
+    if (value == null) return false;
+    return String(value).trim() !== '';
+  });
+}
+
+function getFirstRecordValue(record, keys) {
+  for (const key of keys) {
+    const value = record?.[key];
+    if (value == null) continue;
+    if (typeof value === 'string' && value.trim() === '') continue;
+    return value;
+  }
+
+  return '';
+}
+
+function parseLocalizedNumber(value) {
+  if (value == null || value === '') return null;
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+
+  let text = String(value).trim();
+  if (!text || text === '-') return null;
+
+  text = text
+    .replace(/R\$/gi, '')
+    .replace(/%/g, '')
+    .replace(/\s+/g, '')
+    .replace(/[^0-9,.\-]/g, '');
+
+  if (!text) return null;
+
+  if (text.includes(',') && text.includes('.')) {
+    if (text.lastIndexOf(',') > text.lastIndexOf('.')) {
+      text = text.replace(/\./g, '').replace(',', '.');
+    } else {
+      text = text.replace(/,/g, '');
+    }
+  } else if (text.includes(',')) {
+    text = text.replace(/\./g, '').replace(',', '.');
+  }
+
+  const parsed = Number(text);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function loadStoredObras() {
+  try {
+    const raw = localStorage.getItem(OBRAS_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed?.records) ? parsed.records : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveStoredObras(records) {
+  localStorage.setItem(OBRAS_STORAGE_KEY, JSON.stringify({
+    updatedAt: new Date().toISOString(),
+    records
+  }));
+}
+
+function clearStoredObras() {
+  localStorage.removeItem(OBRAS_STORAGE_KEY);
+}
+
+function loadStoredView() {
+  const saved = localStorage.getItem(VIEW_MODE_KEY);
+  return saved === 'obras' ? 'obras' : 'fiscalizacoes';
+}
+
+function saveStoredView(view) {
+  localStorage.setItem(VIEW_MODE_KEY, view === 'obras' ? 'obras' : 'fiscalizacoes');
+}
+
+function sanitizeCoordinate(value, axis) {
+  const parsed = parseLocalizedNumber(value);
+  if (parsed === null) return null;
+
+  if (axis === 'lat') {
+    if (Math.abs(parsed) < 10 || Math.abs(parsed) > 90) return null;
+    return parsed;
+  }
+
+  let longitude = parsed;
+  if (longitude > 0 && longitude <= 180) longitude *= -1;
+  if (Math.abs(longitude) < 10 || Math.abs(longitude) > 180) return null;
+  return longitude;
+}
+
+function inferCoordinatesFromLocal(local) {
+  const normalizedLocal = normalizePlainText(local);
+  if (!normalizedLocal) return null;
+
+  for (const [region, coords] of Object.entries(regionCoordinates)) {
+    if (normalizedLocal.includes(normalizePlainText(region))) return coords;
+  }
+
+  const aliases = [
+    ['sol nascente / por do sol', 'Sol Nascente/PÃ´r do Sol'],
+    ['sol nascente e por do sol', 'Sol Nascente/PÃ´r do Sol'],
+    ['aguas claras', 'Ãguas Claras'],
+    ['nucleo bandeirante', 'NÃºcleo Bandeirante'],
+    ['sao sebastiao', 'SÃ£o SebastiÃ£o'],
+    ['ceilandia', 'CeilÃ¢ndia'],
+    ['guara', 'GuarÃ¡'],
+    ['paranoa', 'ParanoÃ¡'],
+    ['itapoa', 'ItapoÃ£'],
+    ['jardim botanico', 'Jardim BotÃ¢nico'],
+    ['varjao', 'VarjÃ£o'],
+    ['brazlandia', 'BrazlÃ¢ndia'],
+    ['candangolandia', 'CandangolÃ¢ndia']
+  ];
+
+  for (const [alias, region] of aliases) {
+    if (normalizedLocal.includes(alias)) return regionCoordinates[region];
+  }
+
+  return null;
+}
+
+function buildObraId(seed, index) {
+  const base = normalizePlainText(seed || `obra-${index + 1}`)
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return `obra-${index + 1}-${base || 'item'}`;
+}
+
+function normalizeObraRecord(record, index) {
+  return {
+    __obraId: record?.__obraId || buildObraId(record?.item || record?.local || record?.objeto_contrato, index),
+    ...record
+  };
+}
+
+function formatCurrency(value) {
+  if (value == null || !Number.isFinite(value)) return '-';
+  return new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+    maximumFractionDigits: 2
+  }).format(value);
+}
+
+function formatPercent(value) {
+  if (value == null || !Number.isFinite(value)) return '-';
+  return `${Number(value).toFixed(1).replace(/\.0$/, '')}%`;
+}
+
+function normalizeDateDisplay(value) {
+  const text = (value || '').toString().trim();
+  if (!text) return '-';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+    return new Date(`${text}T00:00:00`).toLocaleDateString('pt-BR');
+  }
+  return text;
+}
+
+function getObraProgressValue(obra) {
+  if (Number.isFinite(obra.execucao_fisica_pct)) return obra.execucao_fisica_pct;
+  if (Number.isFinite(obra.execucao_financeira_pct)) return obra.execucao_financeira_pct;
+  return null;
+}
+
+function getObraMarkerColor(obra) {
+  const progress = getObraProgressValue(obra);
+  if (progress != null) {
+    if (progress >= 80) return '#10b981';
+    if (progress >= 40) return '#f59e0b';
+    return '#ef4444';
+  }
+
+  const status = normalizePlainText(obra.situacao_contrato);
+  if (status.includes('receb') || status.includes('teste') || status.includes('pronta')) return '#10b981';
+  if (status.includes('execu')) return '#f59e0b';
+  return '#3b82f6';
+}
+
+function selectObrasSheetName(sheetNames) {
+  if (!Array.isArray(sheetNames) || sheetNames.length === 0) return null;
+  return sheetNames.find((name) => normalizePlainText(name) === 'dados investimentos 2025') ||
+    sheetNames.find((name) => normalizePlainText(name).includes('dados investimentos')) ||
+    sheetNames.find((name) => normalizePlainText(name).includes('investimentos')) ||
+    sheetNames.find((name) => normalizePlainText(name).includes('dados obras')) ||
+    sheetNames.find((name) => normalizePlainText(name).includes('obra')) ||
+    sheetNames[0];
+}
+
+function findObrasHeaderRow(rows) {
+  if (!Array.isArray(rows)) return -1;
+
+  for (let index = 0; index < Math.min(rows.length, 50); index++) {
+    const headerSet = new Set((rows[index] || []).map(normalizeHeaderKey).filter(Boolean));
+    const hasCoreHeaders = headerSet.has('item') && headerSet.has('local');
+    const hasLocatorHeaders = headerSet.has('latitude') && headerSet.has('longitude');
+    const hasContractHeaders = [
+      'situacao_do_contrato',
+      'situacao',
+      'objeto_do_contrato',
+      'objeto_contrato',
+      'numero_contrato',
+      'n_contrato',
+      'processo_sei',
+      'n_processo_sei'
+    ].some((header) => headerSet.has(header));
+
+    if (hasCoreHeaders && (hasLocatorHeaders || hasContractHeaders)) {
+      return index;
+    }
+  }
+
+  return -1;
+}
+
+function mapUploadedObraRecord(rawRecord, index) {
+  const record = {};
+  Object.entries(rawRecord || {}).forEach(([key, value]) => {
+    record[normalizeHeaderKey(key)] = value;
+  });
+
+  if (!hasMeaningfulRecordData(record)) return null;
+
+  const local = String(getFirstRecordValue(record, ['local'])).trim();
+  const objetoContrato = String(getFirstRecordValue(record, ['objeto_do_contrato', 'objeto_contrato'])).trim();
+  const rawItem = String(getFirstRecordValue(record, ['item'])).trim();
+  const item = rawItem || String(index + 1);
+
+  const latitude = sanitizeCoordinate(getFirstRecordValue(record, ['latitude']), 'lat');
+  const longitude = sanitizeCoordinate(getFirstRecordValue(record, ['longitude']), 'lng');
+  const fallbackCoords = latitude == null || longitude == null ? inferCoordinatesFromLocal(local) : null;
+
+  return {
+    __obraId: buildObraId(item || local || objetoContrato, index),
+    item,
+    sistema: String(getFirstRecordValue(record, ['sistema_agua_saa_esgoto_ses', 'sistema'])).trim(),
+    tipo: String(getFirstRecordValue(record, ['tipo'])).trim(),
+    programa: String(getFirstRecordValue(record, ['programa'])).trim(),
+    codigo_plano_exploracao: String(getFirstRecordValue(record, ['codigo_plano_de_exploracao', 'codigo_plano_exploracao'])).trim(),
+    acao: String(getFirstRecordValue(record, ['acao'])).trim(),
+    local,
+    numero_contrato: String(getFirstRecordValue(record, ['n_contrato', 'numero_contrato'])).trim(),
+    objeto_contrato: objetoContrato,
+    valor_total_obra: parseLocalizedNumber(getFirstRecordValue(record, ['valor_total_da_obra', 'valor_total'])),
+    situacao_contrato: String(getFirstRecordValue(record, ['situacao_do_contrato', 'situacao'])).trim(),
+    sigla_uo: String(getFirstRecordValue(record, ['sigla_uo'])).trim(),
+    fornecedor: String(getFirstRecordValue(record, ['fornecedor'])).trim(),
+    em_operacao: String(getFirstRecordValue(record, ['em_operacao'])).trim(),
+    item_gplan: String(getFirstRecordValue(record, ['item_gplan'])).trim(),
+    numero_processo_sei: String(getFirstRecordValue(record, ['n_processo_sei', 'processo_sei'])).trim(),
+    tipo_recurso: String(getFirstRecordValue(record, ['tipo_de_recurso', 'tipo_recurso'])).trim(),
+    fonte_recurso: String(getFirstRecordValue(record, ['fonte_do_recurso', 'fonte_recurso'])).trim(),
+    execucao_inicio: String(getFirstRecordValue(record, ['execucao_inicio'])).trim(),
+    execucao_termino: String(getFirstRecordValue(record, ['execucao_termino'])).trim(),
+    valor_executado_jan_jun: parseLocalizedNumber(getFirstRecordValue(record, ['valor_executado_jan_a_jun', 'executado_jan_jun'])),
+    valor_executado_jul_dez: parseLocalizedNumber(getFirstRecordValue(record, ['valor_executado_jul_a_dez', 'executado_jul_dez'])),
+    valor_executado_2025: parseLocalizedNumber(getFirstRecordValue(record, ['valor_executado_2025', 'executado_2025'])),
+    execucao_financeira_pct: parseLocalizedNumber(getFirstRecordValue(record, ['execucao_financeira'])),
+    execucao_fisica_pct: parseLocalizedNumber(getFirstRecordValue(record, ['execucao_fisica'])),
+    observacoes: String(getFirstRecordValue(record, ['observacoes'])).trim(),
+    latitude: latitude != null && longitude != null ? latitude : (fallbackCoords ? fallbackCoords[0] : null),
+    longitude: latitude != null && longitude != null ? longitude : (fallbackCoords ? fallbackCoords[1] : null)
+  };
+}
+
+function hasObraCoordinates(obra) {
+  return Number.isFinite(obra?.latitude) && Number.isFinite(obra?.longitude);
+}
+
+async function replaceObrasApiRecords(records) {
+  const payload = await window.dataSdk._fetchJson(window.dataSdk._buildUrl('/obras'), {
+    method: 'PUT',
+    body: JSON.stringify({ records })
+  });
+
+  if (!payload || !Array.isArray(payload.records)) {
+    return null;
+  }
+
+  return payload.records.map((record, index) => normalizeObraRecord(record, index));
+}
+
+async function loadObrasData() {
+  if (!window.dataSdk?.isApiConfigured?.()) {
+    showToast('Configure a API para carregar as obras do banco.', 'warning');
+    allObras = loadStoredObras().map((record, index) => normalizeObraRecord(record, index));
+    return { isOk: false, source: 'local' };
+  }
+
+  const payload = await window.dataSdk._fetchJson(window.dataSdk._buildUrl('/obras'), {
+    method: 'GET'
+  });
+
+  if (!payload || !Array.isArray(payload.records)) {
+    return { isOk: false, source: 'api' };
+  }
+
+  allObras = payload.records.map((record, index) => normalizeObraRecord(record, index));
+  saveStoredObras(allObras);
+  return { isOk: true, source: 'api' };
+}
+
+async function persistObrasData(records) {
+  const normalizedRecords = (records || []).map((record, index) => normalizeObraRecord(record, index));
+
+  if (!window.dataSdk?.isApiConfigured?.()) {
+    showToast('API não configurada: não foi possível salvar obras no banco.', 'error');
+    return { isOk: false, source: 'local' };
+  }
+
+  const savedRecords = await replaceObrasApiRecords(normalizedRecords);
+
+  if (!savedRecords) {
+    return { isOk: false, source: 'api' };
+  }
+
+  allObras = savedRecords;
+  saveStoredObras(allObras);
+  return { isOk: true, source: 'api' };
+}
+
+async function deleteObrasData() {
+  if (!window.dataSdk?.isApiConfigured?.()) {
+    showToast('API não configurada: não foi possível excluir obras no banco.', 'error');
+    return { isOk: false, source: 'local' };
+  }
+
+  const savedRecords = await replaceObrasApiRecords([]);
+  if (!savedRecords) {
+    return { isOk: false, source: 'api' };
+  }
+
+  allObras = [];
+  filteredObras = [];
+  clearStoredObras();
+  return { isOk: true, source: 'api' };
+}
+
+allObras = loadStoredObras().map((record, index) => normalizeObraRecord(record, index));
+currentView = loadStoredView();
+
 const dataHandler = {
   onDataChanged(data) {
     allFiscalizacoes = data;
@@ -69,9 +436,21 @@ const dataHandler = {
 
 async function initDataSDK() {
   const result = await window.dataSdk.init(dataHandler);
+  const obrasResult = await loadObrasData();
   if (!result.isOk) showToast('Erro ao inicializar sistema de dados', 'error');
+  if (!obrasResult.isOk) showToast('Erro ao inicializar obras', 'error');
+  if (result.syncedLocalToApi || obrasResult.syncedLocalToApi) {
+    showToast('Dados locais sincronizados com o banco de dados.', 'success');
+  }
   updateStorageModeStatus();
-  return result;
+  updateFiltersOptions();
+  applyFilters();
+  updateDashboard();
+
+  return {
+    isOk: result.isOk && obrasResult.isOk,
+    source: result.source === 'api' && obrasResult.source === 'api' ? 'api' : 'local'
+  };
 }
 
 function updateStorageModeStatus() {
@@ -79,26 +458,34 @@ function updateStorageModeStatus() {
   const select = document.getElementById('storage-mode-select');
   if (!status || !select || !window.dataSdk) return;
 
-  const selectedMode = window.dataSdk.getStorageMode();
+  const selectedMode = window.dataSdk.getActiveMode();
   const apiConfigured = window.dataSdk.isApiConfigured();
   const lastSource = window.dataSdk.getLastSource();
 
   select.value = selectedMode;
 
-  if (selectedMode === 'api' && !apiConfigured) {
-    status.textContent = 'API nao configurada';
+  if (!apiConfigured) {
+    status.textContent = 'Salvo no navegador';
     return;
   }
 
-  if (selectedMode === 'api' && lastSource !== 'api') {
-    status.textContent = 'API indisponivel';
+  if (lastSource !== 'api') {
+    status.textContent = 'Banco indisponivel';
     return;
   }
 
-  status.textContent = selectedMode === 'api' ? 'API ativa' : 'Salvo no navegador';
+  status.textContent = 'Banco ativo';
 }
 
 async function handleStorageModeChange(event) {
+  if (window.dataSdk?.isApiConfigured?.()) {
+    window.dataSdk.setStorageMode('api');
+    event.target.value = 'api';
+    updateStorageModeStatus();
+    showToast('Esta instalacao salva diretamente no banco de dados.', 'info');
+    return;
+  }
+
   const nextMode = event.target.value === 'api' ? 'api' : 'local';
 
   if (nextMode === 'api' && !window.dataSdk.isApiConfigured()) {
@@ -135,14 +522,157 @@ function initStorageModeSelector() {
   const select = document.getElementById('storage-mode-select');
   if (!select) return;
 
-  if (window.dataSdk && !window.dataSdk.isApiConfigured() && window.dataSdk.getStorageMode() === 'api') {
+  if (window.dataSdk?.isApiConfigured?.()) {
+    window.dataSdk.setStorageMode('api');
+    select.value = 'api';
+    select.disabled = true;
+    select.classList.add('opacity-60', 'cursor-not-allowed');
+    const localOption = select.querySelector('option[value="local"]');
+    if (localOption) localOption.disabled = true;
+    updateStorageModeStatus();
+    return;
+  }
+
+  if (window.dataSdk?.getStorageMode?.() === 'api') {
     window.dataSdk.setStorageMode('local');
   }
 
+  select.disabled = false;
+  select.classList.remove('opacity-60', 'cursor-not-allowed');
   select.value = window.dataSdk?.getStorageMode?.() || 'local';
   select.addEventListener('change', handleStorageModeChange);
   updateStorageModeStatus();
 }
+
+function updateMapLegend() {
+  const title = document.getElementById('map-legend-title');
+  const items = document.getElementById('map-legend-items');
+  if (!title || !items) return;
+
+  if (currentView === 'obras') {
+    title.textContent = 'Legenda de Obras';
+    items.innerHTML = `
+      <div class="flex items-center gap-2">
+        <div class="w-4 h-4 rounded-full bg-gradient-to-br from-emerald-400 to-green-500"></div>
+        <span class="text-xs text-slate-400">Execucao >= 80%</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <div class="w-4 h-4 rounded-full bg-gradient-to-br from-yellow-400 to-amber-500"></div>
+        <span class="text-xs text-slate-400">Execucao entre 40% e 79%</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <div class="w-4 h-4 rounded-full bg-gradient-to-br from-red-400 to-rose-500"></div>
+        <span class="text-xs text-slate-400">Execucao abaixo de 40%</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <div class="w-4 h-4 rounded-full bg-gradient-to-br from-sky-400 to-blue-500"></div>
+        <span class="text-xs text-slate-400">Sem percentual informado</span>
+      </div>
+    `;
+    return;
+  }
+
+  title.textContent = 'Legenda';
+  items.innerHTML = `
+    <div class="flex items-center gap-2">
+      <div class="w-4 h-4 rounded-full bg-gradient-to-br from-yellow-400 to-amber-500"></div>
+      <span class="text-xs text-slate-400">Em Andamento</span>
+    </div>
+    <div class="flex items-center gap-2">
+      <div class="w-4 h-4 rounded-full bg-gradient-to-br from-emerald-400 to-green-500"></div>
+      <span class="text-xs text-slate-400">Concluida</span>
+    </div>
+    <div class="flex items-center gap-2">
+      <div class="w-4 h-4 rounded-full bg-gradient-to-br from-red-400 to-rose-500"></div>
+      <span class="text-xs text-slate-400">Pendente</span>
+    </div>
+  `;
+}
+
+function updateDataViewUI() {
+  const isObras = currentView === 'obras';
+  const fiscalizacoesBtn = document.getElementById('view-fiscalizacoes-btn');
+  const obrasBtn = document.getElementById('view-obras-btn');
+  const importBtn = document.getElementById('import-fiscalizacoes-btn');
+  const uploadBtn = document.getElementById('upload-obras-btn');
+  const addBtn = document.getElementById('add-fiscalizacao-btn');
+  const dashboardBtn = document.getElementById('dashboard-btn');
+  const storageMode = document.getElementById('storage-mode-wrapper');
+  const filterRegiao = document.getElementById('filter-regiao');
+  const filterSituacao = document.getElementById('filter-situacao');
+  const filterAno = document.getElementById('filter-ano');
+  const filterConformidade = document.getElementById('filter-conformidade');
+  const countBadge = document.getElementById('count-badge');
+  const searchInput = document.getElementById('filter-search');
+  const subtitle = document.getElementById('app-subtitle');
+
+  if (fiscalizacoesBtn && obrasBtn) {
+    fiscalizacoesBtn.className = isObras
+      ? 'px-3 py-1.5 rounded-md text-slate-300 text-xs sm:text-sm font-medium transition-colors'
+      : 'px-3 py-1.5 rounded-md bg-blue-600 text-white text-xs sm:text-sm font-medium transition-colors';
+    obrasBtn.className = isObras
+      ? 'px-3 py-1.5 rounded-md bg-emerald-600 text-white text-xs sm:text-sm font-medium transition-colors'
+      : 'px-3 py-1.5 rounded-md text-slate-300 text-xs sm:text-sm font-medium transition-colors';
+  }
+
+  importBtn?.classList.toggle('hidden', isObras);
+  uploadBtn?.classList.toggle('hidden', !isObras);
+  addBtn?.classList.toggle('hidden', isObras);
+  storageMode?.classList.toggle('hidden', isObras);
+
+  if (dashboardBtn) {
+    dashboardBtn.classList.remove('hidden');
+  }
+
+  if (filterRegiao?.previousElementSibling) {
+    filterRegiao.previousElementSibling.textContent = isObras ? 'Local' : 'Regiao Administrativa';
+  }
+  if (filterSituacao?.previousElementSibling) {
+    filterSituacao.previousElementSibling.textContent = isObras ? 'Situacao do Contrato' : 'Situacao';
+  }
+  if (filterAno?.previousElementSibling) {
+    filterAno.previousElementSibling.textContent = isObras ? 'Sistema' : 'Ano';
+  }
+
+  const conformidadeGroup = filterConformidade?.parentElement?.parentElement;
+  if (conformidadeGroup) conformidadeGroup.classList.toggle('hidden', isObras);
+
+  if (countBadge?.parentElement?.firstElementChild) {
+    countBadge.parentElement.firstElementChild.textContent = isObras ? 'Obras' : 'Fiscalizacoes';
+  }
+  if (searchInput) {
+    searchInput.placeholder = isObras
+      ? 'Item, local, acao, fornecedor...'
+      : 'ID, Processo, Destinatario...';
+  }
+  if (subtitle) {
+    subtitle.textContent = isObras ? 'Mapa de Obras em Andamento' : defaultConfig.subtitle;
+  }
+
+  updateMapLegend();
+  updateObrasUploadActions();
+}
+
+function switchDataView(view) {
+  currentView = view === 'obras' ? 'obras' : 'fiscalizacoes';
+  saveStoredView(currentView);
+
+  if (currentView === 'obras') {
+    if (!document.getElementById('form-modal').classList.contains('hidden')) closeModal();
+    if (!document.getElementById('import-modal').classList.contains('hidden')) closeImportModal();
+    disableMapSelection();
+  } else if (!document.getElementById('obras-upload-modal').classList.contains('hidden')) {
+    closeObrasUploadModal();
+  }
+
+  document.getElementById('dashboard-panel')?.classList.add('hidden');
+  closeDetailPanel();
+  clearFilters();
+  updateDataViewUI();
+  updateFiltersOptions();
+  applyFilters();
+}
+window.switchDataView = switchDataView;
 
 // ======== Map ========
 function initMap() {
@@ -219,29 +749,84 @@ function createMarkerIcon(situacao) {
   });
 }
 
+function createObraMarkerIcon(obra) {
+  const color = getObraMarkerColor(obra);
+
+  return L.divIcon({
+    className: 'custom-marker obra-marker',
+    html: `
+      <div style="
+        width: 34px;
+        height: 34px;
+        background: linear-gradient(135deg, ${color}dd, ${color});
+        border-radius: 12px 12px 12px 2px;
+        transform: rotate(45deg);
+        border: 3px solid white;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      ">
+        <div style="
+          transform: rotate(-45deg);
+          width: 12px;
+          height: 12px;
+          border: 2px solid white;
+          border-radius: 999px;
+          border-right-color: transparent;
+          border-top-color: transparent;
+        "></div>
+      </div>
+    `,
+    iconSize: [34, 34],
+    iconAnchor: [17, 34],
+    popupAnchor: [0, -30]
+  });
+}
+
 function updateMapMarkers() {
   markerClusterGroup.clearLayers();
   markers = {};
 
-  filteredFiscalizacoes.forEach(fisc => {
-    if (fisc.latitude && fisc.longitude) {
-      const marker = L.marker([fisc.latitude, fisc.longitude], {
-        icon: createMarkerIcon(fisc.situacao)
+  if (currentView === 'obras') {
+    filteredObras.forEach((obra) => {
+      if (!hasObraCoordinates(obra)) return;
+
+      const marker = L.marker([obra.latitude, obra.longitude], {
+        icon: createObraMarkerIcon(obra)
       });
 
-      marker.bindPopup(createPopupContent(fisc), {
-        maxWidth: 300,
+      marker.bindPopup(createObraPopupContent(obra), {
+        maxWidth: 320,
         className: 'custom-popup'
       });
 
-      marker.on('click', () => showDetailPanel(fisc));
+      marker.on('click', () => showObraDetailPanel(obra));
 
       markerClusterGroup.addLayer(marker);
-      markers[fisc.__backendId] = marker;
-    }
-  });
+      markers[obra.__obraId] = marker;
+    });
+  } else {
+    filteredFiscalizacoes.forEach(fisc => {
+      if (fisc.latitude && fisc.longitude) {
+        const marker = L.marker([fisc.latitude, fisc.longitude], {
+          icon: createMarkerIcon(fisc.situacao)
+        });
 
-  if (filteredFiscalizacoes.length > 0 && Object.keys(markers).length > 0) {
+        marker.bindPopup(createPopupContent(fisc), {
+          maxWidth: 300,
+          className: 'custom-popup'
+        });
+
+        marker.on('click', () => showDetailPanel(fisc));
+
+        markerClusterGroup.addLayer(marker);
+        markers[fisc.__backendId] = marker;
+      }
+    });
+  }
+
+  if (Object.keys(markers).length > 0) {
     const bounds = markerClusterGroup.getBounds();
     if (bounds.isValid()) map.fitBounds(bounds, { padding: [50, 50] });
   }
@@ -272,6 +857,34 @@ function createPopupContent(fisc) {
           <div style="background:#e2e8f0;border-radius:4px;height:6px;overflow:hidden;">
             <div style="background:linear-gradient(90deg,#3b82f6,#2563eb);height:100%;width:${fisc.indice_conformidade}%;"></div>
           </div>
+        </div>
+      ` : ''}
+    </div>
+  `;
+}
+
+function createObraPopupContent(obra) {
+  const color = getObraMarkerColor(obra);
+  const progresso = getObraProgressValue(obra);
+
+  return `
+    <div style="padding: 16px; font-family: 'Plus Jakarta Sans', sans-serif;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:8px;">
+        <span style="font-weight:700;font-size:15px;color:#1e293b;">${obra.item || 'Obra'}</span>
+        <span style="font-size:11px;padding:4px 8px;border-radius:999px;background:${color};color:white;">${progresso != null ? formatPercent(progresso) : 'Obra'}</span>
+      </div>
+      <div style="color:#64748b;font-size:13px;margin-bottom:8px;">
+        <strong>Local:</strong> ${obra.local || '-'}
+      </div>
+      <div style="color:#64748b;font-size:13px;margin-bottom:8px;">
+        <strong>Situacao:</strong> ${obra.situacao_contrato || '-'}
+      </div>
+      <div style="color:#64748b;font-size:13px;margin-bottom:8px;">
+        <strong>Acao:</strong> ${obra.acao || '-'}
+      </div>
+      ${obra.objeto_contrato ? `
+        <div style="margin-top:12px;color:#475569;font-size:12px;line-height:1.4;">
+          ${obra.objeto_contrato}
         </div>
       ` : ''}
     </div>
@@ -328,6 +941,46 @@ function disableMapSelection() {
 
 // ======== Filters ========
 function updateFiltersOptions() {
+  if (currentView === 'obras') {
+    const locais = [...new Set(allObras.map(o => o.local).filter(Boolean))].sort();
+    const situacoes = [...new Set(allObras.map(o => o.situacao_contrato).filter(Boolean))].sort();
+    const sistemas = [...new Set(allObras.map(o => o.sistema).filter(Boolean))].sort();
+
+    const regiaoSelect = document.getElementById('filter-regiao');
+    const currentLocal = regiaoSelect.value;
+    regiaoSelect.innerHTML = '<option value="">Todos os Locais</option>';
+    locais.forEach((local) => {
+      const option = document.createElement('option');
+      option.value = local;
+      option.textContent = local;
+      if (local === currentLocal) option.selected = true;
+      regiaoSelect.appendChild(option);
+    });
+
+    const situacaoSelect = document.getElementById('filter-situacao');
+    const currentSituacao = situacaoSelect.value;
+    situacaoSelect.innerHTML = '<option value="">Todas as Situacoes</option>';
+    situacoes.forEach((situacao) => {
+      const option = document.createElement('option');
+      option.value = situacao;
+      option.textContent = situacao;
+      if (situacao === currentSituacao) option.selected = true;
+      situacaoSelect.appendChild(option);
+    });
+
+    const sistemaSelect = document.getElementById('filter-ano');
+    const currentSistema = sistemaSelect.value;
+    sistemaSelect.innerHTML = '<option value="">Todos os Sistemas</option>';
+    sistemas.forEach((sistema) => {
+      const option = document.createElement('option');
+      option.value = sistema;
+      option.textContent = sistema;
+      if (sistema === currentSistema) option.selected = true;
+      sistemaSelect.appendChild(option);
+    });
+    return;
+  }
+
   const regioes = [...new Set(allFiscalizacoes.map(f => f.regiao_administrativa).filter(Boolean))].sort();
   const anos = [...new Set(allFiscalizacoes.map(f => f.ano).filter(Boolean))].sort((a, b) => b - a);
 
@@ -355,17 +1008,47 @@ function updateFiltersOptions() {
 }
 
 function applyFilters() {
-  const search = document.getElementById('filter-search').value.toLowerCase();
+  const search = document.getElementById('filter-search').value;
   const regiao = document.getElementById('filter-regiao').value;
   const situacao = document.getElementById('filter-situacao').value;
   const ano = document.getElementById('filter-ano').value;
   const conformidade = parseInt(document.getElementById('filter-conformidade').value, 10);
 
-  filteredFiscalizacoes = allFiscalizacoes.filter(f => {
+  if (currentView === 'obras') {
+    const normalizedSearch = normalizePlainText(search);
 
-    if (search && !f.id?.toLowerCase().includes(search) &&
-        !f.processo_sei?.toLowerCase().includes(search) &&
-        !f.destinatario?.toLowerCase().includes(search)) return false;
+    filteredObras = allObras.filter((obra) => {
+      if (normalizedSearch) {
+        const haystack = normalizePlainText([
+          obra.item,
+          obra.local,
+          obra.acao,
+          obra.objeto_contrato,
+          obra.numero_processo_sei,
+          obra.fornecedor
+        ].join(' '));
+
+        if (!haystack.includes(normalizedSearch)) return false;
+      }
+
+      if (regiao && obra.local !== regiao) return false;
+      if (situacao && obra.situacao_contrato !== situacao) return false;
+      if (ano && obra.sistema !== ano) return false;
+      return true;
+    });
+
+    updateMapMarkers();
+    renderObrasList();
+    document.getElementById('count-badge').textContent = filteredObras.length;
+    return;
+  }
+
+  filteredFiscalizacoes = allFiscalizacoes.filter(f => {
+    const normalizedSearch = search.toLowerCase();
+
+    if (normalizedSearch && !f.id?.toLowerCase().includes(normalizedSearch) &&
+        !f.processo_sei?.toLowerCase().includes(normalizedSearch) &&
+        !f.destinatario?.toLowerCase().includes(normalizedSearch)) return false;
 
     if (regiao && f.regiao_administrativa !== regiao) return false;
     if (situacao && f.situacao !== situacao) return false;
@@ -439,6 +1122,52 @@ function renderFiscalizacoesList() {
   }).join('');
 }
 
+function renderObrasList() {
+  const container = document.getElementById('fiscalizacoes-list');
+
+  if (filteredObras.length === 0) {
+    container.innerHTML = allObras.length === 0 ? `
+      <div class="text-center py-8 text-slate-500">
+        <svg class="w-12 h-12 mx-auto mb-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M3 7h18M3 12h18M3 17h18M8 7v10m8-10v10"/>
+        </svg>
+        <p class="text-sm">Nenhuma obra carregada</p>
+        <p class="text-xs mt-1">Use "Upload Obras" para carregar a planilha</p>
+      </div>
+    ` : `
+      <div class="text-center py-8 text-slate-500">
+        <svg class="w-12 h-12 mx-auto mb-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/>
+        </svg>
+        <p class="text-sm">Nenhuma obra encontrada</p>
+        <p class="text-xs mt-1">Ajuste os filtros ou carregue outra planilha</p>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = filteredObras.map((obra) => {
+    const color = getObraMarkerColor(obra);
+    const progress = getObraProgressValue(obra);
+
+    return `
+      <div class="p-3 rounded-lg bg-slate-800/50 hover:bg-slate-700/50 cursor-pointer transition-colors border border-slate-700/50"
+           onclick="focusObra('${obra.__obraId}')">
+        <div class="flex items-start justify-between gap-3 mb-2">
+          <span class="font-semibold text-sm leading-tight">${obra.item || 'Obra'}</span>
+          <span style="font-size:10px;padding:2px 8px;border-radius:999px;background:${color};color:white;white-space:nowrap;">
+            ${progress != null ? formatPercent(progress) : (hasObraCoordinates(obra) ? 'Sem %' : 'Sem coord.')}
+          </span>
+        </div>
+        <p class="text-xs text-slate-300 truncate">${obra.local || 'Sem local informado'}</p>
+        <p class="text-xs text-slate-500 mt-1 truncate">${obra.situacao_contrato || 'Sem situacao'}</p>
+      </div>
+    `;
+  }).join('');
+}
+
 function focusFiscalizacao(backendId) {
   const fisc = allFiscalizacoes.find(f => f.__backendId === backendId);
   if (!fisc) return;
@@ -454,6 +1183,20 @@ function focusFiscalizacao(backendId) {
 }
 window.focusFiscalizacao = focusFiscalizacao;
 
+function focusObra(obraId) {
+  const obra = allObras.find((item) => item.__obraId === obraId);
+  if (!obra) return;
+
+  if (hasObraCoordinates(obra) && markers[obraId]) {
+    map.setView([obra.latitude, obra.longitude], 14);
+    markers[obraId].openPopup();
+  }
+
+  showObraDetailPanel(obra);
+  toggleFiltersPanel(false);
+}
+window.focusObra = focusObra;
+
 // ======== Detail Panel ========
 function createDetailField(label, value) {
   return `
@@ -464,15 +1207,22 @@ function createDetailField(label, value) {
   `;
 }
 
+function setDetailPanelActionsVisible(visible) {
+  document.getElementById('edit-detail-btn')?.classList.toggle('hidden', !visible);
+  document.getElementById('delete-detail-btn')?.classList.toggle('hidden', !visible);
+}
+
 function showDetailPanel(fisc) {
   currentFiscalizacao = fisc;
+  currentObra = null;
   const panel = document.getElementById('detail-panel');
   const content = document.getElementById('detail-content');
 
   const statusClass = fisc.situacao === 'Em Andamento' ? 'status-andamento' :
                       fisc.situacao === 'Concluída' ? 'status-concluida' : 'status-pendente';
 
-  document.getElementById('detail-title').textContent = fisc.id;
+  setDetailPanelActionsVisible(true);
+  document.getElementById('detail-title').textContent = fisc.id || 'Detalhes da Fiscalizacao';
   document.getElementById('delete-detail-btn').onclick = () => confirmDelete(fisc);
 
   content.innerHTML = `
@@ -532,6 +1282,15 @@ function showDetailPanel(fisc) {
           </div>
         </div>
       ` : ''}
+
+      ${fisc.imagem ? `
+        <div class="space-y-3">
+          <h3 class="text-sm font-semibold text-blue-400 uppercase tracking-wider">Imagem</h3>
+          <div class="rounded-xl overflow-hidden border border-slate-700 bg-slate-900/80">
+            <img src="${fisc.imagem}" alt="Imagem da fiscalização" class="w-full object-cover max-h-96">
+          </div>
+        </div>
+      ` : ''}
     </div>
   `;
 
@@ -539,9 +1298,116 @@ function showDetailPanel(fisc) {
 }
 window.showDetailPanel = showDetailPanel;
 
+function showObraDetailPanel(obra) {
+  currentObra = obra;
+  currentFiscalizacao = null;
+
+  const panel = document.getElementById('detail-panel');
+  const content = document.getElementById('detail-content');
+  const progress = getObraProgressValue(obra);
+  const color = getObraMarkerColor(obra);
+
+  setDetailPanelActionsVisible(false);
+  document.getElementById('detail-title').textContent = obra.item || 'Detalhes da Obra';
+
+  content.innerHTML = `
+    <div class="space-y-6">
+      <div class="flex items-center justify-center">
+        <span style="padding:6px 14px;border-radius:999px;background:${color};color:white;font-size:14px;font-weight:600;">
+          ${progress != null ? `Execucao ${formatPercent(progress)}` : (obra.situacao_contrato || 'Obra em mapa')}
+        </span>
+      </div>
+
+      <div class="space-y-3">
+        <h3 class="text-sm font-semibold text-emerald-400 uppercase tracking-wider">Identificacao</h3>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          ${createDetailField('Item', obra.item)}
+          ${createDetailField('Local', obra.local)}
+          ${createDetailField('Sistema', obra.sistema)}
+          ${createDetailField('Tipo', obra.tipo)}
+          ${createDetailField('Programa', obra.programa)}
+          ${createDetailField('Acao', obra.acao)}
+        </div>
+      </div>
+
+      <div class="space-y-3">
+        <h3 class="text-sm font-semibold text-emerald-400 uppercase tracking-wider">Contrato</h3>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          ${createDetailField('Numero do Contrato', obra.numero_contrato)}
+          ${createDetailField('Situacao', obra.situacao_contrato)}
+          ${createDetailField('Fornecedor', obra.fornecedor)}
+          ${createDetailField('Sigla UO', obra.sigla_uo)}
+          ${createDetailField('Processo SEI', obra.numero_processo_sei)}
+          ${createDetailField('Em operacao', obra.em_operacao)}
+        </div>
+        ${obra.objeto_contrato ? `
+          <div class="mt-3">
+            <p class="text-xs text-slate-500 mb-1">Objeto do Contrato</p>
+            <p class="text-sm text-slate-300 bg-slate-800/50 rounded-lg p-3">${obra.objeto_contrato}</p>
+          </div>
+        ` : ''}
+      </div>
+
+      <div class="space-y-3">
+        <h3 class="text-sm font-semibold text-emerald-400 uppercase tracking-wider">Execucao</h3>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          ${createDetailField('Valor Total da Obra', formatCurrency(obra.valor_total_obra))}
+          ${createDetailField('Valor Executado 2025', formatCurrency(obra.valor_executado_2025))}
+          ${createDetailField('Executado Jan-Jun', formatCurrency(obra.valor_executado_jan_jun))}
+          ${createDetailField('Executado Jul-Dez', formatCurrency(obra.valor_executado_jul_dez))}
+          ${createDetailField('Execucao Financeira', formatPercent(obra.execucao_financeira_pct))}
+          ${createDetailField('Execucao Fisica', formatPercent(obra.execucao_fisica_pct))}
+          ${createDetailField('Inicio', normalizeDateDisplay(obra.execucao_inicio))}
+          ${createDetailField('Termino', normalizeDateDisplay(obra.execucao_termino))}
+        </div>
+      </div>
+
+      <div class="space-y-3">
+        <h3 class="text-sm font-semibold text-emerald-400 uppercase tracking-wider">Recursos</h3>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          ${createDetailField('Tipo de Recurso', obra.tipo_recurso)}
+          ${createDetailField('Fonte do Recurso', obra.fonte_recurso)}
+          ${createDetailField('Item GPLAN', obra.item_gplan)}
+          ${createDetailField('Plano de Exploracao', obra.codigo_plano_exploracao)}
+        </div>
+      </div>
+
+      ${(hasObraCoordinates(obra)) ? `
+        <div class="space-y-3">
+          <h3 class="text-sm font-semibold text-emerald-400 uppercase tracking-wider">Localizacao</h3>
+          <div class="bg-slate-800/50 rounded-lg p-3">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <p class="text-xs text-slate-500">Latitude</p>
+                <p class="text-sm font-mono text-slate-300">${obra.latitude}</p>
+              </div>
+              <div>
+                <p class="text-xs text-slate-500">Longitude</p>
+                <p class="text-sm font-mono text-slate-300">${obra.longitude}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      ` : ''}
+
+      ${obra.observacoes ? `
+        <div class="space-y-3">
+          <h3 class="text-sm font-semibold text-emerald-400 uppercase tracking-wider">Observacoes</h3>
+          <p class="text-sm text-slate-300 bg-slate-800/50 rounded-lg p-3">${obra.observacoes}</p>
+        </div>
+      ` : ''}
+    </div>
+  `;
+
+  panel.classList.remove('hidden');
+}
+window.showObraDetailPanel = showObraDetailPanel;
+
 function closeDetailPanel() {
   document.getElementById('detail-panel').classList.add('hidden');
   currentFiscalizacao = null;
+  currentObra = null;
+  setDetailPanelActionsVisible(true);
 }
 window.closeDetailPanel = closeDetailPanel;
 
@@ -559,6 +1425,7 @@ function openAddModal() {
   document.getElementById('form-ano').value = new Date().getFullYear();
   document.getElementById('form-direta').value = 'Direta';
   document.getElementById('form-modal').classList.remove('hidden');
+  updateImagemPreview();
 }
 window.openAddModal = openAddModal;
 
@@ -597,6 +1464,10 @@ function editCurrentFiscalizacao() {
   document.getElementById('form-tn').value = currentFiscalizacao.termos_notificacao || '';
   document.getElementById('form-ai').value = currentFiscalizacao.autos_infracao || '';
   document.getElementById('form-tac').value = currentFiscalizacao.termos_ajuste || '';
+  updateImagemPreview({
+    data: currentFiscalizacao.imagem || '',
+    name: currentFiscalizacao.imagem ? 'Imagem anexada' : ''
+  });
 
   closeDetailPanel();
   document.getElementById('form-modal').classList.remove('hidden');
@@ -612,6 +1483,59 @@ function closeModal() {
   disableMapSelection();
 }
 window.closeModal = closeModal;
+
+function updateImagemPreview({ data = '', name = '' } = {}) {
+  const hidden = document.getElementById('form-imagem-data');
+  const preview = document.getElementById('form-imagem-preview');
+  const img = document.getElementById('form-imagem-preview-img');
+  const label = document.getElementById('form-imagem-name');
+  const fileInput = document.getElementById('form-imagem-file');
+
+  if (!hidden || !preview || !img || !label) return;
+
+  if (data) {
+    hidden.value = data;
+    img.src = data;
+    label.textContent = name || 'Imagem selecionada';
+    preview.classList.remove('hidden');
+  } else {
+    hidden.value = '';
+    img.removeAttribute('src');
+    label.textContent = '';
+    preview.classList.add('hidden');
+    if (fileInput) fileInput.value = '';
+  }
+}
+
+function handleImagemSelected(event) {
+  const file = event?.target?.files?.[0];
+  if (!file) {
+    updateImagemPreview();
+    return;
+  }
+
+  const maxBytes = 2 * 1024 * 1024;
+  if (file.size > maxBytes) {
+    showToast('Imagem deve ter no máximo 2MB.', 'warning');
+    event.target.value = '';
+    updateImagemPreview();
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = () => updateImagemPreview({ data: reader.result, name: file.name });
+  reader.onerror = () => {
+    showToast('Não foi possível ler a imagem.', 'error');
+    updateImagemPreview();
+  };
+  reader.readAsDataURL(file);
+}
+window.handleImagemSelected = handleImagemSelected;
+
+function clearImagemField() {
+  updateImagemPreview();
+}
+window.clearImagemField = clearImagemField;
 
 // ======== Submit (create/update) ========
 async function handleSubmit(event) {
@@ -656,15 +1580,10 @@ async function handleSubmit(event) {
     autos_infracao: parseInt(document.getElementById('form-ai').value, 10) || null,
     termos_ajuste: parseInt(document.getElementById('form-tac').value, 10) || null,
     indice_conformidade: parseFloat(document.getElementById('form-conformidade').value) || null,
+    imagem: document.getElementById('form-imagem-data').value || null,
     latitude: lat || null,
     longitude: lng || null
   };
-
-  if (fiscData.direta_indireta.toLowerCase() !== 'direta') {
-    hideLoading();
-    showToast('Apenas fiscalizações do tipo "Direta" são permitidas.', 'error');
-    return;
-  }
 
   showLoading(isEditing ? 'Atualizando...' : 'Salvando...');
 
@@ -802,29 +1721,470 @@ function updateDashboard() {
     : '<p class="text-center text-slate-500 py-8">Nenhuma região cadastrada</p>';
 }
 
-// ======== Export ========
-function exportToCSV() {
-  if (allFiscalizacoes.length === 0) {
-    showToast('Nenhuma fiscalização para exportar', 'warning');
+function setDashboardMeta(config) {
+  const panel = document.getElementById('dashboard-panel');
+  if (!panel) return;
+
+  const titleHeading = panel.querySelector('h2');
+  if (titleHeading) {
+    const titleSpan = titleHeading.querySelector('#dashboard-title-text');
+    if (titleSpan) {
+      titleSpan.textContent = config.title;
+    } else {
+      const textNode = [...titleHeading.childNodes].find((node) => node.nodeType === Node.TEXT_NODE && node.textContent.trim());
+      if (textNode) textNode.textContent = ` ${config.title}`;
+    }
+  }
+
+  const metricLabels = panel.querySelectorAll('.metric-card .text-slate-400.text-sm');
+  const labels = [
+    config.totalLabel,
+    config.secondaryLabel,
+    config.tertiaryLabel,
+    config.quaternaryLabel,
+    config.quinaryLabel,
+    config.senaryLabel,
+    config.septenaryLabel
+  ];
+
+  metricLabels.forEach((element, index) => {
+    if (labels[index]) element.textContent = labels[index];
+  });
+
+  const chartTitles = panel.querySelectorAll('.metric-card h3');
+  if (chartTitles[0]) chartTitles[0].textContent = config.statusChartTitle;
+  if (chartTitles[1]) chartTitles[1].textContent = config.regionChartTitle;
+}
+
+function buildDashboardBar(value, maxValue, colorClass, valueClass, label) {
+  const safeMax = Math.max(maxValue, 1);
+  const height = Math.max((value / safeMax) * 150, 20);
+
+  return `
+    <div class="flex flex-col items-center">
+      <div class="w-16 bg-slate-700 rounded-t-lg relative" style="height: ${height}px; min-height: 20px;">
+        <div class="absolute inset-0 ${colorClass} rounded-t-lg"></div>
+      </div>
+      <p class="text-xl font-bold mt-2 ${valueClass}">${value}</p>
+      <p class="text-xs text-slate-400 text-center">${label}</p>
+    </div>
+  `;
+}
+
+function updateDashboard() {
+  if (currentView === 'obras') {
+    const total = allObras.length;
+    const comCoordenadas = allObras.filter((obra) => hasObraCoordinates(obra)).length;
+    const semCoordenadas = total - comCoordenadas;
+    const emExecucao = allObras.filter((obra) => normalizePlainText(obra.situacao_contrato).includes('execu')).length;
+    const emRecebimento = allObras.filter((obra) => normalizePlainText(obra.situacao_contrato).includes('receb')).length;
+    const outrasSituacoes = total - emExecucao - emRecebimento;
+
+    const progressos = allObras
+      .map((obra) => getObraProgressValue(obra))
+      .filter((value) => Number.isFinite(value));
+    const avgExecucao = progressos.length > 0
+      ? Math.round(progressos.reduce((sum, value) => sum + value, 0) / progressos.length)
+      : 0;
+
+    const valorTotal = allObras.reduce((sum, obra) => sum + (Number.isFinite(obra.valor_total_obra) ? obra.valor_total_obra : 0), 0);
+    const valorExecutado = allObras.reduce((sum, obra) => sum + (Number.isFinite(obra.valor_executado_2025) ? obra.valor_executado_2025 : 0), 0);
+
+    setDashboardMeta({
+      title: 'Dashboard de Obras',
+      totalLabel: 'Total de Obras',
+      secondaryLabel: 'Em Execucao',
+      tertiaryLabel: 'Em Recebimento',
+      quaternaryLabel: 'Execucao Media',
+      quinaryLabel: 'Sem Coordenadas',
+      senaryLabel: 'Valor Total',
+      septenaryLabel: 'Executado 2025',
+      statusChartTitle: 'Distribuicao por Situacao do Contrato',
+      regionChartTitle: 'Por Local'
+    });
+
+    document.getElementById('metric-total').textContent = total;
+    document.getElementById('metric-andamento').textContent = emExecucao;
+    document.getElementById('metric-concluida').textContent = emRecebimento;
+    document.getElementById('metric-pendente').textContent = semCoordenadas;
+    document.getElementById('metric-conformidade').textContent = `${avgExecucao}%`;
+    document.getElementById('metric-ai').textContent = formatCurrency(valorTotal);
+    document.getElementById('metric-tn').textContent = formatCurrency(valorExecutado);
+
+    const maxStatus = Math.max(emExecucao, emRecebimento, outrasSituacoes, 1);
+    document.getElementById('chart-situacao').innerHTML = [
+      buildDashboardBar(emExecucao, maxStatus, 'bg-gradient-to-t from-amber-500 to-yellow-400', 'text-amber-400', 'Em Execucao'),
+      buildDashboardBar(emRecebimento, maxStatus, 'bg-gradient-to-t from-emerald-500 to-green-400', 'text-emerald-400', 'Em Recebimento'),
+      buildDashboardBar(outrasSituacoes, maxStatus, 'bg-gradient-to-t from-sky-500 to-blue-400', 'text-sky-400', 'Outras')
+    ].join('');
+
+    const localCounts = {};
+    allObras.forEach((obra) => {
+      const local = String(obra.local || '').trim() || 'Sem local informado';
+      localCounts[local] = (localCounts[local] || 0) + 1;
+    });
+
+    const sortedLocais = Object.entries(localCounts).sort((a, b) => b[1] - a[1]);
+    const maxLocal = sortedLocais.length > 0 ? sortedLocais[0][1] : 1;
+
+    document.getElementById('chart-regiao').innerHTML = sortedLocais.length > 0
+      ? sortedLocais.map(([local, count]) => `
+        <div class="flex items-center gap-3">
+          <span class="text-xs text-slate-400 w-32 truncate">${local}</span>
+          <div class="flex-1 h-5 bg-slate-700 rounded-full overflow-hidden">
+            <div class="h-full bg-gradient-to-r from-emerald-600 to-emerald-400 rounded-full transition-all duration-500"
+                 style="width: ${(count / maxLocal) * 100}%"></div>
+          </div>
+          <span class="text-sm font-semibold text-emerald-400 min-w-[30px] text-right">${count}</span>
+        </div>
+      `).join('')
+      : '<p class="text-center text-slate-500 py-8">Nenhuma obra cadastrada</p>';
     return;
   }
 
-  const headers = [
-    'ID', 'Processo SEI', 'Ano', 'Objetivo', 'Região', 'Situação',
-    'Tipo Documento', 'Destinatário', 'Direta/Indireta', 'Programada',
-    'SEI Documento', 'Data', 'Constatações', 'Não Conformes',
-    'Recomendações', 'Determinações', 'TN', 'AI', 'TAC',
-    'Conformidade', 'Latitude', 'Longitude'
-  ];
+  setDashboardMeta({
+    title: 'Dashboard de Metricas',
+    totalLabel: 'Total de Fiscalizacoes',
+    secondaryLabel: 'Em Andamento',
+    tertiaryLabel: 'Concluidas',
+    quaternaryLabel: 'Conformidade Media',
+    quinaryLabel: 'Pendentes',
+    senaryLabel: 'Total Autos de Infracao',
+    septenaryLabel: 'Total Termos de Notificacao',
+    statusChartTitle: 'Distribuicao por Situacao',
+    regionChartTitle: 'Por Regiao Administrativa'
+  });
 
-  const rows = allFiscalizacoes.map(f => [
-    f.id, f.processo_sei, f.ano, f.objetivo, f.regiao_administrativa,
-    f.situacao, f.tipo_documento, f.destinatario, f.direta_indireta,
-    f.programada, f.sei_documento, f.data, f.constatacoes,
-    f.constatacoes_nao_conformes, f.recomendacoes, f.determinacoes,
-    f.termos_notificacao, f.autos_infracao, f.termos_ajuste,
-    f.indice_conformidade, f.latitude, f.longitude
-  ]);
+  const total = allFiscalizacoes.length;
+  const andamento = allFiscalizacoes.filter(f => f.situacao === 'Em Andamento').length;
+  const concluida = allFiscalizacoes.filter(f => f.situacao === 'ConcluÃ­da').length;
+  const pendente = allFiscalizacoes.filter(f => f.situacao === 'Pendente').length;
+
+  const conformidades = allFiscalizacoes.filter(f => f.indice_conformidade).map(f => f.indice_conformidade);
+  const avgConformidade = conformidades.length > 0
+    ? Math.round(conformidades.reduce((a, b) => a + b, 0) / conformidades.length)
+    : 0;
+
+  const totalAI = allFiscalizacoes.reduce((sum, f) => sum + (f.autos_infracao || 0), 0);
+  const totalTN = allFiscalizacoes.reduce((sum, f) => sum + (f.termos_notificacao || 0), 0);
+
+  document.getElementById('metric-total').textContent = total;
+  document.getElementById('metric-andamento').textContent = andamento;
+  document.getElementById('metric-concluida').textContent = concluida;
+  document.getElementById('metric-pendente').textContent = pendente;
+  document.getElementById('metric-conformidade').textContent = `${avgConformidade}%`;
+  document.getElementById('metric-ai').textContent = totalAI;
+  document.getElementById('metric-tn').textContent = totalTN;
+
+  const maxStatus = Math.max(andamento, concluida, pendente, 1);
+  document.getElementById('chart-situacao').innerHTML = [
+    buildDashboardBar(andamento, maxStatus, 'bg-gradient-to-t from-amber-500 to-yellow-400', 'text-amber-400', 'Andamento'),
+    buildDashboardBar(concluida, maxStatus, 'bg-gradient-to-t from-emerald-500 to-green-400', 'text-emerald-400', 'Concluida'),
+    buildDashboardBar(pendente, maxStatus, 'bg-gradient-to-t from-red-500 to-rose-400', 'text-red-400', 'Pendente')
+  ].join('');
+
+  const regionCounts = {};
+  allFiscalizacoes.forEach(f => {
+    if (f.regiao_administrativa) regionCounts[f.regiao_administrativa] = (regionCounts[f.regiao_administrativa] || 0) + 1;
+  });
+
+  const sortedRegions = Object.entries(regionCounts).sort((a, b) => b[1] - a[1]);
+  const maxRegion = sortedRegions.length > 0 ? sortedRegions[0][1] : 1;
+
+  document.getElementById('chart-regiao').innerHTML = sortedRegions.length > 0
+    ? sortedRegions.map(([region, count]) => `
+      <div class="flex items-center gap-3">
+        <span class="text-xs text-slate-400 w-32 truncate">${region}</span>
+        <div class="flex-1 h-5 bg-slate-700 rounded-full overflow-hidden">
+          <div class="h-full bg-gradient-to-r from-blue-600 to-blue-400 rounded-full transition-all duration-500"
+               style="width: ${(count / maxRegion) * 100}%"></div>
+        </div>
+        <span class="text-sm font-semibold text-blue-400 min-w-[30px] text-right">${count}</span>
+      </div>
+    `).join('')
+    : '<p class="text-center text-slate-500 py-8">Nenhuma regiÃ£o cadastrada</p>';
+}
+
+// ======== Obras Upload ========
+function updateObrasUploadActions() {
+  const uploadBtn = document.getElementById('obras-upload-btn');
+  const clearBtn = document.getElementById('clear-obras-btn');
+
+  if (uploadBtn) uploadBtn.disabled = pendingObrasUpload.length === 0;
+  if (clearBtn) clearBtn.classList.toggle('hidden', !(pendingObrasMeta || allObras.length > 0));
+}
+
+function renderObrasUploadPreview(records = [], meta = null) {
+  const summary = document.getElementById('obras-upload-summary');
+  const fileLabel = document.getElementById('obras-summary-file');
+  const sheetLabel = document.getElementById('obras-summary-sheet');
+  const countLabel = document.getElementById('obras-summary-count');
+  const previewBody = document.getElementById('obras-preview-body');
+
+  if (!summary || !fileLabel || !sheetLabel || !countLabel || !previewBody) return;
+
+  if (!meta) {
+    summary.classList.add('hidden');
+    fileLabel.textContent = '-';
+    sheetLabel.textContent = '-';
+    countLabel.textContent = '0';
+    previewBody.innerHTML = '';
+    return;
+  }
+
+  fileLabel.textContent = meta.fileName || '-';
+  sheetLabel.textContent = meta.sheetName || '-';
+  countLabel.textContent = String(records.length);
+  previewBody.innerHTML = records.length > 0
+    ? records.slice(0, 5).map((obra) => `
+      <tr class="border-t border-slate-600">
+        <td class="px-2 py-2 text-slate-300">${obra.item || '-'}</td>
+        <td class="px-2 py-2 text-slate-300">${obra.local || '-'}</td>
+        <td class="px-2 py-2 text-slate-300">${obra.situacao_contrato || '-'}</td>
+        <td class="px-2 py-2 text-slate-300">${formatPercent(getObraProgressValue(obra))}</td>
+      </tr>
+    `).join('')
+    : `
+      <tr class="border-t border-slate-600">
+        <td colspan="4" class="px-2 py-4 text-center text-slate-500">
+          Nenhuma obra valida encontrada na aba selecionada.
+        </td>
+      </tr>
+    `;
+
+  summary.classList.remove('hidden');
+}
+
+function openObrasUploadModal() {
+  document.getElementById('obras-upload-modal').classList.remove('hidden');
+  renderObrasUploadPreview(pendingObrasUpload, pendingObrasMeta);
+  updateObrasUploadActions();
+}
+window.openObrasUploadModal = openObrasUploadModal;
+
+function closeObrasUploadModal() {
+  document.getElementById('obras-upload-modal').classList.add('hidden');
+  updateObrasUploadActions();
+}
+window.closeObrasUploadModal = closeObrasUploadModal;
+
+async function handleObrasFileSelected(event) {
+  const input = event?.target;
+  const file = input?.files?.[0];
+
+  if (!file) {
+    pendingObrasUpload = [];
+    pendingObrasMeta = null;
+    renderObrasUploadPreview();
+    updateObrasUploadActions();
+    return;
+  }
+
+  if (typeof XLSX === 'undefined') {
+    showToast('Leitor de planilha indisponivel no navegador.', 'error');
+    input.value = '';
+    return;
+  }
+
+  showLoading('Lendo planilha de obras...');
+
+  try {
+    const workbook = XLSX.read(await file.arrayBuffer(), {
+      type: 'array',
+      cellDates: false
+    });
+    const sheetName = selectObrasSheetName(workbook.SheetNames);
+    const sheet = sheetName ? workbook.Sheets[sheetName] : null;
+
+    if (!sheetName || !sheet) {
+      throw new Error('Nao foi possivel localizar a aba de obras na planilha.');
+    }
+
+    const rawRows = XLSX.utils.sheet_to_json(sheet, {
+      header: 1,
+      raw: false,
+      defval: ''
+    });
+    const headerRowIndex = findObrasHeaderRow(rawRows);
+
+    if (headerRowIndex < 0) {
+      throw new Error('Nao encontrei o cabecalho da tabela de obras nessa planilha.');
+    }
+
+    const rawRecords = XLSX.utils.sheet_to_json(sheet, {
+      range: headerRowIndex,
+      raw: false,
+      defval: ''
+    });
+
+    const records = rawRecords
+      .map((record, index) => mapUploadedObraRecord(record, index))
+      .filter(Boolean);
+
+    pendingObrasUpload = records;
+    pendingObrasMeta = {
+      fileName: file.name,
+      sheetName,
+      headerRowIndex
+    };
+
+    renderObrasUploadPreview(records, pendingObrasMeta);
+    updateObrasUploadActions();
+
+    if (records.length === 0) {
+      showToast('Planilha lida, mas nenhuma obra valida foi encontrada.', 'warning');
+    } else {
+      const mappedWithCoordinates = records.filter((obra) => hasObraCoordinates(obra)).length;
+      showToast(`${records.length} obras preparadas (${mappedWithCoordinates} com coordenadas).`, 'success');
+    }
+  } catch (error) {
+    pendingObrasUpload = [];
+    pendingObrasMeta = null;
+    renderObrasUploadPreview();
+    updateObrasUploadActions();
+    showToast(error?.message || 'Erro ao processar a planilha de obras.', 'error');
+  } finally {
+    hideLoading();
+    if (input) input.value = '';
+  }
+}
+window.handleObrasFileSelected = handleObrasFileSelected;
+
+async function executeObrasUpload() {
+  if (pendingObrasUpload.length === 0) {
+    showToast('Selecione uma planilha valida antes de carregar as obras.', 'warning');
+    return;
+  }
+
+  showLoading('Salvando obras...');
+
+  const result = await persistObrasData(pendingObrasUpload.map((obra) => ({ ...obra })));
+
+  hideLoading();
+
+  if (!result.isOk) {
+    showToast('Erro ao salvar obras.', 'error');
+    return;
+  }
+
+  pendingObrasUpload = [];
+  pendingObrasMeta = null;
+  renderObrasUploadPreview();
+  updateObrasUploadActions();
+  closeObrasUploadModal();
+
+  if (currentView !== 'obras') {
+    switchDataView('obras');
+  } else {
+    closeDetailPanel();
+    updateFiltersOptions();
+    clearFilters();
+  }
+
+  updateDashboard();
+
+  const mappedWithCoordinates = allObras.filter((obra) => hasObraCoordinates(obra)).length;
+  showToast(`${allObras.length} obras carregadas (${mappedWithCoordinates} com coordenadas).`, 'success');
+}
+window.executeObrasUpload = executeObrasUpload;
+
+async function clearObrasData() {
+  if (!pendingObrasMeta && allObras.length === 0) {
+    showToast('Nao ha obras carregadas para limpar.', 'info');
+    return;
+  }
+
+  if (!window.confirm('Remover todas as obras carregadas do mapa?')) {
+    return;
+  }
+
+  showLoading('Removendo obras...');
+
+  const result = await deleteObrasData();
+
+  hideLoading();
+
+  if (!result.isOk) {
+    showToast('Erro ao remover obras.', 'error');
+    return;
+  }
+
+  pendingObrasUpload = [];
+  pendingObrasMeta = null;
+  renderObrasUploadPreview();
+  updateObrasUploadActions();
+
+  const fileInput = document.getElementById('obras-file-input');
+  if (fileInput) fileInput.value = '';
+
+  if (currentView === 'obras') {
+    closeDetailPanel();
+    updateFiltersOptions();
+    applyFilters();
+  }
+
+  updateDashboard();
+
+  showToast('Dados de obras removidos.', 'success');
+}
+window.clearObrasData = clearObrasData;
+
+// ======== Export ========
+function exportToCSV() {
+  let headers = [];
+  let rows = [];
+  let filename = '';
+
+  if (currentView === 'obras') {
+    if (allObras.length === 0) {
+      showToast('Nenhuma obra para exportar', 'warning');
+      return;
+    }
+
+    headers = [
+      'Item', 'Sistema', 'Tipo', 'Programa', 'Acao', 'Local',
+      'Numero Contrato', 'Objeto Contrato', 'Valor Total', 'Situacao',
+      'Fornecedor', 'Processo SEI', 'Tipo Recurso', 'Fonte Recurso',
+      'Execucao Inicio', 'Execucao Termino', 'Executado 2025',
+      'Execucao Financeira', 'Execucao Fisica', 'Latitude', 'Longitude'
+    ];
+
+    rows = allObras.map((obra) => [
+      obra.item, obra.sistema, obra.tipo, obra.programa, obra.acao, obra.local,
+      obra.numero_contrato, obra.objeto_contrato, obra.valor_total_obra,
+      obra.situacao_contrato, obra.fornecedor, obra.numero_processo_sei,
+      obra.tipo_recurso, obra.fonte_recurso, obra.execucao_inicio,
+      obra.execucao_termino, obra.valor_executado_2025,
+      obra.execucao_financeira_pct, obra.execucao_fisica_pct,
+      obra.latitude, obra.longitude
+    ]);
+
+    filename = `obras_${new Date().toISOString().split('T')[0]}.csv`;
+  } else {
+    if (allFiscalizacoes.length === 0) {
+      showToast('Nenhuma fiscalizacao para exportar', 'warning');
+      return;
+    }
+
+    headers = [
+      'ID', 'Processo SEI', 'Ano', 'Objetivo', 'Regiao', 'Situacao',
+      'Tipo Documento', 'Destinatario', 'Direta/Indireta', 'Programada',
+      'SEI Documento', 'Data', 'Constatacoes', 'Nao Conformes',
+      'Recomendacoes', 'Determinacoes', 'TN', 'AI', 'TAC',
+      'Conformidade', 'Latitude', 'Longitude'
+    ];
+
+    rows = allFiscalizacoes.map(f => [
+      f.id, f.processo_sei, f.ano, f.objetivo, f.regiao_administrativa,
+      f.situacao, f.tipo_documento, f.destinatario, f.direta_indireta,
+      f.programada, f.sei_documento, f.data, f.constatacoes,
+      f.constatacoes_nao_conformes, f.recomendacoes, f.determinacoes,
+      f.termos_notificacao, f.autos_infracao, f.termos_ajuste,
+      f.indice_conformidade, f.latitude, f.longitude
+    ]);
+
+    filename = `fiscalizacoes_${new Date().toISOString().split('T')[0]}.csv`;
+  }
 
   const csvContent = [headers, ...rows]
     .map(row => row.map(cell => `"${(cell ?? '').toString().replace(/"/g, '""')}"`).join(','))
@@ -833,7 +2193,7 @@ function exportToCSV() {
   const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
   const link = document.createElement('a');
   link.href = URL.createObjectURL(blob);
-  link.download = `fiscalizacoes_${new Date().toISOString().split('T')[0]}.csv`;
+  link.download = filename;
   link.click();
 
   showToast('Arquivo exportado!', 'success');
@@ -993,6 +2353,10 @@ async function executeImport() {
   const delim = detectImportDelimiter(lines);
 
   const norm = (v) => (v ?? '').toString().trim();
+  const normalizeTipoFiscalizacao = (v) => norm(v)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
 
   const parseNumber = (v) => {
     const s = norm(v);
@@ -1033,18 +2397,29 @@ async function executeImport() {
     return;
   }
 
-  const newCount = dataLines.length;
-  if (allFiscalizacoes.length + newCount > 999) {
+  const diretaCandidates = dataLines.reduce((count, line) => {
+    const cells = line.split(delim);
+    if (cells.length < 19) return count;
+    return normalizeTipoFiscalizacao(cells[7]) === 'direta' ? count + 1 : count;
+  }, 0);
+
+  if (diretaCandidates === 0) {
+    showToast('Nenhuma fiscalizacao "Direta" encontrada para importar.', 'warning');
+    return;
+  }
+
+  if (allFiscalizacoes.length + diretaCandidates > 999) {
     showToast(`Você tem ${allFiscalizacoes.length} registros. Máximo é 999.`, 'error');
     return;
   }
 
-  showLoading(`Importando ${newCount} registros...`);
+  showLoading(`Importando ${diretaCandidates} fiscalizacoes Direta...`);
   const btn = document.getElementById('import-btn');
   btn.disabled = true;
 
   let imported = 0;
   let failed = 0;
+  let skippedNonDireta = 0;
 
   for (let i = 0; i < dataLines.length; i++) {
     const line = dataLines[i];
@@ -1062,8 +2437,8 @@ async function executeImport() {
     }
 
     const tipoFiscalizacao = norm(cells[7]);
-    if (tipoFiscalizacao.toLowerCase() !== 'direta') {
-      failed++;
+    if (normalizeTipoFiscalizacao(tipoFiscalizacao) !== 'direta') {
+      skippedNonDireta++;
       continue;
     }
 
@@ -1090,7 +2465,7 @@ async function executeImport() {
       situacao: norm(cells[5]),
       tipo_documento: norm(cells[6]),
       destinatario: '',
-      direta_indireta: tipoFiscalizacao,
+      direta_indireta: 'Direta',
       programada: norm(cells[8]),
       sei_documento: norm(cells[9]),
       data: parseDateToISO(cells[10]),
@@ -1112,15 +2487,18 @@ async function executeImport() {
 
     const progress = Math.round(((i + 1) / dataLines.length) * 100);
     document.getElementById('loading-text').textContent =
-      `Importando... ${progress}% (${imported}/${newCount})`;
+      `Importando... ${progress}% (${imported}/${diretaCandidates})`;
   }
 
   hideLoading();
   btn.disabled = false;
 
   if (imported > 0) {
-    showToast(`✅ ${imported} fiscalizações importadas!`, 'success');
+    showToast(`✅ ${imported} fiscalizacoes Direta importadas!`, 'success');
     closeImportModal();
+  }
+  if (skippedNonDireta > 0) {
+    showToast(`⚠️ ${skippedNonDireta} registros ignorados (nao sao Direta)`, 'warning');
   }
   if (failed > 0) {
     showToast(`⚠️ ${failed} registros falharam`, 'warning');
@@ -1137,7 +2515,11 @@ async function init() {
   if (s) s.textContent = defaultConfig.subtitle;
 
   initStorageModeSelector();
+  updateDataViewUI();
   initMap();
   await initDataSDK();
+  updateFiltersOptions();
+  applyFilters();
+  updateObrasUploadActions();
 }
 init();

@@ -25,7 +25,7 @@ $env:DB_PASSWORD="SUA_SENHA"
 mvn quarkus:dev
 ```
 
-A aplicacao sobe em `http://localhost:8081`.
+A aplicacao sobe em `http://localhost:8080`.
 
 ## Deploy
 
@@ -40,7 +40,7 @@ Variaveis obrigatorias no ambiente:
 
 Porta:
 
-- A aplicacao usa `PORT` automaticamente (fallback `8081`).
+- A aplicacao usa `PORT` automaticamente (fallback `8080`).
 
 ## Deploy no Vercel (Serverless)
 
