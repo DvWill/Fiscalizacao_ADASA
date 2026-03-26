@@ -93,8 +93,21 @@ module.exports = function handler(req, res) {
   }
 
   if (method === "PUT") {
+    const incoming = readBody(req.body);
+
     if (!idParam) {
-      res.status(400).json({ error: "ID obrigatorio para atualizar." });
+      if (!Array.isArray(incoming.records)) {
+        res.status(400).json({ error: "Campo records deve ser uma lista." });
+        return;
+      }
+
+      const nextRecords = incoming.records.map((item) => ({
+        ...(item || {}),
+        __backendId: buildId(item?.__backendId)
+      }));
+
+      globalThis.__fiscalizacoesStore = nextRecords;
+      res.status(200).json({ records: nextRecords });
       return;
     }
 
@@ -104,7 +117,6 @@ module.exports = function handler(req, res) {
       return;
     }
 
-    const incoming = readBody(req.body);
     const record = {
       ...records[index],
       ...incoming,
@@ -118,7 +130,9 @@ module.exports = function handler(req, res) {
 
   if (method === "DELETE") {
     if (!idParam) {
-      res.status(400).json({ error: "ID obrigatorio para excluir." });
+      const deleted = records.length;
+      globalThis.__fiscalizacoesStore = [];
+      res.status(200).json({ deleted });
       return;
     }
 
