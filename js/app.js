@@ -16,6 +16,15 @@ let markers = {};
 let isSelectingLocation = false;
 let tempMarker = null;
 let deleteTarget = null;
+let allObras = [];
+let filteredObras = [];
+let currentObra = null;
+let currentView = 'fiscalizacoes';
+let pendingObrasUpload = [];
+let pendingObrasMeta = null;
+
+const OBRAS_STORAGE_KEY = 'obras_storage_v1';
+const VIEW_MODE_KEY = 'fiscalizacoes_data_view';
 
 const defaultConfig = {
   app_title: 'Sistema de Fiscalizações',
@@ -57,6 +66,281 @@ const regionCoordinates = {
   'Sol Nascente/Pôr do Sol': [-15.8000, -48.1333],
   'Arniqueira': [-15.8500, -48.0333]
 };
+
+function normalizePlainText(value) {
+  return (value || '')
+    .toString()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
+function normalizeHeaderKey(value) {
+  return normalizePlainText(value)
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+}
+
+function getFirstRecordValue(record, keys) {
+  for (const key of keys) {
+    const value = record?.[key];
+    if (value == null) continue;
+    if (typeof value === 'string' && value.trim() === '') continue;
+    return value;
+  }
+
+  return '';
+}
+
+function parseLocalizedNumber(value) {
+  if (value == null || value === '') return null;
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+
+  let text = String(value).trim();
+  if (!text || text === '-') return null;
+
+  text = text
+    .replace(/R\$/gi, '')
+    .replace(/%/g, '')
+    .replace(/\s+/g, '')
+    .replace(/[^0-9,.\-]/g, '');
+
+  if (!text) return null;
+
+  if (text.includes(',') && text.includes('.')) {
+    if (text.lastIndexOf(',') > text.lastIndexOf('.')) {
+      text = text.replace(/\./g, '').replace(',', '.');
+    } else {
+      text = text.replace(/,/g, '');
+    }
+  } else if (text.includes(',')) {
+    text = text.replace(/\./g, '').replace(',', '.');
+  }
+
+  const parsed = Number(text);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function loadStoredObras() {
+  try {
+    const raw = localStorage.getItem(OBRAS_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed?.records) ? parsed.records : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveStoredObras(records) {
+  localStorage.setItem(OBRAS_STORAGE_KEY, JSON.stringify({
+    updatedAt: new Date().toISOString(),
+    records
+  }));
+}
+
+function clearStoredObras() {
+  localStorage.removeItem(OBRAS_STORAGE_KEY);
+}
+
+function loadStoredView() {
+  const saved = localStorage.getItem(VIEW_MODE_KEY);
+  return saved === 'obras' ? 'obras' : 'fiscalizacoes';
+}
+
+function saveStoredView(view) {
+  localStorage.setItem(VIEW_MODE_KEY, view === 'obras' ? 'obras' : 'fiscalizacoes');
+}
+
+function sanitizeCoordinate(value, axis) {
+  const parsed = parseLocalizedNumber(value);
+  if (parsed === null) return null;
+
+  if (axis === 'lat') {
+    if (Math.abs(parsed) < 10 || Math.abs(parsed) > 90) return null;
+    return parsed;
+  }
+
+  let longitude = parsed;
+  if (longitude > 0 && longitude <= 180) longitude *= -1;
+  if (Math.abs(longitude) < 10 || Math.abs(longitude) > 180) return null;
+  return longitude;
+}
+
+function inferCoordinatesFromLocal(local) {
+  const normalizedLocal = normalizePlainText(local);
+  if (!normalizedLocal) return null;
+
+  for (const [region, coords] of Object.entries(regionCoordinates)) {
+    if (normalizedLocal.includes(normalizePlainText(region))) return coords;
+  }
+
+  const aliases = [
+    ['sol nascente / por do sol', 'Sol Nascente/PÃ´r do Sol'],
+    ['sol nascente e por do sol', 'Sol Nascente/PÃ´r do Sol'],
+    ['aguas claras', 'Ãguas Claras'],
+    ['nucleo bandeirante', 'NÃºcleo Bandeirante'],
+    ['sao sebastiao', 'SÃ£o SebastiÃ£o'],
+    ['ceilandia', 'CeilÃ¢ndia'],
+    ['guara', 'GuarÃ¡'],
+    ['paranoa', 'ParanoÃ¡'],
+    ['itapoa', 'ItapoÃ£'],
+    ['jardim botanico', 'Jardim BotÃ¢nico'],
+    ['varjao', 'VarjÃ£o'],
+    ['brazlandia', 'BrazlÃ¢ndia'],
+    ['candangolandia', 'CandangolÃ¢ndia']
+  ];
+
+  for (const [alias, region] of aliases) {
+    if (normalizedLocal.includes(alias)) return regionCoordinates[region];
+  }
+
+  return null;
+}
+
+function buildObraId(seed, index) {
+  const base = normalizePlainText(seed || `obra-${index + 1}`)
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return `obra-${index + 1}-${base || 'item'}`;
+}
+
+function formatCurrency(value) {
+  if (value == null || !Number.isFinite(value)) return '-';
+  return new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+    maximumFractionDigits: 2
+  }).format(value);
+}
+
+function formatPercent(value) {
+  if (value == null || !Number.isFinite(value)) return '-';
+  return `${Number(value).toFixed(1).replace(/\.0$/, '')}%`;
+}
+
+function normalizeDateDisplay(value) {
+  const text = (value || '').toString().trim();
+  if (!text) return '-';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+    return new Date(`${text}T00:00:00`).toLocaleDateString('pt-BR');
+  }
+  return text;
+}
+
+function getObraProgressValue(obra) {
+  if (Number.isFinite(obra.execucao_fisica_pct)) return obra.execucao_fisica_pct;
+  if (Number.isFinite(obra.execucao_financeira_pct)) return obra.execucao_financeira_pct;
+  return null;
+}
+
+function getObraMarkerColor(obra) {
+  const progress = getObraProgressValue(obra);
+  if (progress != null) {
+    if (progress >= 80) return '#10b981';
+    if (progress >= 40) return '#f59e0b';
+    return '#ef4444';
+  }
+
+  const status = normalizePlainText(obra.situacao_contrato);
+  if (status.includes('receb') || status.includes('teste') || status.includes('pronta')) return '#10b981';
+  if (status.includes('execu')) return '#f59e0b';
+  return '#3b82f6';
+}
+
+function selectObrasSheetName(sheetNames) {
+  if (!Array.isArray(sheetNames) || sheetNames.length === 0) return null;
+  return sheetNames.find((name) => normalizePlainText(name) === 'dados investimentos 2025') ||
+    sheetNames.find((name) => normalizePlainText(name).includes('dados investimentos')) ||
+    sheetNames.find((name) => normalizePlainText(name).includes('investimentos')) ||
+    sheetNames.find((name) => normalizePlainText(name).includes('dados obras')) ||
+    sheetNames.find((name) => normalizePlainText(name).includes('obra')) ||
+    sheetNames[0];
+}
+
+function findObrasHeaderRow(rows) {
+  if (!Array.isArray(rows)) return -1;
+
+  for (let index = 0; index < Math.min(rows.length, 50); index++) {
+    const headerSet = new Set((rows[index] || []).map(normalizeHeaderKey).filter(Boolean));
+    const hasCoreHeaders = headerSet.has('item') && headerSet.has('local');
+    const hasLocatorHeaders = headerSet.has('latitude') && headerSet.has('longitude');
+    const hasContractHeaders = [
+      'situacao_do_contrato',
+      'situacao',
+      'objeto_do_contrato',
+      'objeto_contrato',
+      'numero_contrato',
+      'n_contrato',
+      'processo_sei',
+      'n_processo_sei'
+    ].some((header) => headerSet.has(header));
+
+    if (hasCoreHeaders && (hasLocatorHeaders || hasContractHeaders)) {
+      return index;
+    }
+  }
+
+  return -1;
+}
+
+function mapUploadedObraRecord(rawRecord, index) {
+  const record = {};
+  Object.entries(rawRecord || {}).forEach(([key, value]) => {
+    record[normalizeHeaderKey(key)] = value;
+  });
+
+  const local = String(getFirstRecordValue(record, ['local'])).trim();
+  const objetoContrato = String(getFirstRecordValue(record, ['objeto_do_contrato', 'objeto_contrato'])).trim();
+  const rawItem = String(getFirstRecordValue(record, ['item'])).trim();
+  const item = rawItem || String(index + 1);
+
+  if (!local && !objetoContrato && !rawItem) return null;
+
+  const latitude = sanitizeCoordinate(getFirstRecordValue(record, ['latitude']), 'lat');
+  const longitude = sanitizeCoordinate(getFirstRecordValue(record, ['longitude']), 'lng');
+  const fallbackCoords = latitude == null || longitude == null ? inferCoordinatesFromLocal(local) : null;
+
+  return {
+    __obraId: buildObraId(item || local || objetoContrato, index),
+    item,
+    sistema: String(getFirstRecordValue(record, ['sistema_agua_saa_esgoto_ses', 'sistema'])).trim(),
+    tipo: String(getFirstRecordValue(record, ['tipo'])).trim(),
+    programa: String(getFirstRecordValue(record, ['programa'])).trim(),
+    codigo_plano_exploracao: String(getFirstRecordValue(record, ['codigo_plano_de_exploracao', 'codigo_plano_exploracao'])).trim(),
+    acao: String(getFirstRecordValue(record, ['acao'])).trim(),
+    local,
+    numero_contrato: String(getFirstRecordValue(record, ['n_contrato', 'numero_contrato'])).trim(),
+    objeto_contrato: objetoContrato,
+    valor_total_obra: parseLocalizedNumber(getFirstRecordValue(record, ['valor_total_da_obra', 'valor_total'])),
+    situacao_contrato: String(getFirstRecordValue(record, ['situacao_do_contrato', 'situacao'])).trim(),
+    sigla_uo: String(getFirstRecordValue(record, ['sigla_uo'])).trim(),
+    fornecedor: String(getFirstRecordValue(record, ['fornecedor'])).trim(),
+    em_operacao: String(getFirstRecordValue(record, ['em_operacao'])).trim(),
+    item_gplan: String(getFirstRecordValue(record, ['item_gplan'])).trim(),
+    numero_processo_sei: String(getFirstRecordValue(record, ['n_processo_sei', 'processo_sei'])).trim(),
+    tipo_recurso: String(getFirstRecordValue(record, ['tipo_de_recurso', 'tipo_recurso'])).trim(),
+    fonte_recurso: String(getFirstRecordValue(record, ['fonte_do_recurso', 'fonte_recurso'])).trim(),
+    execucao_inicio: String(getFirstRecordValue(record, ['execucao_inicio'])).trim(),
+    execucao_termino: String(getFirstRecordValue(record, ['execucao_termino'])).trim(),
+    valor_executado_jan_jun: parseLocalizedNumber(getFirstRecordValue(record, ['valor_executado_jan_a_jun', 'executado_jan_jun'])),
+    valor_executado_jul_dez: parseLocalizedNumber(getFirstRecordValue(record, ['valor_executado_jul_a_dez', 'executado_jul_dez'])),
+    valor_executado_2025: parseLocalizedNumber(getFirstRecordValue(record, ['valor_executado_2025', 'executado_2025'])),
+    execucao_financeira_pct: parseLocalizedNumber(getFirstRecordValue(record, ['execucao_financeira'])),
+    execucao_fisica_pct: parseLocalizedNumber(getFirstRecordValue(record, ['execucao_fisica'])),
+    observacoes: String(getFirstRecordValue(record, ['observacoes'])).trim(),
+    latitude: latitude != null && longitude != null ? latitude : (fallbackCoords ? fallbackCoords[0] : null),
+    longitude: latitude != null && longitude != null ? longitude : (fallbackCoords ? fallbackCoords[1] : null)
+  };
+}
+
+function hasObraCoordinates(obra) {
+  return Number.isFinite(obra?.latitude) && Number.isFinite(obra?.longitude);
+}
+
+allObras = loadStoredObras();
+currentView = loadStoredView();
 
 const dataHandler = {
   onDataChanged(data) {
@@ -144,6 +428,133 @@ function initStorageModeSelector() {
   updateStorageModeStatus();
 }
 
+function updateMapLegend() {
+  const title = document.getElementById('map-legend-title');
+  const items = document.getElementById('map-legend-items');
+  if (!title || !items) return;
+
+  if (currentView === 'obras') {
+    title.textContent = 'Legenda de Obras';
+    items.innerHTML = `
+      <div class="flex items-center gap-2">
+        <div class="w-4 h-4 rounded-full bg-gradient-to-br from-emerald-400 to-green-500"></div>
+        <span class="text-xs text-slate-400">Execucao >= 80%</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <div class="w-4 h-4 rounded-full bg-gradient-to-br from-yellow-400 to-amber-500"></div>
+        <span class="text-xs text-slate-400">Execucao entre 40% e 79%</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <div class="w-4 h-4 rounded-full bg-gradient-to-br from-red-400 to-rose-500"></div>
+        <span class="text-xs text-slate-400">Execucao abaixo de 40%</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <div class="w-4 h-4 rounded-full bg-gradient-to-br from-sky-400 to-blue-500"></div>
+        <span class="text-xs text-slate-400">Sem percentual informado</span>
+      </div>
+    `;
+    return;
+  }
+
+  title.textContent = 'Legenda';
+  items.innerHTML = `
+    <div class="flex items-center gap-2">
+      <div class="w-4 h-4 rounded-full bg-gradient-to-br from-yellow-400 to-amber-500"></div>
+      <span class="text-xs text-slate-400">Em Andamento</span>
+    </div>
+    <div class="flex items-center gap-2">
+      <div class="w-4 h-4 rounded-full bg-gradient-to-br from-emerald-400 to-green-500"></div>
+      <span class="text-xs text-slate-400">Concluida</span>
+    </div>
+    <div class="flex items-center gap-2">
+      <div class="w-4 h-4 rounded-full bg-gradient-to-br from-red-400 to-rose-500"></div>
+      <span class="text-xs text-slate-400">Pendente</span>
+    </div>
+  `;
+}
+
+function updateDataViewUI() {
+  const isObras = currentView === 'obras';
+  const fiscalizacoesBtn = document.getElementById('view-fiscalizacoes-btn');
+  const obrasBtn = document.getElementById('view-obras-btn');
+  const importBtn = document.getElementById('import-fiscalizacoes-btn');
+  const uploadBtn = document.getElementById('upload-obras-btn');
+  const addBtn = document.getElementById('add-fiscalizacao-btn');
+  const dashboardBtn = document.getElementById('dashboard-btn');
+  const storageMode = document.getElementById('storage-mode-wrapper');
+  const filterRegiao = document.getElementById('filter-regiao');
+  const filterSituacao = document.getElementById('filter-situacao');
+  const filterAno = document.getElementById('filter-ano');
+  const filterConformidade = document.getElementById('filter-conformidade');
+  const countBadge = document.getElementById('count-badge');
+  const searchInput = document.getElementById('filter-search');
+  const subtitle = document.getElementById('app-subtitle');
+
+  if (fiscalizacoesBtn && obrasBtn) {
+    fiscalizacoesBtn.className = isObras
+      ? 'px-3 py-1.5 rounded-md text-slate-300 text-xs sm:text-sm font-medium transition-colors'
+      : 'px-3 py-1.5 rounded-md bg-blue-600 text-white text-xs sm:text-sm font-medium transition-colors';
+    obrasBtn.className = isObras
+      ? 'px-3 py-1.5 rounded-md bg-emerald-600 text-white text-xs sm:text-sm font-medium transition-colors'
+      : 'px-3 py-1.5 rounded-md text-slate-300 text-xs sm:text-sm font-medium transition-colors';
+  }
+
+  importBtn?.classList.toggle('hidden', isObras);
+  uploadBtn?.classList.toggle('hidden', !isObras);
+  addBtn?.classList.toggle('hidden', isObras);
+  dashboardBtn?.classList.toggle('hidden', isObras);
+  storageMode?.classList.toggle('hidden', isObras);
+
+  if (filterRegiao?.previousElementSibling) {
+    filterRegiao.previousElementSibling.textContent = isObras ? 'Local' : 'Regiao Administrativa';
+  }
+  if (filterSituacao?.previousElementSibling) {
+    filterSituacao.previousElementSibling.textContent = isObras ? 'Situacao do Contrato' : 'Situacao';
+  }
+  if (filterAno?.previousElementSibling) {
+    filterAno.previousElementSibling.textContent = isObras ? 'Sistema' : 'Ano';
+  }
+
+  const conformidadeGroup = filterConformidade?.parentElement?.parentElement;
+  if (conformidadeGroup) conformidadeGroup.classList.toggle('hidden', isObras);
+
+  if (countBadge?.parentElement?.firstElementChild) {
+    countBadge.parentElement.firstElementChild.textContent = isObras ? 'Obras' : 'Fiscalizacoes';
+  }
+  if (searchInput) {
+    searchInput.placeholder = isObras
+      ? 'Item, local, acao, fornecedor...'
+      : 'ID, Processo, Destinatario...';
+  }
+  if (subtitle) {
+    subtitle.textContent = isObras ? 'Mapa de Obras em Andamento' : defaultConfig.subtitle;
+  }
+
+  updateMapLegend();
+  updateObrasUploadActions();
+}
+
+function switchDataView(view) {
+  currentView = view === 'obras' ? 'obras' : 'fiscalizacoes';
+  saveStoredView(currentView);
+
+  if (currentView === 'obras') {
+    if (!document.getElementById('form-modal').classList.contains('hidden')) closeModal();
+    if (!document.getElementById('import-modal').classList.contains('hidden')) closeImportModal();
+    disableMapSelection();
+  } else if (!document.getElementById('obras-upload-modal').classList.contains('hidden')) {
+    closeObrasUploadModal();
+  }
+
+  document.getElementById('dashboard-panel')?.classList.add('hidden');
+  closeDetailPanel();
+  clearFilters();
+  updateDataViewUI();
+  updateFiltersOptions();
+  applyFilters();
+}
+window.switchDataView = switchDataView;
+
 // ======== Map ========
 function initMap() {
   map = L.map('map').setView([-15.7942, -47.8822], 11);
@@ -219,29 +630,84 @@ function createMarkerIcon(situacao) {
   });
 }
 
+function createObraMarkerIcon(obra) {
+  const color = getObraMarkerColor(obra);
+
+  return L.divIcon({
+    className: 'custom-marker obra-marker',
+    html: `
+      <div style="
+        width: 34px;
+        height: 34px;
+        background: linear-gradient(135deg, ${color}dd, ${color});
+        border-radius: 12px 12px 12px 2px;
+        transform: rotate(45deg);
+        border: 3px solid white;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      ">
+        <div style="
+          transform: rotate(-45deg);
+          width: 12px;
+          height: 12px;
+          border: 2px solid white;
+          border-radius: 999px;
+          border-right-color: transparent;
+          border-top-color: transparent;
+        "></div>
+      </div>
+    `,
+    iconSize: [34, 34],
+    iconAnchor: [17, 34],
+    popupAnchor: [0, -30]
+  });
+}
+
 function updateMapMarkers() {
   markerClusterGroup.clearLayers();
   markers = {};
 
-  filteredFiscalizacoes.forEach(fisc => {
-    if (fisc.latitude && fisc.longitude) {
-      const marker = L.marker([fisc.latitude, fisc.longitude], {
-        icon: createMarkerIcon(fisc.situacao)
+  if (currentView === 'obras') {
+    filteredObras.forEach((obra) => {
+      if (!hasObraCoordinates(obra)) return;
+
+      const marker = L.marker([obra.latitude, obra.longitude], {
+        icon: createObraMarkerIcon(obra)
       });
 
-      marker.bindPopup(createPopupContent(fisc), {
-        maxWidth: 300,
+      marker.bindPopup(createObraPopupContent(obra), {
+        maxWidth: 320,
         className: 'custom-popup'
       });
 
-      marker.on('click', () => showDetailPanel(fisc));
+      marker.on('click', () => showObraDetailPanel(obra));
 
       markerClusterGroup.addLayer(marker);
-      markers[fisc.__backendId] = marker;
-    }
-  });
+      markers[obra.__obraId] = marker;
+    });
+  } else {
+    filteredFiscalizacoes.forEach(fisc => {
+      if (fisc.latitude && fisc.longitude) {
+        const marker = L.marker([fisc.latitude, fisc.longitude], {
+          icon: createMarkerIcon(fisc.situacao)
+        });
 
-  if (filteredFiscalizacoes.length > 0 && Object.keys(markers).length > 0) {
+        marker.bindPopup(createPopupContent(fisc), {
+          maxWidth: 300,
+          className: 'custom-popup'
+        });
+
+        marker.on('click', () => showDetailPanel(fisc));
+
+        markerClusterGroup.addLayer(marker);
+        markers[fisc.__backendId] = marker;
+      }
+    });
+  }
+
+  if (Object.keys(markers).length > 0) {
     const bounds = markerClusterGroup.getBounds();
     if (bounds.isValid()) map.fitBounds(bounds, { padding: [50, 50] });
   }
@@ -272,6 +738,34 @@ function createPopupContent(fisc) {
           <div style="background:#e2e8f0;border-radius:4px;height:6px;overflow:hidden;">
             <div style="background:linear-gradient(90deg,#3b82f6,#2563eb);height:100%;width:${fisc.indice_conformidade}%;"></div>
           </div>
+        </div>
+      ` : ''}
+    </div>
+  `;
+}
+
+function createObraPopupContent(obra) {
+  const color = getObraMarkerColor(obra);
+  const progresso = getObraProgressValue(obra);
+
+  return `
+    <div style="padding: 16px; font-family: 'Plus Jakarta Sans', sans-serif;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:8px;">
+        <span style="font-weight:700;font-size:15px;color:#1e293b;">${obra.item || 'Obra'}</span>
+        <span style="font-size:11px;padding:4px 8px;border-radius:999px;background:${color};color:white;">${progresso != null ? formatPercent(progresso) : 'Obra'}</span>
+      </div>
+      <div style="color:#64748b;font-size:13px;margin-bottom:8px;">
+        <strong>Local:</strong> ${obra.local || '-'}
+      </div>
+      <div style="color:#64748b;font-size:13px;margin-bottom:8px;">
+        <strong>Situacao:</strong> ${obra.situacao_contrato || '-'}
+      </div>
+      <div style="color:#64748b;font-size:13px;margin-bottom:8px;">
+        <strong>Acao:</strong> ${obra.acao || '-'}
+      </div>
+      ${obra.objeto_contrato ? `
+        <div style="margin-top:12px;color:#475569;font-size:12px;line-height:1.4;">
+          ${obra.objeto_contrato}
         </div>
       ` : ''}
     </div>
@@ -328,6 +822,46 @@ function disableMapSelection() {
 
 // ======== Filters ========
 function updateFiltersOptions() {
+  if (currentView === 'obras') {
+    const locais = [...new Set(allObras.map(o => o.local).filter(Boolean))].sort();
+    const situacoes = [...new Set(allObras.map(o => o.situacao_contrato).filter(Boolean))].sort();
+    const sistemas = [...new Set(allObras.map(o => o.sistema).filter(Boolean))].sort();
+
+    const regiaoSelect = document.getElementById('filter-regiao');
+    const currentLocal = regiaoSelect.value;
+    regiaoSelect.innerHTML = '<option value="">Todos os Locais</option>';
+    locais.forEach((local) => {
+      const option = document.createElement('option');
+      option.value = local;
+      option.textContent = local;
+      if (local === currentLocal) option.selected = true;
+      regiaoSelect.appendChild(option);
+    });
+
+    const situacaoSelect = document.getElementById('filter-situacao');
+    const currentSituacao = situacaoSelect.value;
+    situacaoSelect.innerHTML = '<option value="">Todas as Situacoes</option>';
+    situacoes.forEach((situacao) => {
+      const option = document.createElement('option');
+      option.value = situacao;
+      option.textContent = situacao;
+      if (situacao === currentSituacao) option.selected = true;
+      situacaoSelect.appendChild(option);
+    });
+
+    const sistemaSelect = document.getElementById('filter-ano');
+    const currentSistema = sistemaSelect.value;
+    sistemaSelect.innerHTML = '<option value="">Todos os Sistemas</option>';
+    sistemas.forEach((sistema) => {
+      const option = document.createElement('option');
+      option.value = sistema;
+      option.textContent = sistema;
+      if (sistema === currentSistema) option.selected = true;
+      sistemaSelect.appendChild(option);
+    });
+    return;
+  }
+
   const regioes = [...new Set(allFiscalizacoes.map(f => f.regiao_administrativa).filter(Boolean))].sort();
   const anos = [...new Set(allFiscalizacoes.map(f => f.ano).filter(Boolean))].sort((a, b) => b - a);
 
@@ -355,17 +889,47 @@ function updateFiltersOptions() {
 }
 
 function applyFilters() {
-  const search = document.getElementById('filter-search').value.toLowerCase();
+  const search = document.getElementById('filter-search').value;
   const regiao = document.getElementById('filter-regiao').value;
   const situacao = document.getElementById('filter-situacao').value;
   const ano = document.getElementById('filter-ano').value;
   const conformidade = parseInt(document.getElementById('filter-conformidade').value, 10);
 
-  filteredFiscalizacoes = allFiscalizacoes.filter(f => {
+  if (currentView === 'obras') {
+    const normalizedSearch = normalizePlainText(search);
 
-    if (search && !f.id?.toLowerCase().includes(search) &&
-        !f.processo_sei?.toLowerCase().includes(search) &&
-        !f.destinatario?.toLowerCase().includes(search)) return false;
+    filteredObras = allObras.filter((obra) => {
+      if (normalizedSearch) {
+        const haystack = normalizePlainText([
+          obra.item,
+          obra.local,
+          obra.acao,
+          obra.objeto_contrato,
+          obra.numero_processo_sei,
+          obra.fornecedor
+        ].join(' '));
+
+        if (!haystack.includes(normalizedSearch)) return false;
+      }
+
+      if (regiao && obra.local !== regiao) return false;
+      if (situacao && obra.situacao_contrato !== situacao) return false;
+      if (ano && obra.sistema !== ano) return false;
+      return true;
+    });
+
+    updateMapMarkers();
+    renderObrasList();
+    document.getElementById('count-badge').textContent = filteredObras.length;
+    return;
+  }
+
+  filteredFiscalizacoes = allFiscalizacoes.filter(f => {
+    const normalizedSearch = search.toLowerCase();
+
+    if (normalizedSearch && !f.id?.toLowerCase().includes(normalizedSearch) &&
+        !f.processo_sei?.toLowerCase().includes(normalizedSearch) &&
+        !f.destinatario?.toLowerCase().includes(normalizedSearch)) return false;
 
     if (regiao && f.regiao_administrativa !== regiao) return false;
     if (situacao && f.situacao !== situacao) return false;
@@ -439,6 +1003,52 @@ function renderFiscalizacoesList() {
   }).join('');
 }
 
+function renderObrasList() {
+  const container = document.getElementById('fiscalizacoes-list');
+
+  if (filteredObras.length === 0) {
+    container.innerHTML = allObras.length === 0 ? `
+      <div class="text-center py-8 text-slate-500">
+        <svg class="w-12 h-12 mx-auto mb-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M3 7h18M3 12h18M3 17h18M8 7v10m8-10v10"/>
+        </svg>
+        <p class="text-sm">Nenhuma obra carregada</p>
+        <p class="text-xs mt-1">Use "Upload Obras" para carregar a planilha</p>
+      </div>
+    ` : `
+      <div class="text-center py-8 text-slate-500">
+        <svg class="w-12 h-12 mx-auto mb-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/>
+        </svg>
+        <p class="text-sm">Nenhuma obra encontrada</p>
+        <p class="text-xs mt-1">Ajuste os filtros ou carregue outra planilha</p>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = filteredObras.map((obra) => {
+    const color = getObraMarkerColor(obra);
+    const progress = getObraProgressValue(obra);
+
+    return `
+      <div class="p-3 rounded-lg bg-slate-800/50 hover:bg-slate-700/50 cursor-pointer transition-colors border border-slate-700/50"
+           onclick="focusObra('${obra.__obraId}')">
+        <div class="flex items-start justify-between gap-3 mb-2">
+          <span class="font-semibold text-sm leading-tight">${obra.item || 'Obra'}</span>
+          <span style="font-size:10px;padding:2px 8px;border-radius:999px;background:${color};color:white;white-space:nowrap;">
+            ${progress != null ? formatPercent(progress) : 'Mapa'}
+          </span>
+        </div>
+        <p class="text-xs text-slate-300 truncate">${obra.local || 'Sem local informado'}</p>
+        <p class="text-xs text-slate-500 mt-1 truncate">${obra.situacao_contrato || 'Sem situacao'}</p>
+      </div>
+    `;
+  }).join('');
+}
+
 function focusFiscalizacao(backendId) {
   const fisc = allFiscalizacoes.find(f => f.__backendId === backendId);
   if (!fisc) return;
@@ -454,6 +1064,20 @@ function focusFiscalizacao(backendId) {
 }
 window.focusFiscalizacao = focusFiscalizacao;
 
+function focusObra(obraId) {
+  const obra = allObras.find((item) => item.__obraId === obraId);
+  if (!obra) return;
+
+  if (hasObraCoordinates(obra) && markers[obraId]) {
+    map.setView([obra.latitude, obra.longitude], 14);
+    markers[obraId].openPopup();
+  }
+
+  showObraDetailPanel(obra);
+  toggleFiltersPanel(false);
+}
+window.focusObra = focusObra;
+
 // ======== Detail Panel ========
 function createDetailField(label, value) {
   return `
@@ -464,15 +1088,22 @@ function createDetailField(label, value) {
   `;
 }
 
+function setDetailPanelActionsVisible(visible) {
+  document.getElementById('edit-detail-btn')?.classList.toggle('hidden', !visible);
+  document.getElementById('delete-detail-btn')?.classList.toggle('hidden', !visible);
+}
+
 function showDetailPanel(fisc) {
   currentFiscalizacao = fisc;
+  currentObra = null;
   const panel = document.getElementById('detail-panel');
   const content = document.getElementById('detail-content');
 
   const statusClass = fisc.situacao === 'Em Andamento' ? 'status-andamento' :
                       fisc.situacao === 'Concluída' ? 'status-concluida' : 'status-pendente';
 
-  document.getElementById('detail-title').textContent = fisc.id;
+  setDetailPanelActionsVisible(true);
+  document.getElementById('detail-title').textContent = fisc.id || 'Detalhes da Fiscalizacao';
   document.getElementById('delete-detail-btn').onclick = () => confirmDelete(fisc);
 
   content.innerHTML = `
@@ -539,9 +1170,116 @@ function showDetailPanel(fisc) {
 }
 window.showDetailPanel = showDetailPanel;
 
+function showObraDetailPanel(obra) {
+  currentObra = obra;
+  currentFiscalizacao = null;
+
+  const panel = document.getElementById('detail-panel');
+  const content = document.getElementById('detail-content');
+  const progress = getObraProgressValue(obra);
+  const color = getObraMarkerColor(obra);
+
+  setDetailPanelActionsVisible(false);
+  document.getElementById('detail-title').textContent = obra.item || 'Detalhes da Obra';
+
+  content.innerHTML = `
+    <div class="space-y-6">
+      <div class="flex items-center justify-center">
+        <span style="padding:6px 14px;border-radius:999px;background:${color};color:white;font-size:14px;font-weight:600;">
+          ${progress != null ? `Execucao ${formatPercent(progress)}` : (obra.situacao_contrato || 'Obra em mapa')}
+        </span>
+      </div>
+
+      <div class="space-y-3">
+        <h3 class="text-sm font-semibold text-emerald-400 uppercase tracking-wider">Identificacao</h3>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          ${createDetailField('Item', obra.item)}
+          ${createDetailField('Local', obra.local)}
+          ${createDetailField('Sistema', obra.sistema)}
+          ${createDetailField('Tipo', obra.tipo)}
+          ${createDetailField('Programa', obra.programa)}
+          ${createDetailField('Acao', obra.acao)}
+        </div>
+      </div>
+
+      <div class="space-y-3">
+        <h3 class="text-sm font-semibold text-emerald-400 uppercase tracking-wider">Contrato</h3>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          ${createDetailField('Numero do Contrato', obra.numero_contrato)}
+          ${createDetailField('Situacao', obra.situacao_contrato)}
+          ${createDetailField('Fornecedor', obra.fornecedor)}
+          ${createDetailField('Sigla UO', obra.sigla_uo)}
+          ${createDetailField('Processo SEI', obra.numero_processo_sei)}
+          ${createDetailField('Em operacao', obra.em_operacao)}
+        </div>
+        ${obra.objeto_contrato ? `
+          <div class="mt-3">
+            <p class="text-xs text-slate-500 mb-1">Objeto do Contrato</p>
+            <p class="text-sm text-slate-300 bg-slate-800/50 rounded-lg p-3">${obra.objeto_contrato}</p>
+          </div>
+        ` : ''}
+      </div>
+
+      <div class="space-y-3">
+        <h3 class="text-sm font-semibold text-emerald-400 uppercase tracking-wider">Execucao</h3>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          ${createDetailField('Valor Total da Obra', formatCurrency(obra.valor_total_obra))}
+          ${createDetailField('Valor Executado 2025', formatCurrency(obra.valor_executado_2025))}
+          ${createDetailField('Executado Jan-Jun', formatCurrency(obra.valor_executado_jan_jun))}
+          ${createDetailField('Executado Jul-Dez', formatCurrency(obra.valor_executado_jul_dez))}
+          ${createDetailField('Execucao Financeira', formatPercent(obra.execucao_financeira_pct))}
+          ${createDetailField('Execucao Fisica', formatPercent(obra.execucao_fisica_pct))}
+          ${createDetailField('Inicio', normalizeDateDisplay(obra.execucao_inicio))}
+          ${createDetailField('Termino', normalizeDateDisplay(obra.execucao_termino))}
+        </div>
+      </div>
+
+      <div class="space-y-3">
+        <h3 class="text-sm font-semibold text-emerald-400 uppercase tracking-wider">Recursos</h3>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          ${createDetailField('Tipo de Recurso', obra.tipo_recurso)}
+          ${createDetailField('Fonte do Recurso', obra.fonte_recurso)}
+          ${createDetailField('Item GPLAN', obra.item_gplan)}
+          ${createDetailField('Plano de Exploracao', obra.codigo_plano_exploracao)}
+        </div>
+      </div>
+
+      ${(hasObraCoordinates(obra)) ? `
+        <div class="space-y-3">
+          <h3 class="text-sm font-semibold text-emerald-400 uppercase tracking-wider">Localizacao</h3>
+          <div class="bg-slate-800/50 rounded-lg p-3">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <p class="text-xs text-slate-500">Latitude</p>
+                <p class="text-sm font-mono text-slate-300">${obra.latitude}</p>
+              </div>
+              <div>
+                <p class="text-xs text-slate-500">Longitude</p>
+                <p class="text-sm font-mono text-slate-300">${obra.longitude}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      ` : ''}
+
+      ${obra.observacoes ? `
+        <div class="space-y-3">
+          <h3 class="text-sm font-semibold text-emerald-400 uppercase tracking-wider">Observacoes</h3>
+          <p class="text-sm text-slate-300 bg-slate-800/50 rounded-lg p-3">${obra.observacoes}</p>
+        </div>
+      ` : ''}
+    </div>
+  `;
+
+  panel.classList.remove('hidden');
+}
+window.showObraDetailPanel = showObraDetailPanel;
+
 function closeDetailPanel() {
   document.getElementById('detail-panel').classList.add('hidden');
   currentFiscalizacao = null;
+  currentObra = null;
+  setDetailPanelActionsVisible(true);
 }
 window.closeDetailPanel = closeDetailPanel;
 
@@ -659,12 +1397,6 @@ async function handleSubmit(event) {
     latitude: lat || null,
     longitude: lng || null
   };
-
-  if (fiscData.direta_indireta.toLowerCase() !== 'direta') {
-    hideLoading();
-    showToast('Apenas fiscalizações do tipo "Direta" são permitidas.', 'error');
-    return;
-  }
 
   showLoading(isEditing ? 'Atualizando...' : 'Salvando...');
 
@@ -802,29 +1534,265 @@ function updateDashboard() {
     : '<p class="text-center text-slate-500 py-8">Nenhuma região cadastrada</p>';
 }
 
-// ======== Export ========
-function exportToCSV() {
-  if (allFiscalizacoes.length === 0) {
-    showToast('Nenhuma fiscalização para exportar', 'warning');
+// ======== Obras Upload ========
+function updateObrasUploadActions() {
+  const uploadBtn = document.getElementById('obras-upload-btn');
+  const clearBtn = document.getElementById('clear-obras-btn');
+
+  if (uploadBtn) uploadBtn.disabled = pendingObrasUpload.length === 0;
+  if (clearBtn) clearBtn.classList.toggle('hidden', !(pendingObrasMeta || allObras.length > 0));
+}
+
+function renderObrasUploadPreview(records = [], meta = null) {
+  const summary = document.getElementById('obras-upload-summary');
+  const fileLabel = document.getElementById('obras-summary-file');
+  const sheetLabel = document.getElementById('obras-summary-sheet');
+  const countLabel = document.getElementById('obras-summary-count');
+  const previewBody = document.getElementById('obras-preview-body');
+
+  if (!summary || !fileLabel || !sheetLabel || !countLabel || !previewBody) return;
+
+  if (!meta) {
+    summary.classList.add('hidden');
+    fileLabel.textContent = '-';
+    sheetLabel.textContent = '-';
+    countLabel.textContent = '0';
+    previewBody.innerHTML = '';
     return;
   }
 
-  const headers = [
-    'ID', 'Processo SEI', 'Ano', 'Objetivo', 'Região', 'Situação',
-    'Tipo Documento', 'Destinatário', 'Direta/Indireta', 'Programada',
-    'SEI Documento', 'Data', 'Constatações', 'Não Conformes',
-    'Recomendações', 'Determinações', 'TN', 'AI', 'TAC',
-    'Conformidade', 'Latitude', 'Longitude'
-  ];
+  fileLabel.textContent = meta.fileName || '-';
+  sheetLabel.textContent = meta.sheetName || '-';
+  countLabel.textContent = String(records.length);
+  previewBody.innerHTML = records.length > 0
+    ? records.slice(0, 5).map((obra) => `
+      <tr class="border-t border-slate-600">
+        <td class="px-2 py-2 text-slate-300">${obra.item || '-'}</td>
+        <td class="px-2 py-2 text-slate-300">${obra.local || '-'}</td>
+        <td class="px-2 py-2 text-slate-300">${obra.situacao_contrato || '-'}</td>
+        <td class="px-2 py-2 text-slate-300">${formatPercent(getObraProgressValue(obra))}</td>
+      </tr>
+    `).join('')
+    : `
+      <tr class="border-t border-slate-600">
+        <td colspan="4" class="px-2 py-4 text-center text-slate-500">
+          Nenhuma obra valida encontrada na aba selecionada.
+        </td>
+      </tr>
+    `;
 
-  const rows = allFiscalizacoes.map(f => [
-    f.id, f.processo_sei, f.ano, f.objetivo, f.regiao_administrativa,
-    f.situacao, f.tipo_documento, f.destinatario, f.direta_indireta,
-    f.programada, f.sei_documento, f.data, f.constatacoes,
-    f.constatacoes_nao_conformes, f.recomendacoes, f.determinacoes,
-    f.termos_notificacao, f.autos_infracao, f.termos_ajuste,
-    f.indice_conformidade, f.latitude, f.longitude
-  ]);
+  summary.classList.remove('hidden');
+}
+
+function openObrasUploadModal() {
+  document.getElementById('obras-upload-modal').classList.remove('hidden');
+  renderObrasUploadPreview(pendingObrasUpload, pendingObrasMeta);
+  updateObrasUploadActions();
+}
+window.openObrasUploadModal = openObrasUploadModal;
+
+function closeObrasUploadModal() {
+  document.getElementById('obras-upload-modal').classList.add('hidden');
+  updateObrasUploadActions();
+}
+window.closeObrasUploadModal = closeObrasUploadModal;
+
+async function handleObrasFileSelected(event) {
+  const input = event?.target;
+  const file = input?.files?.[0];
+
+  if (!file) {
+    pendingObrasUpload = [];
+    pendingObrasMeta = null;
+    renderObrasUploadPreview();
+    updateObrasUploadActions();
+    return;
+  }
+
+  if (typeof XLSX === 'undefined') {
+    showToast('Leitor de planilha indisponivel no navegador.', 'error');
+    input.value = '';
+    return;
+  }
+
+  showLoading('Lendo planilha de obras...');
+
+  try {
+    const workbook = XLSX.read(await file.arrayBuffer(), {
+      type: 'array',
+      cellDates: false
+    });
+    const sheetName = selectObrasSheetName(workbook.SheetNames);
+    const sheet = sheetName ? workbook.Sheets[sheetName] : null;
+
+    if (!sheetName || !sheet) {
+      throw new Error('Nao foi possivel localizar a aba de obras na planilha.');
+    }
+
+    const rawRows = XLSX.utils.sheet_to_json(sheet, {
+      header: 1,
+      raw: false,
+      defval: ''
+    });
+    const headerRowIndex = findObrasHeaderRow(rawRows);
+
+    if (headerRowIndex < 0) {
+      throw new Error('Nao encontrei o cabecalho da tabela de obras nessa planilha.');
+    }
+
+    const rawRecords = XLSX.utils.sheet_to_json(sheet, {
+      range: headerRowIndex,
+      raw: false,
+      defval: ''
+    });
+
+    const records = rawRecords
+      .map((record, index) => mapUploadedObraRecord(record, index))
+      .filter(Boolean);
+
+    pendingObrasUpload = records;
+    pendingObrasMeta = {
+      fileName: file.name,
+      sheetName,
+      headerRowIndex
+    };
+
+    renderObrasUploadPreview(records, pendingObrasMeta);
+    updateObrasUploadActions();
+
+    if (records.length === 0) {
+      showToast('Planilha lida, mas nenhuma obra valida foi encontrada.', 'warning');
+    } else {
+      const mappedWithCoordinates = records.filter((obra) => hasObraCoordinates(obra)).length;
+      showToast(`${records.length} obras preparadas (${mappedWithCoordinates} com coordenadas).`, 'success');
+    }
+  } catch (error) {
+    pendingObrasUpload = [];
+    pendingObrasMeta = null;
+    renderObrasUploadPreview();
+    updateObrasUploadActions();
+    showToast(error?.message || 'Erro ao processar a planilha de obras.', 'error');
+  } finally {
+    hideLoading();
+    if (input) input.value = '';
+  }
+}
+window.handleObrasFileSelected = handleObrasFileSelected;
+
+function executeObrasUpload() {
+  if (pendingObrasUpload.length === 0) {
+    showToast('Selecione uma planilha valida antes de carregar as obras.', 'warning');
+    return;
+  }
+
+  allObras = pendingObrasUpload.map((obra) => ({ ...obra }));
+  saveStoredObras(allObras);
+
+  pendingObrasUpload = [];
+  pendingObrasMeta = null;
+  renderObrasUploadPreview();
+  updateObrasUploadActions();
+  closeObrasUploadModal();
+
+  if (currentView !== 'obras') {
+    switchDataView('obras');
+  } else {
+    closeDetailPanel();
+    updateFiltersOptions();
+    applyFilters();
+  }
+
+  showToast(`${allObras.length} obras carregadas no mapa.`, 'success');
+}
+window.executeObrasUpload = executeObrasUpload;
+
+function clearObrasData() {
+  if (!pendingObrasMeta && allObras.length === 0) {
+    showToast('Nao ha obras carregadas para limpar.', 'info');
+    return;
+  }
+
+  if (!window.confirm('Remover todas as obras carregadas do mapa?')) {
+    return;
+  }
+
+  pendingObrasUpload = [];
+  pendingObrasMeta = null;
+  allObras = [];
+  filteredObras = [];
+  clearStoredObras();
+  renderObrasUploadPreview();
+  updateObrasUploadActions();
+
+  const fileInput = document.getElementById('obras-file-input');
+  if (fileInput) fileInput.value = '';
+
+  if (currentView === 'obras') {
+    closeDetailPanel();
+    updateFiltersOptions();
+    applyFilters();
+  }
+
+  showToast('Dados de obras removidos.', 'success');
+}
+window.clearObrasData = clearObrasData;
+
+// ======== Export ========
+function exportToCSV() {
+  let headers = [];
+  let rows = [];
+  let filename = '';
+
+  if (currentView === 'obras') {
+    if (allObras.length === 0) {
+      showToast('Nenhuma obra para exportar', 'warning');
+      return;
+    }
+
+    headers = [
+      'Item', 'Sistema', 'Tipo', 'Programa', 'Acao', 'Local',
+      'Numero Contrato', 'Objeto Contrato', 'Valor Total', 'Situacao',
+      'Fornecedor', 'Processo SEI', 'Tipo Recurso', 'Fonte Recurso',
+      'Execucao Inicio', 'Execucao Termino', 'Executado 2025',
+      'Execucao Financeira', 'Execucao Fisica', 'Latitude', 'Longitude'
+    ];
+
+    rows = allObras.map((obra) => [
+      obra.item, obra.sistema, obra.tipo, obra.programa, obra.acao, obra.local,
+      obra.numero_contrato, obra.objeto_contrato, obra.valor_total_obra,
+      obra.situacao_contrato, obra.fornecedor, obra.numero_processo_sei,
+      obra.tipo_recurso, obra.fonte_recurso, obra.execucao_inicio,
+      obra.execucao_termino, obra.valor_executado_2025,
+      obra.execucao_financeira_pct, obra.execucao_fisica_pct,
+      obra.latitude, obra.longitude
+    ]);
+
+    filename = `obras_${new Date().toISOString().split('T')[0]}.csv`;
+  } else {
+    if (allFiscalizacoes.length === 0) {
+      showToast('Nenhuma fiscalizacao para exportar', 'warning');
+      return;
+    }
+
+    headers = [
+      'ID', 'Processo SEI', 'Ano', 'Objetivo', 'Regiao', 'Situacao',
+      'Tipo Documento', 'Destinatario', 'Direta/Indireta', 'Programada',
+      'SEI Documento', 'Data', 'Constatacoes', 'Nao Conformes',
+      'Recomendacoes', 'Determinacoes', 'TN', 'AI', 'TAC',
+      'Conformidade', 'Latitude', 'Longitude'
+    ];
+
+    rows = allFiscalizacoes.map(f => [
+      f.id, f.processo_sei, f.ano, f.objetivo, f.regiao_administrativa,
+      f.situacao, f.tipo_documento, f.destinatario, f.direta_indireta,
+      f.programada, f.sei_documento, f.data, f.constatacoes,
+      f.constatacoes_nao_conformes, f.recomendacoes, f.determinacoes,
+      f.termos_notificacao, f.autos_infracao, f.termos_ajuste,
+      f.indice_conformidade, f.latitude, f.longitude
+    ]);
+
+    filename = `fiscalizacoes_${new Date().toISOString().split('T')[0]}.csv`;
+  }
 
   const csvContent = [headers, ...rows]
     .map(row => row.map(cell => `"${(cell ?? '').toString().replace(/"/g, '""')}"`).join(','))
@@ -833,7 +1801,7 @@ function exportToCSV() {
   const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
   const link = document.createElement('a');
   link.href = URL.createObjectURL(blob);
-  link.download = `fiscalizacoes_${new Date().toISOString().split('T')[0]}.csv`;
+  link.download = filename;
   link.click();
 
   showToast('Arquivo exportado!', 'success');
@@ -993,6 +1961,10 @@ async function executeImport() {
   const delim = detectImportDelimiter(lines);
 
   const norm = (v) => (v ?? '').toString().trim();
+  const normalizeTipoFiscalizacao = (v) => norm(v)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
 
   const parseNumber = (v) => {
     const s = norm(v);
@@ -1033,18 +2005,29 @@ async function executeImport() {
     return;
   }
 
-  const newCount = dataLines.length;
-  if (allFiscalizacoes.length + newCount > 999) {
+  const diretaCandidates = dataLines.reduce((count, line) => {
+    const cells = line.split(delim);
+    if (cells.length < 19) return count;
+    return normalizeTipoFiscalizacao(cells[7]) === 'direta' ? count + 1 : count;
+  }, 0);
+
+  if (diretaCandidates === 0) {
+    showToast('Nenhuma fiscalizacao "Direta" encontrada para importar.', 'warning');
+    return;
+  }
+
+  if (allFiscalizacoes.length + diretaCandidates > 999) {
     showToast(`Você tem ${allFiscalizacoes.length} registros. Máximo é 999.`, 'error');
     return;
   }
 
-  showLoading(`Importando ${newCount} registros...`);
+  showLoading(`Importando ${diretaCandidates} fiscalizacoes Direta...`);
   const btn = document.getElementById('import-btn');
   btn.disabled = true;
 
   let imported = 0;
   let failed = 0;
+  let skippedNonDireta = 0;
 
   for (let i = 0; i < dataLines.length; i++) {
     const line = dataLines[i];
@@ -1062,8 +2045,8 @@ async function executeImport() {
     }
 
     const tipoFiscalizacao = norm(cells[7]);
-    if (tipoFiscalizacao.toLowerCase() !== 'direta') {
-      failed++;
+    if (normalizeTipoFiscalizacao(tipoFiscalizacao) !== 'direta') {
+      skippedNonDireta++;
       continue;
     }
 
@@ -1090,7 +2073,7 @@ async function executeImport() {
       situacao: norm(cells[5]),
       tipo_documento: norm(cells[6]),
       destinatario: '',
-      direta_indireta: tipoFiscalizacao,
+      direta_indireta: 'Direta',
       programada: norm(cells[8]),
       sei_documento: norm(cells[9]),
       data: parseDateToISO(cells[10]),
@@ -1112,15 +2095,18 @@ async function executeImport() {
 
     const progress = Math.round(((i + 1) / dataLines.length) * 100);
     document.getElementById('loading-text').textContent =
-      `Importando... ${progress}% (${imported}/${newCount})`;
+      `Importando... ${progress}% (${imported}/${diretaCandidates})`;
   }
 
   hideLoading();
   btn.disabled = false;
 
   if (imported > 0) {
-    showToast(`✅ ${imported} fiscalizações importadas!`, 'success');
+    showToast(`✅ ${imported} fiscalizacoes Direta importadas!`, 'success');
     closeImportModal();
+  }
+  if (skippedNonDireta > 0) {
+    showToast(`⚠️ ${skippedNonDireta} registros ignorados (nao sao Direta)`, 'warning');
   }
   if (failed > 0) {
     showToast(`⚠️ ${failed} registros falharam`, 'warning');
@@ -1137,7 +2123,11 @@ async function init() {
   if (s) s.textContent = defaultConfig.subtitle;
 
   initStorageModeSelector();
+  updateDataViewUI();
   initMap();
   await initDataSDK();
+  updateFiltersOptions();
+  applyFilters();
+  updateObrasUploadActions();
 }
 init();

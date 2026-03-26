@@ -14,6 +14,7 @@ import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -49,6 +50,29 @@ public class FiscalizacaoResource {
     }
 
     @PUT
+    public Response replaceAll(Map<String, Object> body) {
+        try {
+            Object recordsValue = body == null ? null : body.get("records");
+            if (!(recordsValue instanceof List<?> rawRecords)) {
+                return Response.status(Response.Status.BAD_REQUEST)
+                    .entity(Map.of("error", "Campo records deve ser uma lista."))
+                    .build();
+            }
+
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> records = (List<Map<String, Object>>) (List<?>) rawRecords;
+            List<Map<String, Object>> savedRecords = fiscalizacaoService.replaceAllRecords(records);
+            return Response.ok(Map.of("records", savedRecords)).build();
+        } catch (IllegalArgumentException exception) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                .entity(Map.of("error", exception.getMessage()))
+                .build();
+        } catch (RuntimeException exception) {
+            return internalError("Falha ao salvar fiscalizacoes.");
+        }
+    }
+
+    @PUT
     @Path("/{id}")
     public Response update(@PathParam("id") String id, Map<String, Object> body) {
         try {
@@ -67,6 +91,16 @@ public class FiscalizacaoResource {
                 .build();
         } catch (RuntimeException exception) {
             return internalError("Falha ao atualizar fiscalizacao.");
+        }
+    }
+
+    @DELETE
+    public Response deleteAll() {
+        try {
+            int deleted = fiscalizacaoService.deleteAllRecords();
+            return Response.ok(Map.of("deleted", deleted)).build();
+        } catch (RuntimeException exception) {
+            return internalError("Falha ao excluir fiscalizacoes.");
         }
     }
 
