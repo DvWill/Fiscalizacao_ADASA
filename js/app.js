@@ -82,6 +82,13 @@ function normalizeHeaderKey(value) {
     .replace(/^_+|_+$/g, '');
 }
 
+function hasMeaningfulRecordData(record) {
+  return Object.values(record || {}).some((value) => {
+    if (value == null) return false;
+    return String(value).trim() !== '';
+  });
+}
+
 function getFirstRecordValue(record, keys) {
   for (const key of keys) {
     const value = record?.[key];
@@ -206,6 +213,13 @@ function buildObraId(seed, index) {
   return `obra-${index + 1}-${base || 'item'}`;
 }
 
+function normalizeObraRecord(record, index) {
+  return {
+    __obraId: record?.__obraId || buildObraId(record?.item || record?.local || record?.objeto_contrato, index),
+    ...record
+  };
+}
+
 function formatCurrency(value) {
   if (value == null || !Number.isFinite(value)) return '-';
   return new Intl.NumberFormat('pt-BR', {
@@ -291,12 +305,12 @@ function mapUploadedObraRecord(rawRecord, index) {
     record[normalizeHeaderKey(key)] = value;
   });
 
+  if (!hasMeaningfulRecordData(record)) return null;
+
   const local = String(getFirstRecordValue(record, ['local'])).trim();
   const objetoContrato = String(getFirstRecordValue(record, ['objeto_do_contrato', 'objeto_contrato'])).trim();
   const rawItem = String(getFirstRecordValue(record, ['item'])).trim();
   const item = rawItem || String(index + 1);
-
-  if (!local && !objetoContrato && !rawItem) return null;
 
   const latitude = sanitizeCoordinate(getFirstRecordValue(record, ['latitude']), 'lat');
   const longitude = sanitizeCoordinate(getFirstRecordValue(record, ['longitude']), 'lng');
@@ -339,7 +353,76 @@ function hasObraCoordinates(obra) {
   return Number.isFinite(obra?.latitude) && Number.isFinite(obra?.longitude);
 }
 
-allObras = loadStoredObras();
+async function replaceObrasApiRecords(records) {
+  const payload = await window.dataSdk._fetchJson(window.dataSdk._buildUrl('/obras'), {
+    method: 'PUT',
+    body: JSON.stringify({ records })
+  });
+
+  if (!payload || !Array.isArray(payload.records)) {
+    return null;
+  }
+
+  return payload.records.map((record, index) => normalizeObraRecord(record, index));
+}
+
+async function loadObrasData() {
+  if (!window.dataSdk?.isApiConfigured?.()) {
+    showToast('Configure a API para carregar as obras do banco.', 'warning');
+    allObras = loadStoredObras().map((record, index) => normalizeObraRecord(record, index));
+    return { isOk: false, source: 'local' };
+  }
+
+  const payload = await window.dataSdk._fetchJson(window.dataSdk._buildUrl('/obras'), {
+    method: 'GET'
+  });
+
+  if (!payload || !Array.isArray(payload.records)) {
+    return { isOk: false, source: 'api' };
+  }
+
+  allObras = payload.records.map((record, index) => normalizeObraRecord(record, index));
+  saveStoredObras(allObras);
+  return { isOk: true, source: 'api' };
+}
+
+async function persistObrasData(records) {
+  const normalizedRecords = (records || []).map((record, index) => normalizeObraRecord(record, index));
+
+  if (!window.dataSdk?.isApiConfigured?.()) {
+    showToast('API não configurada: não foi possível salvar obras no banco.', 'error');
+    return { isOk: false, source: 'local' };
+  }
+
+  const savedRecords = await replaceObrasApiRecords(normalizedRecords);
+
+  if (!savedRecords) {
+    return { isOk: false, source: 'api' };
+  }
+
+  allObras = savedRecords;
+  saveStoredObras(allObras);
+  return { isOk: true, source: 'api' };
+}
+
+async function deleteObrasData() {
+  if (!window.dataSdk?.isApiConfigured?.()) {
+    showToast('API não configurada: não foi possível excluir obras no banco.', 'error');
+    return { isOk: false, source: 'local' };
+  }
+
+  const savedRecords = await replaceObrasApiRecords([]);
+  if (!savedRecords) {
+    return { isOk: false, source: 'api' };
+  }
+
+  allObras = [];
+  filteredObras = [];
+  clearStoredObras();
+  return { isOk: true, source: 'api' };
+}
+
+allObras = loadStoredObras().map((record, index) => normalizeObraRecord(record, index));
 currentView = loadStoredView();
 
 const dataHandler = {
@@ -353,9 +436,21 @@ const dataHandler = {
 
 async function initDataSDK() {
   const result = await window.dataSdk.init(dataHandler);
+  const obrasResult = await loadObrasData();
   if (!result.isOk) showToast('Erro ao inicializar sistema de dados', 'error');
+  if (!obrasResult.isOk) showToast('Erro ao inicializar obras', 'error');
+  if (result.syncedLocalToApi || obrasResult.syncedLocalToApi) {
+    showToast('Dados locais sincronizados com o banco de dados.', 'success');
+  }
   updateStorageModeStatus();
-  return result;
+  updateFiltersOptions();
+  applyFilters();
+  updateDashboard();
+
+  return {
+    isOk: result.isOk && obrasResult.isOk,
+    source: result.source === 'api' && obrasResult.source === 'api' ? 'api' : 'local'
+  };
 }
 
 function updateStorageModeStatus() {
@@ -363,26 +458,34 @@ function updateStorageModeStatus() {
   const select = document.getElementById('storage-mode-select');
   if (!status || !select || !window.dataSdk) return;
 
-  const selectedMode = window.dataSdk.getStorageMode();
+  const selectedMode = window.dataSdk.getActiveMode();
   const apiConfigured = window.dataSdk.isApiConfigured();
   const lastSource = window.dataSdk.getLastSource();
 
   select.value = selectedMode;
 
-  if (selectedMode === 'api' && !apiConfigured) {
-    status.textContent = 'API nao configurada';
+  if (!apiConfigured) {
+    status.textContent = 'Salvo no navegador';
     return;
   }
 
-  if (selectedMode === 'api' && lastSource !== 'api') {
-    status.textContent = 'API indisponivel';
+  if (lastSource !== 'api') {
+    status.textContent = 'Banco indisponivel';
     return;
   }
 
-  status.textContent = selectedMode === 'api' ? 'API ativa' : 'Salvo no navegador';
+  status.textContent = 'Banco ativo';
 }
 
 async function handleStorageModeChange(event) {
+  if (window.dataSdk?.isApiConfigured?.()) {
+    window.dataSdk.setStorageMode('api');
+    event.target.value = 'api';
+    updateStorageModeStatus();
+    showToast('Esta instalacao salva diretamente no banco de dados.', 'info');
+    return;
+  }
+
   const nextMode = event.target.value === 'api' ? 'api' : 'local';
 
   if (nextMode === 'api' && !window.dataSdk.isApiConfigured()) {
@@ -419,10 +522,23 @@ function initStorageModeSelector() {
   const select = document.getElementById('storage-mode-select');
   if (!select) return;
 
-  if (window.dataSdk && !window.dataSdk.isApiConfigured() && window.dataSdk.getStorageMode() === 'api') {
+  if (window.dataSdk?.isApiConfigured?.()) {
+    window.dataSdk.setStorageMode('api');
+    select.value = 'api';
+    select.disabled = true;
+    select.classList.add('opacity-60', 'cursor-not-allowed');
+    const localOption = select.querySelector('option[value="local"]');
+    if (localOption) localOption.disabled = true;
+    updateStorageModeStatus();
+    return;
+  }
+
+  if (window.dataSdk?.getStorageMode?.() === 'api') {
     window.dataSdk.setStorageMode('local');
   }
 
+  select.disabled = false;
+  select.classList.remove('opacity-60', 'cursor-not-allowed');
   select.value = window.dataSdk?.getStorageMode?.() || 'local';
   select.addEventListener('change', handleStorageModeChange);
   updateStorageModeStatus();
@@ -502,8 +618,11 @@ function updateDataViewUI() {
   importBtn?.classList.toggle('hidden', isObras);
   uploadBtn?.classList.toggle('hidden', !isObras);
   addBtn?.classList.toggle('hidden', isObras);
-  dashboardBtn?.classList.toggle('hidden', isObras);
   storageMode?.classList.toggle('hidden', isObras);
+
+  if (dashboardBtn) {
+    dashboardBtn.classList.remove('hidden');
+  }
 
   if (filterRegiao?.previousElementSibling) {
     filterRegiao.previousElementSibling.textContent = isObras ? 'Local' : 'Regiao Administrativa';
@@ -1039,7 +1158,7 @@ function renderObrasList() {
         <div class="flex items-start justify-between gap-3 mb-2">
           <span class="font-semibold text-sm leading-tight">${obra.item || 'Obra'}</span>
           <span style="font-size:10px;padding:2px 8px;border-radius:999px;background:${color};color:white;white-space:nowrap;">
-            ${progress != null ? formatPercent(progress) : 'Mapa'}
+            ${progress != null ? formatPercent(progress) : (hasObraCoordinates(obra) ? 'Sem %' : 'Sem coord.')}
           </span>
         </div>
         <p class="text-xs text-slate-300 truncate">${obra.local || 'Sem local informado'}</p>
@@ -1160,6 +1279,15 @@ function showDetailPanel(fisc) {
                 <p class="text-sm font-mono text-slate-300">${fisc.longitude}</p>
               </div>
             </div>
+          </div>
+        </div>
+      ` : ''}
+
+      ${fisc.imagem ? `
+        <div class="space-y-3">
+          <h3 class="text-sm font-semibold text-blue-400 uppercase tracking-wider">Imagem</h3>
+          <div class="rounded-xl overflow-hidden border border-slate-700 bg-slate-900/80">
+            <img src="${fisc.imagem}" alt="Imagem da fiscalização" class="w-full object-cover max-h-96">
           </div>
         </div>
       ` : ''}
@@ -1297,6 +1425,7 @@ function openAddModal() {
   document.getElementById('form-ano').value = new Date().getFullYear();
   document.getElementById('form-direta').value = 'Direta';
   document.getElementById('form-modal').classList.remove('hidden');
+  updateImagemPreview();
 }
 window.openAddModal = openAddModal;
 
@@ -1335,6 +1464,10 @@ function editCurrentFiscalizacao() {
   document.getElementById('form-tn').value = currentFiscalizacao.termos_notificacao || '';
   document.getElementById('form-ai').value = currentFiscalizacao.autos_infracao || '';
   document.getElementById('form-tac').value = currentFiscalizacao.termos_ajuste || '';
+  updateImagemPreview({
+    data: currentFiscalizacao.imagem || '',
+    name: currentFiscalizacao.imagem ? 'Imagem anexada' : ''
+  });
 
   closeDetailPanel();
   document.getElementById('form-modal').classList.remove('hidden');
@@ -1350,6 +1483,59 @@ function closeModal() {
   disableMapSelection();
 }
 window.closeModal = closeModal;
+
+function updateImagemPreview({ data = '', name = '' } = {}) {
+  const hidden = document.getElementById('form-imagem-data');
+  const preview = document.getElementById('form-imagem-preview');
+  const img = document.getElementById('form-imagem-preview-img');
+  const label = document.getElementById('form-imagem-name');
+  const fileInput = document.getElementById('form-imagem-file');
+
+  if (!hidden || !preview || !img || !label) return;
+
+  if (data) {
+    hidden.value = data;
+    img.src = data;
+    label.textContent = name || 'Imagem selecionada';
+    preview.classList.remove('hidden');
+  } else {
+    hidden.value = '';
+    img.removeAttribute('src');
+    label.textContent = '';
+    preview.classList.add('hidden');
+    if (fileInput) fileInput.value = '';
+  }
+}
+
+function handleImagemSelected(event) {
+  const file = event?.target?.files?.[0];
+  if (!file) {
+    updateImagemPreview();
+    return;
+  }
+
+  const maxBytes = 2 * 1024 * 1024;
+  if (file.size > maxBytes) {
+    showToast('Imagem deve ter no máximo 2MB.', 'warning');
+    event.target.value = '';
+    updateImagemPreview();
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = () => updateImagemPreview({ data: reader.result, name: file.name });
+  reader.onerror = () => {
+    showToast('Não foi possível ler a imagem.', 'error');
+    updateImagemPreview();
+  };
+  reader.readAsDataURL(file);
+}
+window.handleImagemSelected = handleImagemSelected;
+
+function clearImagemField() {
+  updateImagemPreview();
+}
+window.clearImagemField = clearImagemField;
 
 // ======== Submit (create/update) ========
 async function handleSubmit(event) {
@@ -1394,6 +1580,7 @@ async function handleSubmit(event) {
     autos_infracao: parseInt(document.getElementById('form-ai').value, 10) || null,
     termos_ajuste: parseInt(document.getElementById('form-tac').value, 10) || null,
     indice_conformidade: parseFloat(document.getElementById('form-conformidade').value) || null,
+    imagem: document.getElementById('form-imagem-data').value || null,
     latitude: lat || null,
     longitude: lng || null
   };
@@ -1532,6 +1719,190 @@ function updateDashboard() {
       </div>
     `).join('')
     : '<p class="text-center text-slate-500 py-8">Nenhuma região cadastrada</p>';
+}
+
+function setDashboardMeta(config) {
+  const panel = document.getElementById('dashboard-panel');
+  if (!panel) return;
+
+  const titleHeading = panel.querySelector('h2');
+  if (titleHeading) {
+    const titleSpan = titleHeading.querySelector('#dashboard-title-text');
+    if (titleSpan) {
+      titleSpan.textContent = config.title;
+    } else {
+      const textNode = [...titleHeading.childNodes].find((node) => node.nodeType === Node.TEXT_NODE && node.textContent.trim());
+      if (textNode) textNode.textContent = ` ${config.title}`;
+    }
+  }
+
+  const metricLabels = panel.querySelectorAll('.metric-card .text-slate-400.text-sm');
+  const labels = [
+    config.totalLabel,
+    config.secondaryLabel,
+    config.tertiaryLabel,
+    config.quaternaryLabel,
+    config.quinaryLabel,
+    config.senaryLabel,
+    config.septenaryLabel
+  ];
+
+  metricLabels.forEach((element, index) => {
+    if (labels[index]) element.textContent = labels[index];
+  });
+
+  const chartTitles = panel.querySelectorAll('.metric-card h3');
+  if (chartTitles[0]) chartTitles[0].textContent = config.statusChartTitle;
+  if (chartTitles[1]) chartTitles[1].textContent = config.regionChartTitle;
+}
+
+function buildDashboardBar(value, maxValue, colorClass, valueClass, label) {
+  const safeMax = Math.max(maxValue, 1);
+  const height = Math.max((value / safeMax) * 150, 20);
+
+  return `
+    <div class="flex flex-col items-center">
+      <div class="w-16 bg-slate-700 rounded-t-lg relative" style="height: ${height}px; min-height: 20px;">
+        <div class="absolute inset-0 ${colorClass} rounded-t-lg"></div>
+      </div>
+      <p class="text-xl font-bold mt-2 ${valueClass}">${value}</p>
+      <p class="text-xs text-slate-400 text-center">${label}</p>
+    </div>
+  `;
+}
+
+function updateDashboard() {
+  if (currentView === 'obras') {
+    const total = allObras.length;
+    const comCoordenadas = allObras.filter((obra) => hasObraCoordinates(obra)).length;
+    const semCoordenadas = total - comCoordenadas;
+    const emExecucao = allObras.filter((obra) => normalizePlainText(obra.situacao_contrato).includes('execu')).length;
+    const emRecebimento = allObras.filter((obra) => normalizePlainText(obra.situacao_contrato).includes('receb')).length;
+    const outrasSituacoes = total - emExecucao - emRecebimento;
+
+    const progressos = allObras
+      .map((obra) => getObraProgressValue(obra))
+      .filter((value) => Number.isFinite(value));
+    const avgExecucao = progressos.length > 0
+      ? Math.round(progressos.reduce((sum, value) => sum + value, 0) / progressos.length)
+      : 0;
+
+    const valorTotal = allObras.reduce((sum, obra) => sum + (Number.isFinite(obra.valor_total_obra) ? obra.valor_total_obra : 0), 0);
+    const valorExecutado = allObras.reduce((sum, obra) => sum + (Number.isFinite(obra.valor_executado_2025) ? obra.valor_executado_2025 : 0), 0);
+
+    setDashboardMeta({
+      title: 'Dashboard de Obras',
+      totalLabel: 'Total de Obras',
+      secondaryLabel: 'Em Execucao',
+      tertiaryLabel: 'Em Recebimento',
+      quaternaryLabel: 'Execucao Media',
+      quinaryLabel: 'Sem Coordenadas',
+      senaryLabel: 'Valor Total',
+      septenaryLabel: 'Executado 2025',
+      statusChartTitle: 'Distribuicao por Situacao do Contrato',
+      regionChartTitle: 'Por Local'
+    });
+
+    document.getElementById('metric-total').textContent = total;
+    document.getElementById('metric-andamento').textContent = emExecucao;
+    document.getElementById('metric-concluida').textContent = emRecebimento;
+    document.getElementById('metric-pendente').textContent = semCoordenadas;
+    document.getElementById('metric-conformidade').textContent = `${avgExecucao}%`;
+    document.getElementById('metric-ai').textContent = formatCurrency(valorTotal);
+    document.getElementById('metric-tn').textContent = formatCurrency(valorExecutado);
+
+    const maxStatus = Math.max(emExecucao, emRecebimento, outrasSituacoes, 1);
+    document.getElementById('chart-situacao').innerHTML = [
+      buildDashboardBar(emExecucao, maxStatus, 'bg-gradient-to-t from-amber-500 to-yellow-400', 'text-amber-400', 'Em Execucao'),
+      buildDashboardBar(emRecebimento, maxStatus, 'bg-gradient-to-t from-emerald-500 to-green-400', 'text-emerald-400', 'Em Recebimento'),
+      buildDashboardBar(outrasSituacoes, maxStatus, 'bg-gradient-to-t from-sky-500 to-blue-400', 'text-sky-400', 'Outras')
+    ].join('');
+
+    const localCounts = {};
+    allObras.forEach((obra) => {
+      const local = String(obra.local || '').trim() || 'Sem local informado';
+      localCounts[local] = (localCounts[local] || 0) + 1;
+    });
+
+    const sortedLocais = Object.entries(localCounts).sort((a, b) => b[1] - a[1]);
+    const maxLocal = sortedLocais.length > 0 ? sortedLocais[0][1] : 1;
+
+    document.getElementById('chart-regiao').innerHTML = sortedLocais.length > 0
+      ? sortedLocais.map(([local, count]) => `
+        <div class="flex items-center gap-3">
+          <span class="text-xs text-slate-400 w-32 truncate">${local}</span>
+          <div class="flex-1 h-5 bg-slate-700 rounded-full overflow-hidden">
+            <div class="h-full bg-gradient-to-r from-emerald-600 to-emerald-400 rounded-full transition-all duration-500"
+                 style="width: ${(count / maxLocal) * 100}%"></div>
+          </div>
+          <span class="text-sm font-semibold text-emerald-400 min-w-[30px] text-right">${count}</span>
+        </div>
+      `).join('')
+      : '<p class="text-center text-slate-500 py-8">Nenhuma obra cadastrada</p>';
+    return;
+  }
+
+  setDashboardMeta({
+    title: 'Dashboard de Metricas',
+    totalLabel: 'Total de Fiscalizacoes',
+    secondaryLabel: 'Em Andamento',
+    tertiaryLabel: 'Concluidas',
+    quaternaryLabel: 'Conformidade Media',
+    quinaryLabel: 'Pendentes',
+    senaryLabel: 'Total Autos de Infracao',
+    septenaryLabel: 'Total Termos de Notificacao',
+    statusChartTitle: 'Distribuicao por Situacao',
+    regionChartTitle: 'Por Regiao Administrativa'
+  });
+
+  const total = allFiscalizacoes.length;
+  const andamento = allFiscalizacoes.filter(f => f.situacao === 'Em Andamento').length;
+  const concluida = allFiscalizacoes.filter(f => f.situacao === 'ConcluÃ­da').length;
+  const pendente = allFiscalizacoes.filter(f => f.situacao === 'Pendente').length;
+
+  const conformidades = allFiscalizacoes.filter(f => f.indice_conformidade).map(f => f.indice_conformidade);
+  const avgConformidade = conformidades.length > 0
+    ? Math.round(conformidades.reduce((a, b) => a + b, 0) / conformidades.length)
+    : 0;
+
+  const totalAI = allFiscalizacoes.reduce((sum, f) => sum + (f.autos_infracao || 0), 0);
+  const totalTN = allFiscalizacoes.reduce((sum, f) => sum + (f.termos_notificacao || 0), 0);
+
+  document.getElementById('metric-total').textContent = total;
+  document.getElementById('metric-andamento').textContent = andamento;
+  document.getElementById('metric-concluida').textContent = concluida;
+  document.getElementById('metric-pendente').textContent = pendente;
+  document.getElementById('metric-conformidade').textContent = `${avgConformidade}%`;
+  document.getElementById('metric-ai').textContent = totalAI;
+  document.getElementById('metric-tn').textContent = totalTN;
+
+  const maxStatus = Math.max(andamento, concluida, pendente, 1);
+  document.getElementById('chart-situacao').innerHTML = [
+    buildDashboardBar(andamento, maxStatus, 'bg-gradient-to-t from-amber-500 to-yellow-400', 'text-amber-400', 'Andamento'),
+    buildDashboardBar(concluida, maxStatus, 'bg-gradient-to-t from-emerald-500 to-green-400', 'text-emerald-400', 'Concluida'),
+    buildDashboardBar(pendente, maxStatus, 'bg-gradient-to-t from-red-500 to-rose-400', 'text-red-400', 'Pendente')
+  ].join('');
+
+  const regionCounts = {};
+  allFiscalizacoes.forEach(f => {
+    if (f.regiao_administrativa) regionCounts[f.regiao_administrativa] = (regionCounts[f.regiao_administrativa] || 0) + 1;
+  });
+
+  const sortedRegions = Object.entries(regionCounts).sort((a, b) => b[1] - a[1]);
+  const maxRegion = sortedRegions.length > 0 ? sortedRegions[0][1] : 1;
+
+  document.getElementById('chart-regiao').innerHTML = sortedRegions.length > 0
+    ? sortedRegions.map(([region, count]) => `
+      <div class="flex items-center gap-3">
+        <span class="text-xs text-slate-400 w-32 truncate">${region}</span>
+        <div class="flex-1 h-5 bg-slate-700 rounded-full overflow-hidden">
+          <div class="h-full bg-gradient-to-r from-blue-600 to-blue-400 rounded-full transition-all duration-500"
+               style="width: ${(count / maxRegion) * 100}%"></div>
+        </div>
+        <span class="text-sm font-semibold text-blue-400 min-w-[30px] text-right">${count}</span>
+      </div>
+    `).join('')
+    : '<p class="text-center text-slate-500 py-8">Nenhuma regiÃ£o cadastrada</p>';
 }
 
 // ======== Obras Upload ========
@@ -1679,14 +2050,22 @@ async function handleObrasFileSelected(event) {
 }
 window.handleObrasFileSelected = handleObrasFileSelected;
 
-function executeObrasUpload() {
+async function executeObrasUpload() {
   if (pendingObrasUpload.length === 0) {
     showToast('Selecione uma planilha valida antes de carregar as obras.', 'warning');
     return;
   }
 
-  allObras = pendingObrasUpload.map((obra) => ({ ...obra }));
-  saveStoredObras(allObras);
+  showLoading('Salvando obras...');
+
+  const result = await persistObrasData(pendingObrasUpload.map((obra) => ({ ...obra })));
+
+  hideLoading();
+
+  if (!result.isOk) {
+    showToast('Erro ao salvar obras.', 'error');
+    return;
+  }
 
   pendingObrasUpload = [];
   pendingObrasMeta = null;
@@ -1699,14 +2078,17 @@ function executeObrasUpload() {
   } else {
     closeDetailPanel();
     updateFiltersOptions();
-    applyFilters();
+    clearFilters();
   }
 
-  showToast(`${allObras.length} obras carregadas no mapa.`, 'success');
+  updateDashboard();
+
+  const mappedWithCoordinates = allObras.filter((obra) => hasObraCoordinates(obra)).length;
+  showToast(`${allObras.length} obras carregadas (${mappedWithCoordinates} com coordenadas).`, 'success');
 }
 window.executeObrasUpload = executeObrasUpload;
 
-function clearObrasData() {
+async function clearObrasData() {
   if (!pendingObrasMeta && allObras.length === 0) {
     showToast('Nao ha obras carregadas para limpar.', 'info');
     return;
@@ -1716,11 +2098,19 @@ function clearObrasData() {
     return;
   }
 
+  showLoading('Removendo obras...');
+
+  const result = await deleteObrasData();
+
+  hideLoading();
+
+  if (!result.isOk) {
+    showToast('Erro ao remover obras.', 'error');
+    return;
+  }
+
   pendingObrasUpload = [];
   pendingObrasMeta = null;
-  allObras = [];
-  filteredObras = [];
-  clearStoredObras();
   renderObrasUploadPreview();
   updateObrasUploadActions();
 
@@ -1732,6 +2122,8 @@ function clearObrasData() {
     updateFiltersOptions();
     applyFilters();
   }
+
+  updateDashboard();
 
   showToast('Dados de obras removidos.', 'success');
 }
