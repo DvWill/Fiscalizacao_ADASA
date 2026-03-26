@@ -367,10 +367,10 @@ async function replaceObrasApiRecords(records) {
 }
 
 async function loadObrasData() {
+  const localRecords = loadStoredObras().map((record, index) => normalizeObraRecord(record, index));
   if (!window.dataSdk?.isApiConfigured?.()) {
-    showToast('Configure a API para carregar as obras do banco.', 'warning');
-    allObras = loadStoredObras().map((record, index) => normalizeObraRecord(record, index));
-    return { isOk: false, source: 'local' };
+    allObras = localRecords;
+    return { isOk: true, source: 'local' };
   }
 
   const payload = await window.dataSdk._fetchJson(window.dataSdk._buildUrl('/obras'), {
@@ -378,7 +378,8 @@ async function loadObrasData() {
   });
 
   if (!payload || !Array.isArray(payload.records)) {
-    return { isOk: false, source: 'api' };
+    allObras = localRecords;
+    return { isOk: true, source: 'local', fallbackReason: 'api_unavailable' };
   }
 
   allObras = payload.records.map((record, index) => normalizeObraRecord(record, index));
@@ -390,14 +391,17 @@ async function persistObrasData(records) {
   const normalizedRecords = (records || []).map((record, index) => normalizeObraRecord(record, index));
 
   if (!window.dataSdk?.isApiConfigured?.()) {
-    showToast('API não configurada: não foi possível salvar obras no banco.', 'error');
-    return { isOk: false, source: 'local' };
+    allObras = normalizedRecords;
+    saveStoredObras(allObras);
+    return { isOk: true, source: 'local' };
   }
 
   const savedRecords = await replaceObrasApiRecords(normalizedRecords);
 
   if (!savedRecords) {
-    return { isOk: false, source: 'api' };
+    allObras = normalizedRecords;
+    saveStoredObras(allObras);
+    return { isOk: true, source: 'local', fallbackReason: 'api_unavailable' };
   }
 
   allObras = savedRecords;
@@ -407,13 +411,18 @@ async function persistObrasData(records) {
 
 async function deleteObrasData() {
   if (!window.dataSdk?.isApiConfigured?.()) {
-    showToast('API não configurada: não foi possível excluir obras no banco.', 'error');
-    return { isOk: false, source: 'local' };
+    allObras = [];
+    filteredObras = [];
+    clearStoredObras();
+    return { isOk: true, source: 'local' };
   }
 
   const savedRecords = await replaceObrasApiRecords([]);
   if (!savedRecords) {
-    return { isOk: false, source: 'api' };
+    allObras = [];
+    filteredObras = [];
+    clearStoredObras();
+    return { isOk: true, source: 'local', fallbackReason: 'api_unavailable' };
   }
 
   allObras = [];
@@ -438,7 +447,9 @@ async function initDataSDK() {
   const result = await window.dataSdk.init(dataHandler);
   const obrasResult = await loadObrasData();
   if (!result.isOk) showToast('Erro ao inicializar sistema de dados', 'error');
-  if (!obrasResult.isOk) showToast('Erro ao inicializar obras', 'error');
+  if (obrasResult.fallbackReason === 'api_unavailable') {
+    showToast('API de obras indisponivel no momento. Usando armazenamento local.', 'warning');
+  }
   if (result.syncedLocalToApi || obrasResult.syncedLocalToApi) {
     showToast('Dados locais sincronizados com o banco de dados.', 'success');
   }
@@ -2084,6 +2095,10 @@ async function executeObrasUpload() {
   updateDashboard();
 
   const mappedWithCoordinates = allObras.filter((obra) => hasObraCoordinates(obra)).length;
+  if (result.fallbackReason === 'api_unavailable') {
+    showToast(`${allObras.length} obras carregadas localmente (${mappedWithCoordinates} com coordenadas).`, 'warning');
+    return;
+  }
   showToast(`${allObras.length} obras carregadas (${mappedWithCoordinates} com coordenadas).`, 'success');
 }
 window.executeObrasUpload = executeObrasUpload;
@@ -2125,6 +2140,10 @@ async function clearObrasData() {
 
   updateDashboard();
 
+  if (result.fallbackReason === 'api_unavailable') {
+    showToast('Obras removidas localmente (API indisponivel).', 'warning');
+    return;
+  }
   showToast('Dados de obras removidos.', 'success');
 }
 window.clearObrasData = clearObrasData;
