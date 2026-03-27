@@ -1,0 +1,15 @@
+node_modules
+.git
+.idea
+.vscode
+.m2
+.m2clean
+target
+data
+tmp_obras_xlsx
+tmp_obras_upload.zip
+tmp_test_write.txt
+.redhat
+quarkus-neon-check.err.log
+quarkus-neon-check.out.log
+quarkus-neon-check.response.log

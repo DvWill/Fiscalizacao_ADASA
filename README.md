@@ -44,13 +44,22 @@ Porta:
 
 ## Deploy no Vercel (Serverless)
 
-Este projeto tambem inclui uma funcao em `api/fiscalizacoes.js` para uso no Vercel.
+Este projeto inclui funcoes em `api/fiscalizacoes.js` e `api/obras.js` para uso no Vercel.
 
-- Endpoint: `/api/fiscalizacoes`
-- Metodos: `GET`, `POST`, `PUT`, `DELETE`
+- Endpoints:
+  - `/api/fiscalizacoes` (`GET`, `POST`, `PUT`, `DELETE`)
+  - `/api/obras` (`GET`, `PUT`, `DELETE`)
 - Reescrita para ID: `vercel.json` mapeia `/api/fiscalizacoes/:id` para a funcao.
 
-Observacao: os dados dessa funcao sao em memoria (mock/prototipo) e podem reiniciar entre execucoes.
+Persistencia: as funcoes usam PostgreSQL (`pg`) e exigem a variavel de ambiente:
+
+- `NEON_DATABASE_URL` (ou `DATABASE_URL`)
+
+Exemplo:
+
+```text
+postgresql://USUARIO:SENHA@HOST/DB?sslmode=require&channel_binding=require
+```
 
 ## Endpoints
 

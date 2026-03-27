@@ -951,7 +951,10 @@
     // window.__FISCALIZACOES_API_BASE_URL__ = "https://meu-servidor.com/api";
     const externalApiBaseUrl = String(window.__FISCALIZACOES_API_BASE_URL__ || "").trim();
     // Sempre tenta falar com o backend em /api por padrão (ou valor externo configurado).
-    const resolvedApiBaseUrl = externalApiBaseUrl || "/api";
+    const defaultApiBaseUrl = isLocalhost
+      ? "https://fiscalizacao-adasa.vercel.app/api"
+      : "/api";
+    const resolvedApiBaseUrl = externalApiBaseUrl || defaultApiBaseUrl;
 
     window.APP_BACKEND_CONFIG = {
       baseUrl: resolvedApiBaseUrl,

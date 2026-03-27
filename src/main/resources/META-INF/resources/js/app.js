@@ -378,8 +378,9 @@ async function loadObrasData() {
   });
 
   if (!payload || !Array.isArray(payload.records)) {
-    allObras = localRecords;
-    return { isOk: true, source: 'local', fallbackReason: 'api_unavailable' };
+    allObras = [];
+    filteredObras = [];
+    return { isOk: false, source: 'api', fallbackReason: 'api_unavailable' };
   }
 
   allObras = payload.records.map((record, index) => normalizeObraRecord(record, index));
@@ -399,9 +400,7 @@ async function persistObrasData(records) {
   const savedRecords = await replaceObrasApiRecords(normalizedRecords);
 
   if (!savedRecords) {
-    allObras = normalizedRecords;
-    saveStoredObras(allObras);
-    return { isOk: true, source: 'local', fallbackReason: 'api_unavailable' };
+    return { isOk: false, source: 'api', fallbackReason: 'api_unavailable' };
   }
 
   allObras = savedRecords;
@@ -419,10 +418,7 @@ async function deleteObrasData() {
 
   const savedRecords = await replaceObrasApiRecords([]);
   if (!savedRecords) {
-    allObras = [];
-    filteredObras = [];
-    clearStoredObras();
-    return { isOk: true, source: 'local', fallbackReason: 'api_unavailable' };
+    return { isOk: false, source: 'api', fallbackReason: 'api_unavailable' };
   }
 
   allObras = [];
@@ -448,7 +444,7 @@ async function initDataSDK() {
   const obrasResult = await loadObrasData();
   if (!result.isOk) showToast('Erro ao inicializar sistema de dados', 'error');
   if (obrasResult.fallbackReason === 'api_unavailable') {
-    showToast('API de obras indisponivel no momento. Usando armazenamento local.', 'warning');
+    showToast('API de obras indisponivel no momento. Nao foi possivel ler dados do banco.', 'warning');
   }
   if (result.syncedLocalToApi || obrasResult.syncedLocalToApi) {
     showToast('Dados locais sincronizados com o banco de dados.', 'success');

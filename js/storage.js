@@ -13,6 +13,7 @@ window.dataSdk = {
   async init(handler) {
     this._handler = handler;
 
+    const localRecords = this._loadStoredRecords();
     let records = [];
     let loadedFromBackend = false;
     const activeMode = this.getActiveMode();
@@ -25,8 +26,8 @@ window.dataSdk = {
       }
     }
 
-    if (!loadedFromBackend) {
-      records = this._loadStoredRecords();
+    if (!loadedFromBackend && activeMode !== "api") {
+      records = localRecords;
     }
 
     this._data = records.map((r) => ({
@@ -39,7 +40,7 @@ window.dataSdk = {
     this._notify();
 
     return {
-      isOk: loadedFromBackend || persisted,
+      isOk: activeMode === "api" ? loadedFromBackend : persisted,
       mode: activeMode,
       source: loadedFromBackend ? "api" : "local"
     };
@@ -162,22 +163,27 @@ window.dataSdk = {
   },
 
   getStorageMode() {
-    const config = this._getBackendConfig();
-    const storedMode = localStorage.getItem(this._modeKey);
-    const mode = storedMode || config.mode || "local";
-    return mode === "api" ? "api" : "local";
-  },
-
-  getActiveMode() {
-    if (this.getStorageMode() === "api" && this.isApiConfigured()) {
+    if (this.isApiConfigured()) {
+      try {
+        localStorage.setItem(this._modeKey, "api");
+      } catch {
+        // Ignore localStorage write issues; API remains the active mode.
+      }
       return "api";
     }
 
-    return "local";
+    const config = this._getBackendConfig();
+    const storedMode = localStorage.getItem(this._modeKey);
+    const mode = storedMode || config.mode || "local";
+    return mode === "api" && this.isApiConfigured() ? "api" : "local";
+  },
+
+  getActiveMode() {
+    return this.isApiConfigured() ? "api" : "local";
   },
 
   setStorageMode(mode) {
-    const nextMode = mode === "api" ? "api" : "local";
+    const nextMode = this.isApiConfigured() ? "api" : "local";
     localStorage.setItem(this._modeKey, nextMode);
     return nextMode;
   },

@@ -16,7 +16,6 @@ window.dataSdk = {
     const localRecords = this._loadStoredRecords();
     let records = [];
     let loadedFromBackend = false;
-    let syncedLocalToApi = false;
     const activeMode = this.getActiveMode();
 
     if (activeMode === "api") {
@@ -24,21 +23,10 @@ window.dataSdk = {
       if (remote) {
         records = remote;
         loadedFromBackend = true;
-
-        if (remote.length === 0 && localRecords.length > 0) {
-          const synced = await this._replaceRemoteRecords(localRecords);
-          if (synced) {
-            records = synced;
-            syncedLocalToApi = true;
-          } else {
-            records = localRecords;
-            loadedFromBackend = false;
-          }
-        }
       }
     }
 
-    if (!loadedFromBackend) {
+    if (!loadedFromBackend && activeMode !== "api") {
       records = localRecords;
     }
 
@@ -52,10 +40,10 @@ window.dataSdk = {
     this._notify();
 
     return {
-      isOk: loadedFromBackend || persisted,
+      isOk: activeMode === "api" ? loadedFromBackend : persisted,
       mode: activeMode,
       source: loadedFromBackend ? "api" : "local",
-      syncedLocalToApi
+      syncedLocalToApi: false
     };
   },
 
@@ -256,17 +244,6 @@ window.dataSdk = {
   async _fetchRemoteRecords() {
     const payload = await this._fetchJson(this._buildUrl("/fiscalizacoes"), {
       method: "GET"
-    });
-
-    if (Array.isArray(payload)) return payload;
-    if (Array.isArray(payload?.records)) return payload.records;
-    return null;
-  },
-
-  async _replaceRemoteRecords(records) {
-    const payload = await this._fetchJson(this._buildUrl("/fiscalizacoes"), {
-      method: "PUT",
-      body: JSON.stringify({ records })
     });
 
     if (Array.isArray(payload)) return payload;
