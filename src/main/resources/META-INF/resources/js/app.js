@@ -1665,17 +1665,19 @@ window.toggleDashboard = toggleDashboard;
 
 function updateDashboard() {
   const total = allFiscalizacoes.length;
-  const andamento = allFiscalizacoes.filter(f => f.situacao === 'Em Andamento').length;
-  const concluida = allFiscalizacoes.filter(f => f.situacao === 'Concluída').length;
-  const pendente = allFiscalizacoes.filter(f => f.situacao === 'Pendente').length;
+  const andamento = allFiscalizacoes.filter((f) => isSituacaoAndamento(f.situacao)).length;
+  const concluida = allFiscalizacoes.filter((f) => isSituacaoConcluida(f.situacao)).length;
+  const pendente = allFiscalizacoes.filter((f) => isSituacaoPendente(f.situacao)).length;
 
-  const conformidades = allFiscalizacoes.filter(f => f.indice_conformidade).map(f => f.indice_conformidade);
+  const conformidades = allFiscalizacoes
+    .map((f) => Number(f.indice_conformidade))
+    .filter((value) => Number.isFinite(value));
   const avgConformidade = conformidades.length > 0
     ? Math.round(conformidades.reduce((a, b) => a + b, 0) / conformidades.length)
     : 0;
 
-  const totalAI = allFiscalizacoes.reduce((sum, f) => sum + (f.autos_infracao || 0), 0);
-  const totalTN = allFiscalizacoes.reduce((sum, f) => sum + (f.termos_notificacao || 0), 0);
+  const totalAI = allFiscalizacoes.reduce((sum, f) => sum + toFiniteNumber(f.autos_infracao), 0);
+  const totalTN = allFiscalizacoes.reduce((sum, f) => sum + toFiniteNumber(f.termos_notificacao), 0);
 
   document.getElementById('metric-total').textContent = total;
   document.getElementById('metric-andamento').textContent = andamento;
@@ -1782,6 +1784,23 @@ function buildDashboardBar(value, maxValue, colorClass, valueClass, label) {
   `;
 }
 
+function isSituacaoAndamento(value) {
+  return normalizePlainText(value).includes('andamento');
+}
+
+function isSituacaoConcluida(value) {
+  return normalizePlainText(value).includes('conclu');
+}
+
+function isSituacaoPendente(value) {
+  return normalizePlainText(value).includes('pend');
+}
+
+function toFiniteNumber(value) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
 function updateDashboard() {
   if (currentView === 'obras') {
     const total = allObras.length;
@@ -1867,17 +1886,19 @@ function updateDashboard() {
   });
 
   const total = allFiscalizacoes.length;
-  const andamento = allFiscalizacoes.filter(f => f.situacao === 'Em Andamento').length;
-  const concluida = allFiscalizacoes.filter(f => f.situacao === 'ConcluÃ­da').length;
-  const pendente = allFiscalizacoes.filter(f => f.situacao === 'Pendente').length;
+  const andamento = allFiscalizacoes.filter((f) => isSituacaoAndamento(f.situacao)).length;
+  const concluida = allFiscalizacoes.filter((f) => isSituacaoConcluida(f.situacao)).length;
+  const pendente = allFiscalizacoes.filter((f) => isSituacaoPendente(f.situacao)).length;
 
-  const conformidades = allFiscalizacoes.filter(f => f.indice_conformidade).map(f => f.indice_conformidade);
+  const conformidades = allFiscalizacoes
+    .map((f) => Number(f.indice_conformidade))
+    .filter((value) => Number.isFinite(value));
   const avgConformidade = conformidades.length > 0
     ? Math.round(conformidades.reduce((a, b) => a + b, 0) / conformidades.length)
     : 0;
 
-  const totalAI = allFiscalizacoes.reduce((sum, f) => sum + (f.autos_infracao || 0), 0);
-  const totalTN = allFiscalizacoes.reduce((sum, f) => sum + (f.termos_notificacao || 0), 0);
+  const totalAI = allFiscalizacoes.reduce((sum, f) => sum + toFiniteNumber(f.autos_infracao), 0);
+  const totalTN = allFiscalizacoes.reduce((sum, f) => sum + toFiniteNumber(f.termos_notificacao), 0);
 
   document.getElementById('metric-total').textContent = total;
   document.getElementById('metric-andamento').textContent = andamento;
