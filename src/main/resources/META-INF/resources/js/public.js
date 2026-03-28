@@ -43,8 +43,8 @@ function getMarkerClassName(kind) {
 
 function createMarkerIcon(kind) {
   return L.divIcon({
-    className: "",
-    html: `<span class="public-marker ${getMarkerClassName(kind)}" aria-hidden="true"></span>`,
+    className: "public-div-icon",
+    html: `<div class="public-marker ${getMarkerClassName(kind)}" aria-hidden="true"></div>`,
     iconSize: [14, 14],
     iconAnchor: [7, 7]
   });
