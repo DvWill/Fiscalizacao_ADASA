@@ -332,35 +332,50 @@
 
         <!-- Map Legend (melhor no mobile) -->
         <div class="absolute bottom-4 left-4 sm:bottom-6 sm:left-6 glass-card rounded-xl p-3 sm:p-4 z-[1000] max-w-[85vw] sm:max-w-none">
-          <h4 id="map-legend-title" class="text-sm font-semibold mb-3 text-slate-300">Legenda</h4>
-          <div id="map-legend-items" class="space-y-2">
-            <div class="flex items-center gap-2">
-              <div class="w-4 h-4 rounded-full bg-gradient-to-br from-yellow-400 to-amber-500"></div>
-              <span class="text-xs text-slate-400">Em Andamento</span>
-            </div>
-            <div class="flex items-center gap-2">
-              <div class="w-4 h-4 rounded-full bg-gradient-to-br from-emerald-400 to-green-500"></div>
-              <span class="text-xs text-slate-400">Concluida</span>
-            </div>
-            <div class="flex items-center gap-2">
-              <div class="w-4 h-4 rounded-full bg-gradient-to-br from-red-400 to-rose-500"></div>
-              <span class="text-xs text-slate-400">Pendente</span>
-            </div>
+          <div class="flex items-center justify-between gap-3">
+            <h4 id="map-legend-title" class="text-sm font-semibold text-slate-300">Legenda</h4>
+            <button
+              id="map-legend-toggle"
+              type="button"
+              onclick="toggleMapLegend()"
+              aria-expanded="true"
+              class="px-2 py-1 rounded-md bg-slate-700 hover:bg-slate-600 text-[11px] font-medium transition-colors flex items-center gap-1.5"
+            >
+              <span id="map-legend-toggle-text">Minimizar</span>
+              <span id="map-legend-toggle-icon" class="leading-none">-</span>
+            </button>
           </div>
-          <div class="mt-3 space-y-2">
-            <p class="text-[11px] text-slate-400">Camadas</p>
-            <div id="map-layer-toggles" class="space-y-1"></div>
-          </div>
-          <div class="mt-3 space-y-2">
-            <label class="block text-[11px] text-slate-400">Foco rapido no mapa</label>
-            <div class="grid grid-cols-1 gap-2">
-              <select id="map-focus-status" class="input-field w-full px-2 py-1.5 rounded-lg bg-slate-800 border border-slate-600 text-slate-200 text-xs">
-                <option value="">Todos os status</option>
-              </select>
-              <select id="map-focus-region" class="input-field w-full px-2 py-1.5 rounded-lg bg-slate-800 border border-slate-600 text-slate-200 text-xs">
-                <option value="">Todas as regioes/locais</option>
-              </select>
-              <button id="map-focus-apply" type="button" class="px-2 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-xs font-medium transition-colors">Aplicar foco</button>
+
+          <div id="map-legend-body" class="mt-3">
+            <div id="map-legend-items" class="space-y-2">
+              <div class="flex items-center gap-2">
+                <div class="w-4 h-4 rounded-full bg-gradient-to-br from-yellow-400 to-amber-500"></div>
+                <span class="text-xs text-slate-400">Em Andamento</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <div class="w-4 h-4 rounded-full bg-gradient-to-br from-emerald-400 to-green-500"></div>
+                <span class="text-xs text-slate-400">Concluida</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <div class="w-4 h-4 rounded-full bg-gradient-to-br from-red-400 to-rose-500"></div>
+                <span class="text-xs text-slate-400">Pendente</span>
+              </div>
+            </div>
+            <div class="mt-3 space-y-2">
+              <p class="text-[11px] text-slate-400">Camadas</p>
+              <div id="map-layer-toggles" class="space-y-1"></div>
+            </div>
+            <div class="mt-3 space-y-2">
+              <label class="block text-[11px] text-slate-400">Foco rapido no mapa</label>
+              <div class="grid grid-cols-1 gap-2">
+                <select id="map-focus-status" class="input-field w-full px-2 py-1.5 rounded-lg bg-slate-800 border border-slate-600 text-slate-200 text-xs">
+                  <option value="">Todos os status</option>
+                </select>
+                <select id="map-focus-region" class="input-field w-full px-2 py-1.5 rounded-lg bg-slate-800 border border-slate-600 text-slate-200 text-xs">
+                  <option value="">Todas as regioes/locais</option>
+                </select>
+                <button id="map-focus-apply" type="button" class="px-2 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-xs font-medium transition-colors">Aplicar foco</button>
+              </div>
             </div>
           </div>
         </div>

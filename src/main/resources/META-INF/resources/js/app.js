@@ -40,6 +40,7 @@ const FORM_DRAFT_KEY = 'fiscalizacao_form_draft_v1';
 const AUDIT_LOCAL_KEY = 'fiscalizacoes_audit_local_v1';
 const SESSION_METRICS_KEY = 'fiscalizacoes_session_metrics_v1';
 const MAP_LAYER_STATE_KEY = 'fiscalizacoes_map_layers_v1';
+const MAP_LEGEND_STATE_KEY = 'fiscalizacoes_map_legend_v1';
 const MAX_AUDIT_ENTRIES = 300;
 
 const FISCALIZACAO_FORM_FIELDS = [
@@ -101,6 +102,7 @@ let mapLayerVisibility = {
   obra_baixa: true,
   obra_sem_pct: true
 };
+let isMapLegendCollapsed = false;
 
 const OBRAS_STORAGE_KEY = 'obras_storage_v1';
 const VIEW_MODE_KEY = 'fiscalizacoes_data_view';
@@ -1259,6 +1261,55 @@ function initAuthSessionUI() {
   }
 }
 
+function loadMapLegendState() {
+  const stored = readStoredJson(MAP_LEGEND_STATE_KEY, null);
+
+  if (typeof stored === 'boolean') {
+    isMapLegendCollapsed = stored;
+    return;
+  }
+
+  if (stored && typeof stored === 'object' && Object.prototype.hasOwnProperty.call(stored, 'collapsed')) {
+    isMapLegendCollapsed = Boolean(stored.collapsed);
+  }
+}
+
+function saveMapLegendState() {
+  writeStoredJson(MAP_LEGEND_STATE_KEY, {
+    collapsed: isMapLegendCollapsed
+  });
+}
+
+function updateMapLegendCollapseUI() {
+  const legendBody = document.getElementById('map-legend-body');
+  const toggleBtn = document.getElementById('map-legend-toggle');
+  const toggleText = document.getElementById('map-legend-toggle-text');
+  const toggleIcon = document.getElementById('map-legend-toggle-icon');
+  if (!legendBody || !toggleBtn) return;
+
+  legendBody.classList.toggle('hidden', isMapLegendCollapsed);
+  toggleBtn.setAttribute('aria-expanded', String(!isMapLegendCollapsed));
+
+  if (toggleText) {
+    toggleText.textContent = isMapLegendCollapsed ? 'Expandir' : 'Minimizar';
+  }
+  if (toggleIcon) {
+    toggleIcon.textContent = isMapLegendCollapsed ? '+' : '-';
+  }
+}
+
+function toggleMapLegend(forceCollapsed = null) {
+  if (typeof forceCollapsed === 'boolean') {
+    isMapLegendCollapsed = forceCollapsed;
+  } else {
+    isMapLegendCollapsed = !isMapLegendCollapsed;
+  }
+
+  saveMapLegendState();
+  updateMapLegendCollapseUI();
+}
+window.toggleMapLegend = toggleMapLegend;
+
 function loadMapLayerState() {
   const stored = readStoredJson(MAP_LAYER_STATE_KEY, null);
   if (!stored || typeof stored !== 'object') return;
@@ -1413,6 +1464,7 @@ function updateMapLegend() {
       </div>
     `;
     renderMapLayerControls();
+    updateMapLegendCollapseUI();
     return;
   }
 
@@ -1432,6 +1484,7 @@ function updateMapLegend() {
     </div>
   `;
   renderMapLayerControls();
+  updateMapLegendCollapseUI();
 }
 
 function updateDataViewUI() {
@@ -4141,6 +4194,8 @@ async function init() {
   loadSessionMetrics();
   loadListState();
   loadMapLayerState();
+  loadMapLegendState();
+  updateMapLegendCollapseUI();
   initStorageModeSelector();
   initEnhancedControls();
   initFormRealtimeValidation();
