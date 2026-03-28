@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="pt-BR" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Visualizacao Publica | Fiscalizacoes e Obras</title>
+
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./styles/app.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+  <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+  <link rel="shortcut icon" href="./favicon.svg" />
+
+  <style>
+    #public-map { min-height: 520px; height: 100%; width: 100%; }
+    .dot-fisc { background: #f59e0b; }
+    .dot-obra { background: #10b981; }
+    .public-marker {
+      width: 14px;
+      height: 14px;
+      border-radius: 9999px;
+      border: 2px solid rgba(15, 23, 42, 0.95);
+      box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.35);
+    }
+  </style>
+</head>
+<body class="h-full bg-slate-900 text-slate-100">
+  <div class="min-h-full">
+    <header class="sticky top-0 z-20 border-b border-slate-700/70 bg-slate-900/90 backdrop-blur px-4 py-3 sm:px-6">
+      <div class="mx-auto max-w-7xl flex items-center justify-between gap-3">
+        <div>
+          <h1 class="text-lg sm:text-xl font-bold text-white">Mapa Publico de Fiscalizacoes e Obras</h1>
+          <p class="text-xs sm:text-sm text-slate-400">Visualizacao aberta para cidadaos, sem dados sensiveis.</p>
+        </div>
+        <a
+          href="/login.html"
+          class="btn-primary rounded-lg px-3 py-2 text-xs sm:text-sm font-semibold text-white whitespace-nowrap"
+          aria-label="Fazer login para acessar informacoes completas"
+        >
+          Fazer login
+        </a>
+      </div>
+    </header>
+
+    <main class="mx-auto max-w-7xl p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-[320px,1fr] gap-4 sm:gap-6">
+      <section class="glass-card rounded-2xl border border-slate-700 p-4 sm:p-5 space-y-4">
+        <div class="grid grid-cols-3 gap-2">
+          <div class="metric-card rounded-xl p-3 text-center">
+            <p class="text-[11px] text-slate-400">Pontos</p>
+            <p id="stat-total" class="text-xl font-bold text-white">0</p>
+          </div>
+          <div class="metric-card rounded-xl p-3 text-center">
+            <p class="text-[11px] text-slate-400">Fiscalizacoes</p>
+            <p id="stat-fisc" class="text-xl font-bold text-amber-300">0</p>
+          </div>
+          <div class="metric-card rounded-xl p-3 text-center">
+            <p class="text-[11px] text-slate-400">Obras</p>
+            <p id="stat-obras" class="text-xl font-bold text-emerald-300">0</p>
+          </div>
+        </div>
+
+        <div class="space-y-3">
+          <div>
+            <label for="filter-kind" class="block text-xs text-slate-400 mb-1">Tipo</label>
+            <select id="filter-kind" class="input-field w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-600 text-sm">
+              <option value="all">Todos</option>
+              <option value="fiscalizacao">Fiscalizacoes</option>
+              <option value="obra">Obras</option>
+            </select>
+          </div>
+
+          <div>
+            <label for="filter-status" class="block text-xs text-slate-400 mb-1">Status</label>
+            <select id="filter-status" class="input-field w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-600 text-sm">
+              <option value="">Todos os status</option>
+            </select>
+          </div>
+
+          <div>
+            <label for="filter-area" class="block text-xs text-slate-400 mb-1">Regiao / Local</label>
+            <input
+              id="filter-area"
+              type="text"
+              class="input-field w-full px-3 py-2 rounded-lg bg-slate-800 border border-slate-600 text-sm"
+              placeholder="Digite para filtrar"
+            />
+          </div>
+
+          <button
+            id="clear-filters-btn"
+            type="button"
+            class="w-full rounded-lg bg-slate-700 hover:bg-slate-600 transition-colors px-3 py-2 text-sm font-medium"
+          >
+            Limpar filtros
+          </button>
+        </div>
+
+        <div class="rounded-xl border border-slate-700 bg-slate-800/60 p-3 space-y-2">
+          <p class="text-xs text-slate-400">Legenda</p>
+          <div class="flex items-center gap-2 text-xs text-slate-300">
+            <span class="public-marker dot-fisc" aria-hidden="true"></span>
+            <span>Fiscalizacao</span>
+          </div>
+          <div class="flex items-center gap-2 text-xs text-slate-300">
+            <span class="public-marker dot-obra" aria-hidden="true"></span>
+            <span>Obra</span>
+          </div>
+        </div>
+
+        <p id="public-updated-at" class="text-[11px] text-slate-500">Atualizacao: -</p>
+      </section>
+
+      <section class="glass-card rounded-2xl border border-slate-700 overflow-hidden">
+        <div id="public-map" role="region" aria-label="Mapa publico de pontos"></div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    const externalApiBaseUrl = String(window.__FISCALIZACOES_API_BASE_URL__ || "").trim();
+    const defaultApiBaseUrl = "/api";
+    window.PUBLIC_APP_CONFIG = {
+      apiBaseUrl: externalApiBaseUrl || defaultApiBaseUrl
+    };
+  </script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+  <script src="./js/public.js"></script>
+</body>
+</html>

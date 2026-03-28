@@ -1,6 +1,10 @@
 {
   "rewrites": [
     {
+      "source": "/publico",
+      "destination": "/publico.html"
+    },
+    {
       "source": "/api/fiscalizacoes/:id",
       "destination": "/api/fiscalizacoes?id=:id"
     }
