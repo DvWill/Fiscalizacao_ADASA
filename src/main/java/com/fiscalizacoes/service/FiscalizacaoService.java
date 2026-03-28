@@ -14,10 +14,12 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import javax.sql.DataSource;
 
@@ -28,8 +30,8 @@ public class FiscalizacaoService {
     private final DataSource dataSource;
     @ConfigProperty(name = "app.mirror.enabled", defaultValue = "false")
     boolean mirrorEnabled;
-    @ConfigProperty(name = "app.mirror.jdbc.url", defaultValue = "")
-    String mirrorJdbcUrl;
+    @ConfigProperty(name = "app.mirror.jdbc.url")
+    Optional<String> mirrorJdbcUrl;
     @ConfigProperty(name = "app.mirror.username", defaultValue = "sa")
     String mirrorUsername;
     @ConfigProperty(name = "app.mirror.password", defaultValue = "sa")
@@ -68,11 +70,17 @@ public class FiscalizacaoService {
         validateTipoFiscalizacao(normalizedRecord);
 
         try (Connection connection = dataSource.getConnection()) {
+            ensureNoDuplicateIdentity(connection, normalizedRecord, null);
             insertRecord(connection, normalizedRecord);
+            writeAuditInConnection(connection, "create", getRecordId(normalizedRecord), null, normalizedRecord, null);
         } catch (SQLException exception) {
             throw new IllegalStateException("Falha ao salvar fiscalizacao.", exception);
         }
-        mirrorOperation(connection -> insertRecord(connection, normalizedRecord),
+        mirrorOperation(connection -> {
+                ensureNoDuplicateIdentity(connection, normalizedRecord, null);
+                insertRecord(connection, normalizedRecord);
+                writeAuditInConnection(connection, "create", getRecordId(normalizedRecord), null, normalizedRecord, null);
+            },
             "Falha ao espelhar fiscalizacao no banco local.");
 
         return normalizedRecord;
@@ -85,13 +93,22 @@ public class FiscalizacaoService {
             validateTipoFiscalizacao(normalizedRecord);
             normalizedRecords.add(normalizedRecord);
         }
+        validateBatchIdentityUniqueness(normalizedRecords);
 
         try (Connection connection = dataSource.getConnection()) {
+            int previousCount = countRecords(connection);
             replaceAllInConnection(connection, normalizedRecords);
+            writeAuditInConnection(connection, "replace_all", null, null, null,
+                Map.of("previousCount", previousCount, "nextCount", normalizedRecords.size()));
         } catch (SQLException exception) {
             throw new IllegalStateException("Falha ao substituir fiscalizacoes.", exception);
         }
-        mirrorOperation(connection -> replaceAllInConnection(connection, normalizedRecords),
+        mirrorOperation(connection -> {
+                int previousCount = countRecords(connection);
+                replaceAllInConnection(connection, normalizedRecords);
+                writeAuditInConnection(connection, "replace_all", null, null, null,
+                    Map.of("previousCount", previousCount, "nextCount", normalizedRecords.size()));
+            },
             "Falha ao espelhar fiscalizacoes no banco local.");
         return normalizedRecords;
     }
@@ -119,6 +136,7 @@ public class FiscalizacaoService {
             mergedRecord.put("__backendId", id);
             Map<String, Object> normalizedRecord = normalizeRecord(mergedRecord);
             validateTipoFiscalizacao(normalizedRecord);
+            ensureNoDuplicateIdentity(connection, normalizedRecord, id);
 
             try (PreparedStatement updateStatement = connection.prepareStatement(updateSql)) {
                 updateStatement.setString(1, toJson(normalizedRecord));
@@ -128,7 +146,11 @@ public class FiscalizacaoService {
                     return Optional.empty();
                 }
             }
-            mirrorOperation(mirrorConnection -> upsertRecord(mirrorConnection, normalizedRecord),
+            writeAuditInConnection(connection, "update", id, currentRecord, normalizedRecord, null);
+            mirrorOperation(mirrorConnection -> {
+                    upsertRecord(mirrorConnection, normalizedRecord);
+                    writeAuditInConnection(mirrorConnection, "update", id, currentRecord, normalizedRecord, null);
+                },
                 "Falha ao espelhar fiscalizacao atualizada no banco local.");
             return Optional.of(normalizedRecord);
         } catch (SQLException exception) {
@@ -137,15 +159,34 @@ public class FiscalizacaoService {
     }
 
     public boolean deleteRecord(String id) {
-        String sql = "DELETE FROM fiscalizacoes WHERE backend_id = ?";
+        String findSql = "SELECT payload FROM fiscalizacoes WHERE backend_id = ?";
+        String deleteSql = "DELETE FROM fiscalizacoes WHERE backend_id = ?";
 
         try (Connection connection = dataSource.getConnection();
-             PreparedStatement statement = connection.prepareStatement(sql)) {
-            statement.setString(1, id);
-            boolean removed = statement.executeUpdate() > 0;
-            mirrorOperation(mirrorConnection -> deleteRecordInConnection(mirrorConnection, id),
+             PreparedStatement findStatement = connection.prepareStatement(findSql);
+             PreparedStatement deleteStatement = connection.prepareStatement(deleteSql)) {
+            findStatement.setString(1, id);
+            Map<String, Object> beforeRecord = null;
+            try (ResultSet resultSet = findStatement.executeQuery()) {
+                if (resultSet.next()) {
+                    beforeRecord = parsePayload(resultSet.getString("payload"));
+                }
+            }
+
+            deleteStatement.setString(1, id);
+            boolean removed = deleteStatement.executeUpdate() > 0;
+            if (!removed) {
+                return false;
+            }
+
+            writeAuditInConnection(connection, "delete", id, beforeRecord, null, null);
+            Map<String, Object> finalBeforeRecord = beforeRecord;
+            mirrorOperation(mirrorConnection -> {
+                    deleteRecordInConnection(mirrorConnection, id);
+                    writeAuditInConnection(mirrorConnection, "delete", id, finalBeforeRecord, null, null);
+                },
                 "Falha ao espelhar exclusao de fiscalizacao no banco local.");
-            return removed;
+            return true;
         } catch (SQLException exception) {
             throw new IllegalStateException("Falha ao excluir fiscalizacao.", exception);
         }
@@ -156,8 +197,16 @@ public class FiscalizacaoService {
 
         try (Connection connection = dataSource.getConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
+            int previousCount = countRecords(connection);
             int deleted = statement.executeUpdate();
-            mirrorOperation(this::deleteAllInConnection,
+            writeAuditInConnection(connection, "delete_all", null, null, null,
+                Map.of("deleted", deleted, "previousCount", previousCount));
+            mirrorOperation(mirrorConnection -> {
+                    int mirrorPreviousCount = countRecords(mirrorConnection);
+                    deleteAllInConnection(mirrorConnection);
+                    writeAuditInConnection(mirrorConnection, "delete_all", null, null, null,
+                        Map.of("deleted", mirrorPreviousCount, "previousCount", mirrorPreviousCount));
+                },
                 "Falha ao espelhar exclusao de fiscalizacoes no banco local.");
             return deleted;
         } catch (SQLException exception) {
@@ -191,6 +240,62 @@ public class FiscalizacaoService {
         }
     }
 
+    private String normalizeIdentityPart(Object value) {
+        return String.valueOf(value == null ? "" : value)
+            .toLowerCase()
+            .trim()
+            .replaceAll("\\s+", "");
+    }
+
+    private String buildIdentityKey(Map<String, Object> record) {
+        if (record == null) {
+            return "";
+        }
+
+        String idPart = normalizeIdentityPart(record.get("id"));
+        String processoPart = normalizeIdentityPart(record.get("processo_sei"));
+        if (idPart.isBlank() && processoPart.isBlank()) {
+            return "";
+        }
+        return idPart + "::" + processoPart;
+    }
+
+    private void validateBatchIdentityUniqueness(List<Map<String, Object>> records) {
+        Set<String> identities = new HashSet<>();
+        for (Map<String, Object> record : records) {
+            String identity = buildIdentityKey(record);
+            if (identity.isBlank()) {
+                continue;
+            }
+            if (identities.contains(identity)) {
+                throw new IllegalArgumentException("A lista enviada contem duplicidade de ID + Processo SEI.");
+            }
+            identities.add(identity);
+        }
+    }
+
+    private void ensureNoDuplicateIdentity(Connection connection, Map<String, Object> candidate, String excludingBackendId) throws SQLException {
+        String candidateIdentity = buildIdentityKey(candidate);
+        if (candidateIdentity.isBlank()) {
+            return;
+        }
+
+        String sql = "SELECT backend_id, payload FROM fiscalizacoes";
+        try (PreparedStatement statement = connection.prepareStatement(sql);
+             ResultSet resultSet = statement.executeQuery()) {
+            while (resultSet.next()) {
+                String backendId = resultSet.getString("backend_id");
+                if (excludingBackendId != null && !excludingBackendId.isBlank() && excludingBackendId.equals(backendId)) {
+                    continue;
+                }
+                Map<String, Object> existingRecord = parsePayload(resultSet.getString("payload"));
+                if (candidateIdentity.equals(buildIdentityKey(existingRecord))) {
+                    throw new IllegalArgumentException("Ja existe fiscalizacao com mesmo ID e Processo SEI.");
+                }
+            }
+        }
+    }
+
     private void ensureSchema() {
         try (Connection connection = dataSource.getConnection()) {
             ensureSchema(connection);
@@ -200,7 +305,7 @@ public class FiscalizacaoService {
     }
 
     private void ensureSchema(Connection connection) throws SQLException {
-        String ddl = """
+        String dataTableDdl = """
             CREATE TABLE IF NOT EXISTS fiscalizacoes (
               backend_id VARCHAR(128) PRIMARY KEY,
               payload TEXT NOT NULL,
@@ -208,8 +313,22 @@ public class FiscalizacaoService {
               updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
             )
             """;
+        String auditTableDdl = """
+            CREATE TABLE IF NOT EXISTS fiscalizacoes_audit (
+              audit_id VARCHAR(128) PRIMARY KEY,
+              backend_id VARCHAR(128),
+              action VARCHAR(64) NOT NULL,
+              payload_before TEXT,
+              payload_after TEXT,
+              metadata TEXT,
+              created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """;
 
-        try (PreparedStatement statement = connection.prepareStatement(ddl)) {
+        try (PreparedStatement statement = connection.prepareStatement(dataTableDdl)) {
+            statement.execute();
+        }
+        try (PreparedStatement statement = connection.prepareStatement(auditTableDdl)) {
             statement.execute();
         }
     }
@@ -273,15 +392,59 @@ public class FiscalizacaoService {
         }
     }
 
+    private int countRecords(Connection connection) throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement("SELECT COUNT(1) AS total FROM fiscalizacoes");
+             ResultSet resultSet = statement.executeQuery()) {
+            if (!resultSet.next()) {
+                return 0;
+            }
+            return resultSet.getInt("total");
+        }
+    }
+
+    private void writeAuditInConnection(
+        Connection connection,
+        String action,
+        String backendId,
+        Map<String, Object> beforeRecord,
+        Map<String, Object> afterRecord,
+        Map<String, Object> metadata
+    ) throws SQLException {
+        String sql = """
+            INSERT INTO fiscalizacoes_audit (
+              audit_id,
+              backend_id,
+              action,
+              payload_before,
+              payload_after,
+              metadata,
+              created_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            """;
+
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, UUID.randomUUID().toString());
+            statement.setString(2, backendId);
+            statement.setString(3, action);
+            statement.setString(4, toJsonObject(beforeRecord));
+            statement.setString(5, toJsonObject(afterRecord));
+            statement.setString(6, toJsonObject(metadata));
+            statement.executeUpdate();
+        }
+    }
+
     private boolean isMirrorEnabled() {
-        return mirrorEnabled && mirrorJdbcUrl != null && !mirrorJdbcUrl.isBlank();
+        return mirrorEnabled && mirrorJdbcUrl.filter(url -> !url.isBlank()).isPresent();
     }
 
     private void mirrorOperation(SqlOperation operation, String errorMessage) {
         if (!isMirrorEnabled()) {
             return;
         }
-        try (Connection mirrorConnection = DriverManager.getConnection(mirrorJdbcUrl, mirrorUsername, mirrorPassword)) {
+        String jdbcUrl = mirrorJdbcUrl.orElseThrow(() ->
+            new IllegalStateException("URL do espelhamento nao configurada."));
+        try (Connection mirrorConnection = DriverManager.getConnection(jdbcUrl, mirrorUsername, mirrorPassword)) {
             ensureSchema(mirrorConnection);
             operation.execute(mirrorConnection);
         } catch (SQLException exception) {
@@ -305,10 +468,17 @@ public class FiscalizacaoService {
     }
 
     private String toJson(Map<String, Object> record) {
+        return toJsonObject(record);
+    }
+
+    private String toJsonObject(Object payload) {
+        if (payload == null) {
+            return null;
+        }
         try {
-            return objectMapper.writeValueAsString(record);
+            return objectMapper.writeValueAsString(payload);
         } catch (IOException exception) {
-            throw new IllegalStateException("Falha ao serializar fiscalizacao.", exception);
+            throw new IllegalStateException("Falha ao serializar payload JSON.", exception);
         }
     }
 }

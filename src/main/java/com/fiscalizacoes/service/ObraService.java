@@ -17,6 +17,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import javax.sql.DataSource;
 
@@ -27,8 +28,8 @@ public class ObraService {
     private final DataSource dataSource;
     @ConfigProperty(name = "app.mirror.enabled", defaultValue = "false")
     boolean mirrorEnabled;
-    @ConfigProperty(name = "app.mirror.jdbc.url", defaultValue = "")
-    String mirrorJdbcUrl;
+    @ConfigProperty(name = "app.mirror.jdbc.url")
+    Optional<String> mirrorJdbcUrl;
     @ConfigProperty(name = "app.mirror.username", defaultValue = "sa")
     String mirrorUsername;
     @ConfigProperty(name = "app.mirror.password", defaultValue = "sa")
@@ -170,14 +171,16 @@ public class ObraService {
     }
 
     private boolean isMirrorEnabled() {
-        return mirrorEnabled && mirrorJdbcUrl != null && !mirrorJdbcUrl.isBlank();
+        return mirrorEnabled && mirrorJdbcUrl.filter(url -> !url.isBlank()).isPresent();
     }
 
     private void mirrorOperation(SqlOperation operation, String errorMessage) {
         if (!isMirrorEnabled()) {
             return;
         }
-        try (Connection mirrorConnection = DriverManager.getConnection(mirrorJdbcUrl, mirrorUsername, mirrorPassword)) {
+        String jdbcUrl = mirrorJdbcUrl.orElseThrow(() ->
+            new IllegalStateException("URL do espelhamento nao configurada."));
+        try (Connection mirrorConnection = DriverManager.getConnection(jdbcUrl, mirrorUsername, mirrorPassword)) {
             ensureSchema(mirrorConnection);
             operation.execute(mirrorConnection);
         } catch (SQLException exception) {
