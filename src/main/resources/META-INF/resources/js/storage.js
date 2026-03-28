@@ -13,10 +13,8 @@ window.dataSdk = {
   async init(handler) {
     this._handler = handler;
 
-    const localRecords = this._loadStoredRecords();
     let records = [];
     let loadedFromBackend = false;
-    let syncedLocalToApi = false;
     const activeMode = this.getActiveMode();
 
     if (activeMode === "api") {
@@ -24,22 +22,11 @@ window.dataSdk = {
       if (remote) {
         records = remote;
         loadedFromBackend = true;
-
-        if (remote.length === 0 && localRecords.length > 0) {
-          const synced = await this._replaceRemoteRecords(localRecords);
-          if (synced) {
-            records = synced;
-            syncedLocalToApi = true;
-          } else {
-            records = localRecords;
-            loadedFromBackend = false;
-          }
-        }
       }
     }
 
     if (!loadedFromBackend) {
-      records = localRecords;
+      records = this._loadStoredRecords();
     }
 
     this._data = records.map((r) => ({
@@ -54,8 +41,7 @@ window.dataSdk = {
     return {
       isOk: loadedFromBackend || persisted,
       mode: activeMode,
-      source: loadedFromBackend ? "api" : "local",
-      syncedLocalToApi
+      source: loadedFromBackend ? "api" : "local"
     };
   },
 
@@ -176,27 +162,22 @@ window.dataSdk = {
   },
 
   getStorageMode() {
-    if (this.isApiConfigured()) {
-      try {
-        localStorage.setItem(this._modeKey, "api");
-      } catch {
-        // Ignore localStorage write issues; API remains the active mode.
-      }
-      return "api";
-    }
-
     const config = this._getBackendConfig();
     const storedMode = localStorage.getItem(this._modeKey);
     const mode = storedMode || config.mode || "local";
-    return mode === "api" && this.isApiConfigured() ? "api" : "local";
+    return mode === "api" ? "api" : "local";
   },
 
   getActiveMode() {
-    return this.isApiConfigured() ? "api" : "local";
+    if (this.getStorageMode() === "api" && this.isApiConfigured()) {
+      return "api";
+    }
+
+    return "local";
   },
 
   setStorageMode(mode) {
-    const nextMode = this.isApiConfigured() ? "api" : "local";
+    const nextMode = mode === "api" ? "api" : "local";
     localStorage.setItem(this._modeKey, nextMode);
     return nextMode;
   },
@@ -263,17 +244,6 @@ window.dataSdk = {
     return null;
   },
 
-  async _replaceRemoteRecords(records) {
-    const payload = await this._fetchJson(this._buildUrl("/fiscalizacoes"), {
-      method: "PUT",
-      body: JSON.stringify({ records })
-    });
-
-    if (Array.isArray(payload)) return payload;
-    if (Array.isArray(payload?.records)) return payload.records;
-    return null;
-  },
-
   async _createRemoteRecord(record) {
     const payload = await this._fetchJson(this._buildUrl("/fiscalizacoes"), {
       method: "POST",
@@ -284,20 +254,49 @@ window.dataSdk = {
     return payload.record || payload;
   },
 
+  _buildFiscalizacaoByIdUrl(backendId) {
+    const id = encodeURIComponent(String(backendId || "").trim());
+    return this._buildUrl(`/fiscalizacoes?id=${id}`);
+  },
+
+  _buildLegacyFiscalizacaoByIdUrl(backendId) {
+    const id = encodeURIComponent(String(backendId || "").trim());
+    return this._buildUrl(`/fiscalizacoes/${id}`);
+  },
+
   async _updateRemoteRecord(record) {
-    const payload = await this._fetchJson(this._buildUrl(`/fiscalizacoes/${encodeURIComponent(record.__backendId)}`), {
+    const backendId = String(record?.__backendId || "").trim();
+    if (!backendId) return false;
+
+    const payload = await this._fetchJson(this._buildFiscalizacaoByIdUrl(backendId), {
+      method: "PUT",
+      body: JSON.stringify(record)
+    });
+    if (payload) return true;
+
+    // Compatibilidade com backends antigos que usam /fiscalizacoes/:id.
+    const legacyPayload = await this._fetchJson(this._buildLegacyFiscalizacaoByIdUrl(backendId), {
       method: "PUT",
       body: JSON.stringify(record)
     });
 
-    return Boolean(payload);
+    return Boolean(legacyPayload);
   },
 
   async _deleteRemoteRecord(record) {
-    const payload = await this._fetchJson(this._buildUrl(`/fiscalizacoes/${encodeURIComponent(record.__backendId)}`), {
+    const backendId = String(record?.__backendId || "").trim();
+    if (!backendId) return false;
+
+    const payload = await this._fetchJson(this._buildFiscalizacaoByIdUrl(backendId), {
+      method: "DELETE"
+    });
+    if (payload !== null) return true;
+
+    // Compatibilidade com backends antigos que usam /fiscalizacoes/:id.
+    const legacyPayload = await this._fetchJson(this._buildLegacyFiscalizacaoByIdUrl(backendId), {
       method: "DELETE"
     });
 
-    return payload !== null;
+    return legacyPayload !== null;
   }
 };

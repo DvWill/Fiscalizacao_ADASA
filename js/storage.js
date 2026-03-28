@@ -254,20 +254,49 @@ window.dataSdk = {
     return payload.record || payload;
   },
 
+  _buildFiscalizacaoByIdUrl(backendId) {
+    const id = encodeURIComponent(String(backendId || "").trim());
+    return this._buildUrl(`/fiscalizacoes?id=${id}`);
+  },
+
+  _buildLegacyFiscalizacaoByIdUrl(backendId) {
+    const id = encodeURIComponent(String(backendId || "").trim());
+    return this._buildUrl(`/fiscalizacoes/${id}`);
+  },
+
   async _updateRemoteRecord(record) {
-    const payload = await this._fetchJson(this._buildUrl(`/fiscalizacoes/${encodeURIComponent(record.__backendId)}`), {
+    const backendId = String(record?.__backendId || "").trim();
+    if (!backendId) return false;
+
+    const payload = await this._fetchJson(this._buildFiscalizacaoByIdUrl(backendId), {
+      method: "PUT",
+      body: JSON.stringify(record)
+    });
+    if (payload) return true;
+
+    // Compatibilidade com backends antigos que usam /fiscalizacoes/:id.
+    const legacyPayload = await this._fetchJson(this._buildLegacyFiscalizacaoByIdUrl(backendId), {
       method: "PUT",
       body: JSON.stringify(record)
     });
 
-    return Boolean(payload);
+    return Boolean(legacyPayload);
   },
 
   async _deleteRemoteRecord(record) {
-    const payload = await this._fetchJson(this._buildUrl(`/fiscalizacoes/${encodeURIComponent(record.__backendId)}`), {
+    const backendId = String(record?.__backendId || "").trim();
+    if (!backendId) return false;
+
+    const payload = await this._fetchJson(this._buildFiscalizacaoByIdUrl(backendId), {
+      method: "DELETE"
+    });
+    if (payload !== null) return true;
+
+    // Compatibilidade com backends antigos que usam /fiscalizacoes/:id.
+    const legacyPayload = await this._fetchJson(this._buildLegacyFiscalizacaoByIdUrl(backendId), {
       method: "DELETE"
     });
 
-    return payload !== null;
+    return legacyPayload !== null;
   }
 };
