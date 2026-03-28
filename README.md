@@ -44,17 +44,46 @@ Porta:
 
 ## Deploy no Vercel (Serverless)
 
-Este projeto tambem inclui uma funcao em `api/fiscalizacoes.js` para uso no Vercel.
+Este projeto inclui funcoes em `api/fiscalizacoes.js` e `api/obras.js` para uso no Vercel.
 
-- Endpoint: `/api/fiscalizacoes`
-- Metodos: `GET`, `POST`, `PUT`, `DELETE`
+- Endpoints:
+  - `/api/fiscalizacoes` (`GET`, `POST`, `PUT`, `DELETE`)
+  - `/api/obras` (`GET`, `PUT`, `DELETE`)
 - Reescrita para ID: `vercel.json` mapeia `/api/fiscalizacoes/:id` para a funcao.
 
-Observacao: os dados dessa funcao sao em memoria (mock/prototipo) e podem reiniciar entre execucoes.
+Persistencia: as funcoes usam PostgreSQL (`pg`) e exigem a variavel de ambiente:
+
+- `NEON_DATABASE_URL` (ou `DATABASE_URL`)
+- Opcional de seguranca:
+  - `API_TOKEN` (se definido, exige `Authorization: Bearer <token>`)
+  - `AUTH_LOGIN` e `AUTH_PASSWORD` (se definidos, exigem login/senha via tela de login)
+  - `AUTH_SESSION_SECRET` (recomendado para assinar cookie de sessao)
+  - `AUTH_SESSION_TTL_SECONDS` (tempo de sessao em segundos; padrao 43200)
+  - `CORS_ALLOWED_ORIGINS` (lista separada por virgula)
+  - `CORS_ALLOW_ALL=true` (somente se voce realmente quiser liberar qualquer origem)
+
+Exemplo:
+
+```text
+postgresql://USUARIO:SENHA@HOST/DB?sslmode=require&channel_binding=require
+```
+
+## Frontend local
+
+Por padrao, o frontend usa `/api`. Para apontar para um backend externo, defina:
+
+```html
+<script>
+  window.__FISCALIZACOES_API_BASE_URL__ = "https://seu-backend.com/api";
+</script>
+```
 
 ## Endpoints
 
 - `GET /api/fiscalizacoes`
 - `POST /api/fiscalizacoes`
-- `PUT /api/fiscalizacoes/{id}`
-- `DELETE /api/fiscalizacoes/{id}`
+- `PUT /api/fiscalizacoes?id={id}` (ou `/api/fiscalizacoes/{id}` via rewrite)
+- `DELETE /api/fiscalizacoes?id={id}` (ou `/api/fiscalizacoes/{id}` via rewrite)
+- `POST /api/auth/login` (login/senha)
+- `GET /api/auth/me` (sessao atual)
+- `POST /api/auth/logout` (encerrar sessao)

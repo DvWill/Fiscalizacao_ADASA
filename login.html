@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="pt-BR" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Login | Sistema de Fiscalizacoes</title>
+
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./styles/app.css" />
+  <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+  <link rel="shortcut icon" href="./favicon.svg" />
+</head>
+<body class="h-full bg-slate-900 text-slate-100">
+  <main class="min-h-full flex items-center justify-center px-4 py-8">
+    <section class="glass-card w-full max-w-md rounded-2xl border border-slate-700 p-6 sm:p-8">
+      <div class="flex items-center gap-3 mb-6">
+        <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
+          <svg class="icon-min w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path d="M12 21s-6-5.2-6-10a6 6 0 1112 0c0 4.8-6 10-6 10z"></path>
+            <circle cx="12" cy="11" r="2.5"></circle>
+          </svg>
+        </div>
+        <div>
+          <h1 class="text-xl font-bold text-white">Acesso ao Sistema</h1>
+          <p class="text-sm text-slate-400">Entre com login e senha</p>
+        </div>
+      </div>
+
+      <form id="login-form" class="space-y-4">
+        <div>
+          <label for="login" class="block text-sm font-medium text-slate-300 mb-2">Login</label>
+          <input
+            id="login"
+            name="login"
+            type="text"
+            autocomplete="username"
+            required
+            class="input-field w-full px-4 py-2.5 rounded-lg bg-slate-800 border border-slate-600 text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
+            placeholder="Seu login"
+          />
+        </div>
+
+        <div>
+          <label for="senha" class="block text-sm font-medium text-slate-300 mb-2">Senha</label>
+          <input
+            id="senha"
+            name="senha"
+            type="password"
+            autocomplete="current-password"
+            required
+            class="input-field w-full px-4 py-2.5 rounded-lg bg-slate-800 border border-slate-600 text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
+            placeholder="Sua senha"
+          />
+        </div>
+
+        <p id="login-error" class="hidden text-sm text-red-300"></p>
+
+        <button
+          id="login-submit"
+          type="submit"
+          class="w-full btn-primary rounded-lg px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60 disabled:cursor-not-allowed"
+        >
+          Entrar
+        </button>
+      </form>
+    </section>
+  </main>
+
+  <script>
+    const externalApiBaseUrl = String(window.__FISCALIZACOES_API_BASE_URL__ || "").trim();
+    const defaultApiBaseUrl = "/api";
+    const apiBaseUrl = externalApiBaseUrl || defaultApiBaseUrl;
+
+    function setLoginError(message) {
+      const error = document.getElementById("login-error");
+      if (!error) return;
+      if (!message) {
+        error.classList.add("hidden");
+        error.textContent = "";
+        return;
+      }
+      error.textContent = message;
+      error.classList.remove("hidden");
+    }
+
+    async function checkExistingSession() {
+      try {
+        const response = await fetch(`${apiBaseUrl}/auth/me`, {
+          method: "GET",
+          credentials: "include"
+        });
+        if (response.ok) {
+          window.location.replace("/");
+          return true;
+        }
+      } catch {
+        // ignora erro de rede e permanece na tela de login
+      }
+      return false;
+    }
+
+    async function handleLoginSubmit(event) {
+      event.preventDefault();
+      setLoginError("");
+
+      const submit = document.getElementById("login-submit");
+      const loginInput = document.getElementById("login");
+      const senhaInput = document.getElementById("senha");
+      if (!submit || !loginInput || !senhaInput) return;
+
+      const login = loginInput.value.trim();
+      const senha = senhaInput.value;
+      if (!login || !senha) {
+        setLoginError("Informe login e senha.");
+        return;
+      }
+
+      submit.disabled = true;
+      submit.textContent = "Entrando...";
+
+      try {
+        const response = await fetch(`${apiBaseUrl}/auth/login`, {
+          method: "POST",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ login, senha })
+        });
+
+        const payload = await response.json().catch(() => ({}));
+        if (response.ok) {
+          window.location.replace("/");
+          return;
+        }
+
+        if (response.status === 401) {
+          setLoginError("Login ou senha invalidos.");
+          return;
+        }
+
+        if (response.status === 503) {
+          setLoginError("Login nao configurado no servidor.");
+          return;
+        }
+
+        setLoginError(payload.error || "Nao foi possivel autenticar agora.");
+      } catch {
+        setLoginError("Falha de conexao. Tente novamente.");
+      } finally {
+        submit.disabled = false;
+        submit.textContent = "Entrar";
+      }
+    }
+
+    document.getElementById("login-form")?.addEventListener("submit", handleLoginSubmit);
+    checkExistingSession();
+  </script>
+</body>
+</html>

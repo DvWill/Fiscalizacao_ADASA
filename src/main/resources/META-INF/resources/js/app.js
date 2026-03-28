@@ -1222,6 +1222,43 @@ function initStorageModeSelector() {
   updateStorageModeStatus();
 }
 
+function getApiBaseUrl() {
+  const raw = String(window.APP_BACKEND_CONFIG?.baseUrl || '/api').trim();
+  return raw.replace(/\/+$/, '');
+}
+
+async function logoutSession() {
+  setOperationStatus('Encerrando sessao...', 'syncing');
+  showLoading('Saindo...');
+
+  try {
+    await fetch(`${getApiBaseUrl()}/auth/logout`, {
+      method: 'POST',
+      credentials: 'include'
+    });
+  } catch {
+    // Mesmo com falha de rede, seguimos para limpar o acesso local.
+  } finally {
+    hideLoading();
+    window.location.replace('/login.html');
+  }
+}
+
+function initAuthSessionUI() {
+  const userLabel = document.getElementById('auth-user-name');
+  const logoutBtn = document.getElementById('logout-btn');
+  const authBadge = document.getElementById('auth-user-badge');
+
+  const login = String(window.APP_AUTH_USER || '').trim();
+  if (userLabel) userLabel.textContent = login || 'Usuario';
+  if (authBadge) authBadge.classList.remove('hidden');
+
+  if (logoutBtn && !logoutBtn.dataset.bound) {
+    logoutBtn.dataset.bound = '1';
+    logoutBtn.addEventListener('click', logoutSession);
+  }
+}
+
 function loadMapLayerState() {
   const stored = readStoredJson(MAP_LAYER_STATE_KEY, null);
   if (!stored || typeof stored !== 'object') return;
@@ -4100,6 +4137,7 @@ async function init() {
   if (t) t.textContent = defaultConfig.app_title;
   if (s) s.textContent = defaultConfig.subtitle;
 
+  initAuthSessionUI();
   loadSessionMetrics();
   loadListState();
   loadMapLayerState();

@@ -125,6 +125,24 @@
           <span id="storage-mode-status" class="hidden md:inline text-[10px] text-slate-400 whitespace-nowrap max-w-[92px] overflow-hidden text-ellipsis"></span>
         </div>
 
+        <div id="auth-user-badge" class="shrink-0 hidden md:flex items-center gap-1.5 rounded-lg bg-slate-800/80 border border-slate-700 px-2.5 py-1.5">
+          <svg class="icon-min w-4 h-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <circle cx="12" cy="8" r="3"></circle>
+            <path d="M5 19c1.8-3 4-4.5 7-4.5s5.2 1.5 7 4.5"></path>
+          </svg>
+          <span id="auth-user-name" class="text-[11px] text-slate-300 whitespace-nowrap">Usuario</span>
+        </div>
+
+        <button id="logout-btn" type="button"
+          class="shrink-0 px-3 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 transition-colors flex items-center gap-2 text-xs sm:text-sm font-medium">
+          <svg class="icon-min w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path d="M10 17l5-5-5-5"></path>
+            <path d="M15 12H4"></path>
+            <path d="M13 4h5a2 2 0 012 2v12a2 2 0 01-2 2h-5"></path>
+          </svg>
+          <span>Sair</span>
+        </button>
+
         <div id="operation-status" role="status" aria-live="polite" class="shrink-0 hidden md:flex items-center gap-2 rounded-lg bg-slate-800/80 border border-slate-700 px-2.5 py-1.5">
           <span class="w-2 h-2 rounded-full bg-slate-500" id="operation-status-dot"></span>
           <span id="operation-status-text" class="text-[11px] text-slate-300 whitespace-nowrap">Sistema pronto</span>
@@ -186,7 +204,7 @@
             <label class="block text-sm font-medium text-slate-300 mb-2">Regiao Administrativa</label>
             <select id="filter-regiao" onchange="applyFilters()"
               class="input-field w-full px-4 py-2.5 rounded-lg bg-slate-800 border border-slate-600 text-white focus:outline-none focus:border-blue-500">
-              <option value="">Todas as Regiões</option>
+              <option value="">Todas as RegiÃµes</option>
             </select>
           </div>
 
@@ -194,7 +212,7 @@
             <label class="block text-sm font-medium text-slate-300 mb-2">Situacao</label>
             <select id="filter-situacao" onchange="applyFilters()"
               class="input-field w-full px-4 py-2.5 rounded-lg bg-slate-800 border border-slate-600 text-white focus:outline-none focus:border-blue-500">
-              <option value="">Todas as Situações</option>
+              <option value="">Todas as SituaÃ§Ãµes</option>
               <option value="Em Andamento">Em Andamento</option>
               <option value="Concluida">Concluida</option>
               <option value="Pendente">Pendente</option>
@@ -257,7 +275,7 @@
               </select>
             </div>
             <div>
-              <label class="block text-sm font-medium text-slate-300 mb-2">Itens por página</label>
+              <label class="block text-sm font-medium text-slate-300 mb-2">Itens por pÃ¡gina</label>
               <select id="list-page-size"
                 class="input-field w-full px-4 py-2.5 rounded-lg bg-slate-800 border border-slate-600 text-white focus:outline-none focus:border-blue-500">
                 <option value="8">8</option>
@@ -288,7 +306,7 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                   d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
               </svg>
-              <p class="text-sm">Nenhuma fiscalização cadastrada</p>
+              <p class="text-sm">Nenhuma fiscalizaÃ§Ã£o cadastrada</p>
               <p class="text-xs mt-1">Clique em "Nova Fiscalizacao" para comecar</p>
             </div>
           </div>
@@ -356,7 +374,7 @@
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                 d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
             </svg>
-            Clique no mapa para selecionar a localização
+            Clique no mapa para selecionar a localizaÃ§Ã£o
           </p>
         </div>
       </div>
@@ -492,7 +510,7 @@
             <h3 class="text-lg font-semibold mb-4">Indicadores Operacionais</h3>
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
               <div class="rounded-lg border border-slate-700 bg-slate-900/40 p-3">
-                <p class="text-slate-500">Pendencias críticas</p>
+                <p class="text-slate-500">Pendencias crÃ­ticas</p>
                 <p id="metric-critical-pending" class="text-red-300 text-xl font-bold">0</p>
               </div>
               <div class="rounded-lg border border-slate-700 bg-slate-900/40 p-3">
@@ -572,7 +590,7 @@
                   placeholder="FISC-001">
               </div>
               <div>
-                <label class="block text-sm font-medium text-slate-300 mb-2">Nº Processo SEI *</label>
+                <label class="block text-sm font-medium text-slate-300 mb-2">NÂº Processo SEI *</label>
                 <input type="text" id="form-processo-sei" required
                   class="input-field w-full px-4 py-2.5 rounded-lg bg-slate-800 border border-slate-600 text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
                   placeholder="00000.000000/0000-00">
@@ -727,11 +745,11 @@
                 <label class="block text-sm font-medium text-slate-300 mb-2">Tipo de Documento</label>
                 <input type="text" id="form-tipo-doc"
                   class="input-field w-full px-4 py-2.5 rounded-lg bg-slate-800 border border-slate-600 text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
-                  placeholder="Relatório">
+                  placeholder="RelatÃ³rio">
               </div>
 
               <div>
-                <label class="block text-sm font-medium text-slate-300 mb-2">Nº SEI do Documento</label>
+                <label class="block text-sm font-medium text-slate-300 mb-2">NÂº SEI do Documento</label>
                 <input type="text" id="form-sei-doc"
                   class="input-field w-full px-4 py-2.5 rounded-lg bg-slate-800 border border-slate-600 text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
                   placeholder="00000000">
@@ -749,14 +767,14 @@
                 <label class="block text-sm font-medium text-slate-300 mb-2">Objetivo *</label>
                 <textarea id="form-objetivo" rows="2" required
                   class="input-field w-full px-4 py-2.5 rounded-lg bg-slate-800 border border-slate-600 text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 resize-none"
-                  placeholder="Descreva o objetivo da fiscalização..."></textarea>
+                  placeholder="Descreva o objetivo da fiscalizaÃ§Ã£o..."></textarea>
               </div>
 
               <div>
                 <label class="block text-sm font-medium text-slate-300 mb-2">Destinatario *</label>
                 <input type="text" id="form-destinatario" required
                   class="input-field w-full px-4 py-2.5 rounded-lg bg-slate-800 border border-slate-600 text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
-                  placeholder="Nome do destinatário">
+                  placeholder="Nome do destinatÃ¡rio">
               </div>
             </div>
 
@@ -771,7 +789,7 @@
                   class="input-field w-full px-4 py-2.5 rounded-lg bg-slate-800 border border-slate-600 text-white focus:outline-none focus:border-blue-500"
                 >
                 <input type="hidden" id="form-imagem-data">
-                <p class="text-xs text-slate-500 mt-2">PNG/JPEG/WebP até 2MB. A imagem fica salva junto com a fiscalização.</p>
+                <p class="text-xs text-slate-500 mt-2">PNG/JPEG/WebP atÃ© 2MB. A imagem fica salva junto com a fiscalizaÃ§Ã£o.</p>
                 <div id="form-imagem-preview" class="hidden mt-3 rounded-lg overflow-hidden border border-slate-700 bg-slate-900/60">
                   <img id="form-imagem-preview-img" alt="Previa da imagem" class="w-full object-cover max-h-64">
                   <div class="flex items-center justify-between px-3 py-2 text-xs text-slate-300">
@@ -798,7 +816,7 @@
                 <label class="block text-sm font-medium text-slate-300 mb-2">Constatacoes</label>
                 <textarea id="form-constatacoes" rows="3"
                   class="input-field w-full px-4 py-2.5 rounded-lg bg-slate-800 border border-slate-600 text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 resize-none"
-                  placeholder="Descreva as constatações..."></textarea>
+                  placeholder="Descreva as constataÃ§Ãµes..."></textarea>
               </div>
 
               <div>
@@ -814,14 +832,14 @@
                 <label class="block text-sm font-medium text-slate-300 mb-2">Recomendacoes</label>
                 <textarea id="form-recomendacoes" rows="2"
                   class="input-field w-full px-4 py-2.5 rounded-lg bg-slate-800 border border-slate-600 text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 resize-none"
-                  placeholder="Descreva as recomendações..."></textarea>
+                  placeholder="Descreva as recomendaÃ§Ãµes..."></textarea>
               </div>
 
               <div>
                 <label class="block text-sm font-medium text-slate-300 mb-2">Determinacoes</label>
                 <textarea id="form-determinacoes" rows="2"
                   class="input-field w-full px-4 py-2.5 rounded-lg bg-slate-800 border border-slate-600 text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 resize-none"
-                  placeholder="Descreva as determinações..."></textarea>
+                  placeholder="Descreva as determinaÃ§Ãµes..."></textarea>
               </div>
             </div>
           </div>
@@ -916,8 +934,8 @@
                 d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
           </div>
-          <h3 class="text-xl font-bold mb-2">Confirmar Exclusão</h3>
-          <p class="text-slate-400 mb-6">Tem certeza que deseja excluir esta fiscalização? Esta ação não pode ser desfeita.</p>
+          <h3 class="text-xl font-bold mb-2">Confirmar ExclusÃ£o</h3>
+          <p class="text-slate-400 mb-6">Tem certeza que deseja excluir esta fiscalizaÃ§Ã£o? Esta aÃ§Ã£o nÃ£o pode ser desfeita.</p>
           <div class="flex items-center justify-center gap-3">
             <button onclick="cancelDelete()" class="px-6 py-2.5 rounded-lg bg-slate-700 hover:bg-slate-600 transition-colors font-medium">
               Cancelar
@@ -950,10 +968,10 @@
 
         <div class="p-4 sm:p-6">
           <div class="mb-6">
-            <label class="block text-sm font-medium text-slate-300 mb-3">Selecione o arquivo de fiscalizações (.xlsx, .xls, .xlsm ou .csv)</label>
+            <label class="block text-sm font-medium text-slate-300 mb-3">Selecione o arquivo de fiscalizaÃ§Ãµes (.xlsx, .xls, .xlsm ou .csv)</label>
             <input id="fiscalizacoes-file-input" type="file" accept=".xlsx,.xls,.xlsm,.csv,text/csv" onchange="handleFiscalizacoesFileSelected(event)"
               class="w-full px-4 py-3 rounded-lg bg-slate-800 border border-slate-600 text-white focus:outline-none focus:border-blue-500">
-            <p class="text-xs text-slate-500 mt-2">Planilhas Excel e CSV sao aceitos. O sistema detecta automaticamente a aba e o cabeçalho.</p>
+            <p class="text-xs text-slate-500 mt-2">Planilhas Excel e CSV sao aceitos. O sistema detecta automaticamente a aba e o cabeÃ§alho.</p>
           </div>
 
           <div id="fiscalizacoes-upload-summary" class="hidden mb-6">
@@ -1120,7 +1138,7 @@
     // Opcional para frontend estatico (ex.: GitHub Pages):
     // window.__FISCALIZACOES_API_BASE_URL__ = "https://meu-servidor.com/api";
     const externalApiBaseUrl = String(window.__FISCALIZACOES_API_BASE_URL__ || "").trim();
-    // Sempre usa /api por padrão; para backend externo use window.__FISCALIZACOES_API_BASE_URL__.
+    // Sempre usa /api por padrao; para backend externo use window.__FISCALIZACOES_API_BASE_URL__.
     const defaultApiBaseUrl = "/api";
     const resolvedApiBaseUrl = externalApiBaseUrl || defaultApiBaseUrl;
 
@@ -1130,8 +1148,41 @@
       mode: resolvedApiBaseUrl ? "api" : "local"
     };
   </script>
-  <script src="./js/storage.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script src="./js/app.js"></script>
+  <script>
+    function loadScript(source) {
+      return new Promise((resolve, reject) => {
+        const script = document.createElement("script");
+        script.src = source;
+        script.onload = () => resolve();
+        script.onerror = () => reject(new Error(`Falha ao carregar script: ${source}`));
+        document.body.appendChild(script);
+      });
+    }
+
+    async function guardAndBootApp() {
+      try {
+        const response = await fetch(`${resolvedApiBaseUrl}/auth/me`, {
+          method: "GET",
+          credentials: "include"
+        });
+
+        if (!response.ok) {
+          window.location.replace("/login.html");
+          return;
+        }
+
+        const authPayload = await response.json().catch(() => ({}));
+        window.APP_AUTH_USER = String(authPayload.login || "").trim();
+
+        await loadScript("./js/storage.js");
+        await loadScript("./js/app.js");
+      } catch {
+        window.location.replace("/login.html");
+      }
+    }
+
+    guardAndBootApp();
+  </script>
 </body>
 </html>
