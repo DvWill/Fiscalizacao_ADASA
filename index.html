@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Sistema de Fiscalizações</title>
+  <title>Sistema de Fiscalizacoes</title>
 
   <!-- Tailwind CDN -->
   <script src="https://cdn.tailwindcss.com/3.4.17"></script>
@@ -33,18 +33,18 @@
     <header class="glass-card border-b border-slate-700 px-4 sm:px-6 py-3 sm:py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 z-50">
       <div class="flex items-center gap-4">
         <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
-          <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-              d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+          <svg class="icon-min w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path d="M12 21s-6-5.2-6-10a6 6 0 1112 0c0 4.8-6 10-6 10z" />
+            <circle cx="12" cy="11" r="2.5" />
           </svg>
         </div>
         <div class="min-w-0">
-          <h1 id="app-title" class="text-lg sm:text-xl font-bold text-white truncate">Sistema de Fiscalizações</h1>
+          <h1 id="app-title" class="text-lg sm:text-xl font-bold text-white truncate">Sistema de Fiscalizacoes</h1>
           <p id="app-subtitle" class="text-xs sm:text-sm text-slate-400 truncate">Monitoramento em Tempo Real</p>
         </div>
       </div>
 
-      <!-- Botões (rolagem horizontal no mobile) -->
+      <!-- Botoes (rolagem horizontal no mobile) -->
       <div class="flex items-center gap-2 sm:gap-3 w-full sm:w-auto overflow-x-auto sm:overflow-visible pb-1 sm:pb-0">
         <div class="shrink-0 flex items-center gap-1 rounded-lg bg-slate-800/80 border border-slate-700 p-1">
           <button id="view-fiscalizacoes-btn" onclick="switchDataView('fiscalizacoes')"
@@ -59,9 +59,10 @@
 
         <button onclick="toggleFiltersPanel(true)"
           class="shrink-0 px-3 sm:px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 transition-colors flex items-center gap-2 text-xs sm:text-sm font-medium">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-              d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+          <svg class="icon-min w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path d="M4 6h16" />
+            <path d="M7 12h10" />
+            <path d="M10 18h4" />
           </svg>
           <span class="hidden sm:inline">Filtros</span>
           <span class="sm:hidden">Filtros</span>
@@ -69,9 +70,11 @@
 
         <button id="dashboard-btn" onclick="toggleDashboard()"
           class="shrink-0 px-3 sm:px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 transition-colors flex items-center gap-2 text-xs sm:text-sm font-medium">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-              d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+          <svg class="icon-min w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path d="M5 18V11" />
+            <path d="M12 18V7" />
+            <path d="M19 18V13" />
+            <path d="M3 18h18" />
           </svg>
           <span class="hidden sm:inline">Dashboard</span>
           <span class="sm:hidden">Dash</span>
@@ -79,9 +82,10 @@
 
         <button id="import-fiscalizacoes-btn" onclick="openImportModal()"
           class="shrink-0 px-3 sm:px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 transition-colors flex items-center gap-2 text-xs sm:text-sm font-medium">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-              d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          <svg class="icon-min w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path d="M12 15V6" />
+            <path d="M9 9l3-3 3 3" />
+            <rect x="5" y="15" width="14" height="4" rx="1.5" />
           </svg>
           <span class="hidden sm:inline">Importar</span>
           <span class="sm:hidden">Import</span>
@@ -89,9 +93,10 @@
 
         <button id="upload-obras-btn" onclick="openObrasUploadModal()"
           class="hidden shrink-0 px-3 sm:px-4 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-600 transition-colors flex items-center gap-2 text-xs sm:text-sm font-medium text-white">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-              d="M7 16a4 4 0 01-.88-7.903A5 5 0 0115.9 6L16 6a5 5 0 011 9.9M12 11v8m0 0l-3-3m3 3l3-3" />
+          <svg class="icon-min w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path d="M6 18h12" />
+            <path d="M12 6v9" />
+            <path d="M9 12l3 3 3-3" />
           </svg>
           <span class="hidden sm:inline">Upload Obras</span>
           <span class="sm:hidden">Obras</span>
@@ -99,9 +104,10 @@
 
         <button onclick="exportToCSV()"
           class="shrink-0 px-3 sm:px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 transition-colors flex items-center gap-2 text-xs sm:text-sm font-medium">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-              d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          <svg class="icon-min w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path d="M12 6v9" />
+            <path d="M9 12l3 3 3-3" />
+            <path d="M5 18h14" />
           </svg>
           <span class="hidden sm:inline">Exportar</span>
           <span class="sm:hidden">Export</span>
@@ -119,12 +125,19 @@
           <span id="storage-mode-status" class="hidden md:inline text-[10px] text-slate-400 whitespace-nowrap max-w-[92px] overflow-hidden text-ellipsis"></span>
         </div>
 
+        <div id="operation-status" role="status" aria-live="polite" class="shrink-0 hidden md:flex items-center gap-2 rounded-lg bg-slate-800/80 border border-slate-700 px-2.5 py-1.5">
+          <span class="w-2 h-2 rounded-full bg-slate-500" id="operation-status-dot"></span>
+          <span id="operation-status-text" class="text-[11px] text-slate-300 whitespace-nowrap">Sistema pronto</span>
+        </div>
+
         <button id="add-fiscalizacao-btn" onclick="openAddModal()"
           class="shrink-0 btn-primary px-3 sm:px-4 py-2 rounded-lg flex items-center gap-2 text-xs sm:text-sm font-medium text-white">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+          <svg class="icon-min w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="8" />
+            <path d="M12 8v8" />
+            <path d="M8 12h8" />
           </svg>
-          <span class="hidden sm:inline">Nova Fiscalização</span>
+          <span class="hidden sm:inline">Nova Fiscalizacao</span>
           <span class="sm:hidden">Nova</span>
         </button>
       </div>
@@ -165,12 +178,12 @@
         <div class="space-y-4">
           <div>
             <label class="block text-sm font-medium text-slate-300 mb-2">Buscar</label>
-            <input type="text" id="filter-search" oninput="applyFilters()" placeholder="ID, Processo, Destinatário..."
+            <input type="text" id="filter-search" oninput="applyFilters()" placeholder="ID, Processo, Destinatario..."
               class="input-field w-full px-4 py-2.5 rounded-lg bg-slate-800 border border-slate-600 text-white placeholder-slate-400 focus:outline-none focus:border-blue-500">
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-slate-300 mb-2">Região Administrativa</label>
+            <label class="block text-sm font-medium text-slate-300 mb-2">Regiao Administrativa</label>
             <select id="filter-regiao" onchange="applyFilters()"
               class="input-field w-full px-4 py-2.5 rounded-lg bg-slate-800 border border-slate-600 text-white focus:outline-none focus:border-blue-500">
               <option value="">Todas as Regiões</option>
@@ -178,12 +191,12 @@
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-slate-300 mb-2">Situação</label>
+            <label class="block text-sm font-medium text-slate-300 mb-2">Situacao</label>
             <select id="filter-situacao" onchange="applyFilters()"
               class="input-field w-full px-4 py-2.5 rounded-lg bg-slate-800 border border-slate-600 text-white focus:outline-none focus:border-blue-500">
               <option value="">Todas as Situações</option>
               <option value="Em Andamento">Em Andamento</option>
-              <option value="Concluída">Concluída</option>
+              <option value="Concluida">Concluida</option>
               <option value="Pendente">Pendente</option>
             </select>
           </div>
@@ -197,7 +210,7 @@
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-slate-300 mb-2">Índice de Conformidade</label>
+            <label class="block text-sm font-medium text-slate-300 mb-2">Indice de Conformidade</label>
             <div class="flex items-center gap-3">
               <input type="range" id="filter-conformidade" min="0" max="100" value="0"
                 oninput="updateConformidadeLabel(); applyFilters()"
@@ -206,6 +219,54 @@
             </div>
           </div>
 
+
+          <div class="rounded-lg bg-slate-800/60 border border-slate-700 p-3 space-y-3">
+            <div class="flex items-center justify-between gap-2">
+              <p class="text-xs uppercase tracking-wide text-slate-500">Atalhos de filtro</p>
+              <button id="save-filter-favorite-btn" type="button"
+                class="px-2 py-1 rounded-md bg-slate-700 hover:bg-slate-600 text-[11px] font-medium transition-colors">
+                Salvar favorito
+              </button>
+            </div>
+            <div id="quick-filter-buttons" class="flex flex-wrap gap-2"></div>
+            <div>
+              <p class="text-[11px] uppercase tracking-wide text-slate-500 mb-1">Favoritos</p>
+              <p id="favorite-filter-empty" class="text-[11px] text-slate-500">Nenhum favorito salvo</p>
+              <div id="favorite-filter-buttons" class="flex flex-wrap gap-2"></div>
+            </div>
+            <div>
+              <p class="text-[11px] uppercase tracking-wide text-slate-500 mb-1">Ultimos filtros</p>
+              <p id="recent-filter-empty" class="text-[11px] text-slate-500">Sem historico recente</p>
+              <div id="recent-filter-buttons" class="flex flex-wrap gap-2"></div>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 gap-3">
+            <div>
+              <label class="block text-sm font-medium text-slate-300 mb-2">Ordenar por</label>
+              <select id="list-sort-field"
+                class="input-field w-full px-4 py-2.5 rounded-lg bg-slate-800 border border-slate-600 text-white focus:outline-none focus:border-blue-500">
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-slate-300 mb-2">Direcao</label>
+              <select id="list-sort-direction"
+                class="input-field w-full px-4 py-2.5 rounded-lg bg-slate-800 border border-slate-600 text-white focus:outline-none focus:border-blue-500">
+                <option value="desc">Decrescente</option>
+                <option value="asc">Crescente</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-slate-300 mb-2">Itens por página</label>
+              <select id="list-page-size"
+                class="input-field w-full px-4 py-2.5 rounded-lg bg-slate-800 border border-slate-600 text-white focus:outline-none focus:border-blue-500">
+                <option value="8">8</option>
+                <option value="12" selected>12</option>
+                <option value="20">20</option>
+                <option value="40">40</option>
+              </select>
+            </div>
+          </div>
           <button onclick="clearFilters()"
             class="w-full py-2.5 rounded-lg bg-slate-700 hover:bg-slate-600 transition-colors text-sm font-medium flex items-center justify-center gap-2">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -217,7 +278,7 @@
 
         <div class="mt-6">
           <h3 class="text-sm font-semibold text-slate-400 mb-3 flex items-center justify-between">
-            <span>Fiscalizações</span>
+            <span>Fiscalizacoes</span>
             <span id="count-badge" class="px-2 py-1 rounded-full bg-blue-500/20 text-blue-400 text-xs">0</span>
           </h3>
 
@@ -228,10 +289,23 @@
                   d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
               </svg>
               <p class="text-sm">Nenhuma fiscalização cadastrada</p>
-              <p class="text-xs mt-1">Clique em "Nova Fiscalização" para começar</p>
+              <p class="text-xs mt-1">Clique em "Nova Fiscalizacao" para comecar</p>
             </div>
           </div>
         </div>
+          <div id="list-pagination" class="mt-3 hidden">
+            <div class="flex items-center justify-between gap-2">
+              <button id="pagination-prev" type="button"
+                class="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-xs font-medium transition-colors">
+                Anterior
+              </button>
+              <span id="pagination-info" class="text-xs text-slate-400">Pagina 1 de 1</span>
+              <button id="pagination-next" type="button"
+                class="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-xs font-medium transition-colors">
+                Proxima
+              </button>
+            </div>
+          </div>
       </aside>
 
       <!-- Map Container -->
@@ -248,11 +322,27 @@
             </div>
             <div class="flex items-center gap-2">
               <div class="w-4 h-4 rounded-full bg-gradient-to-br from-emerald-400 to-green-500"></div>
-              <span class="text-xs text-slate-400">Concluída</span>
+              <span class="text-xs text-slate-400">Concluida</span>
             </div>
             <div class="flex items-center gap-2">
               <div class="w-4 h-4 rounded-full bg-gradient-to-br from-red-400 to-rose-500"></div>
               <span class="text-xs text-slate-400">Pendente</span>
+            </div>
+          </div>
+          <div class="mt-3 space-y-2">
+            <p class="text-[11px] text-slate-400">Camadas</p>
+            <div id="map-layer-toggles" class="space-y-1"></div>
+          </div>
+          <div class="mt-3 space-y-2">
+            <label class="block text-[11px] text-slate-400">Foco rapido no mapa</label>
+            <div class="grid grid-cols-1 gap-2">
+              <select id="map-focus-status" class="input-field w-full px-2 py-1.5 rounded-lg bg-slate-800 border border-slate-600 text-slate-200 text-xs">
+                <option value="">Todos os status</option>
+              </select>
+              <select id="map-focus-region" class="input-field w-full px-2 py-1.5 rounded-lg bg-slate-800 border border-slate-600 text-slate-200 text-xs">
+                <option value="">Todas as regioes/locais</option>
+              </select>
+              <button id="map-focus-apply" type="button" class="px-2 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-xs font-medium transition-colors">Aplicar foco</button>
             </div>
           </div>
         </div>
@@ -281,7 +371,7 @@
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                 d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
             </svg>
-            Dashboard de Métricas
+            <span id="dashboard-title-text">Dashboard de Metricas</span>
           </h2>
           <button onclick="toggleDashboard()" class="p-2 rounded-lg hover:bg-slate-700 transition-colors">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -294,7 +384,7 @@
           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             <div class="metric-card rounded-xl p-5">
               <div class="flex items-center justify-between mb-3">
-                <span class="text-slate-400 text-sm">Total de Fiscalizações</span>
+                <span class="text-slate-400 text-sm">Total de Fiscalizacoes</span>
                 <div class="w-10 h-10 rounded-lg bg-blue-500/20 flex items-center justify-center">
                   <svg class="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -320,7 +410,7 @@
 
             <div class="metric-card rounded-xl p-5">
               <div class="flex items-center justify-between mb-3">
-                <span class="text-slate-400 text-sm">Concluídas</span>
+                <span class="text-slate-400 text-sm">Concluidas</span>
                 <div class="w-10 h-10 rounded-lg bg-emerald-500/20 flex items-center justify-center">
                   <svg class="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -333,7 +423,7 @@
 
             <div class="metric-card rounded-xl p-5">
               <div class="flex items-center justify-between mb-3">
-                <span class="text-slate-400 text-sm">Conformidade Média</span>
+                <span class="text-slate-400 text-sm">Conformidade Media</span>
                 <div class="w-10 h-10 rounded-lg bg-purple-500/20 flex items-center justify-center">
                   <svg class="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -361,7 +451,7 @@
 
             <div class="metric-card rounded-xl p-5">
               <div class="flex items-center justify-between mb-3">
-                <span class="text-slate-400 text-sm">Total Autos de Infração</span>
+                <span class="text-slate-400 text-sm">Total Autos de Infracao</span>
                 <div class="w-10 h-10 rounded-lg bg-orange-500/20 flex items-center justify-center">
                   <svg class="w-5 h-5 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -374,7 +464,7 @@
 
             <div class="metric-card rounded-xl p-5">
               <div class="flex items-center justify-between mb-3">
-                <span class="text-slate-400 text-sm">Total Termos de Notificação</span>
+                <span class="text-slate-400 text-sm">Total de Termos de Notificacao</span>
                 <div class="w-10 h-10 rounded-lg bg-cyan-500/20 flex items-center justify-center">
                   <svg class="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -388,13 +478,44 @@
 
           <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div class="metric-card rounded-xl p-5">
-              <h3 class="text-lg font-semibold mb-4">Distribuição por Situação</h3>
+              <h3 class="text-lg font-semibold mb-4">Distribuicao por Situacao</h3>
               <div id="chart-situacao" class="h-48 flex items-end justify-center gap-8"></div>
             </div>
 
             <div class="metric-card rounded-xl p-5">
-              <h3 class="text-lg font-semibold mb-4">Por Região Administrativa</h3>
+              <h3 class="text-lg font-semibold mb-4">Por Regiao Administrativa</h3>
               <div id="chart-regiao" class="h-48 overflow-y-auto custom-scrollbar space-y-2"></div>
+            </div>
+          </div>
+
+          <div class="metric-card rounded-xl p-5 mt-6">
+            <h3 class="text-lg font-semibold mb-4">Indicadores Operacionais</h3>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+              <div class="rounded-lg border border-slate-700 bg-slate-900/40 p-3">
+                <p class="text-slate-500">Pendencias críticas</p>
+                <p id="metric-critical-pending" class="text-red-300 text-xl font-bold">0</p>
+              </div>
+              <div class="rounded-lg border border-slate-700 bg-slate-900/40 p-3">
+                <p class="text-slate-500">Sem coordenadas</p>
+                <p id="metric-no-coords" class="text-amber-300 text-xl font-bold">0</p>
+              </div>
+              <div class="rounded-lg border border-slate-700 bg-slate-900/40 p-3">
+                <p class="text-slate-500">Salvamentos (sessao)</p>
+                <p id="metric-session-saves" class="text-emerald-300 text-xl font-bold">0</p>
+              </div>
+              <div class="rounded-lg border border-slate-700 bg-slate-900/40 p-3">
+                <p class="text-slate-500">Importacoes (sessao)</p>
+                <p id="metric-session-imports" class="text-blue-300 text-xl font-bold">0</p>
+              </div>
+            </div>
+            <div class="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <p id="duplicate-summary-text" class="text-xs text-slate-400">
+                Duplicidades por ID + Processo SEI: 0
+              </p>
+              <button id="dedupe-fiscalizacoes-btn" type="button" onclick="deduplicateFiscalizacoes()"
+                class="px-3 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-xs font-medium transition-colors">
+                Remover Duplicados
+              </button>
             </div>
           </div>
 
@@ -410,7 +531,7 @@
             <svg class="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
             </svg>
-            Nova Fiscalização
+            Nova Fiscalizacao
           </h2>
           <button onclick="closeModal()" class="p-2 rounded-lg hover:bg-slate-700 transition-colors">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -423,6 +544,16 @@
         <form id="fiscalizacao-form" onsubmit="handleSubmit(event)" class="p-4 sm:p-6">
           <input type="hidden" id="form-backend-id">
 
+          <div id="form-error-summary" role="alert" aria-live="assertive" class="hidden mb-5 rounded-lg border border-red-500/40 bg-red-500/10 p-3">
+            <p class="text-sm font-semibold text-red-300 mb-1">Revise os campos abaixo</p>
+            <ul id="form-error-list" class="text-xs text-red-200 space-y-1"></ul>
+          </div>
+
+          <div class="mb-5 flex items-center justify-between gap-2 rounded-lg border border-slate-700 bg-slate-800/60 px-3 py-2">
+            <span class="text-xs text-slate-400">Rascunho</span>
+            <span id="form-draft-status" aria-live="polite" class="text-xs text-slate-300">Sem alteracoes pendentes</span>
+          </div>
+
           <!-- Basic Info -->
           <div class="mb-6">
             <h3 class="text-sm font-semibold text-blue-400 uppercase tracking-wider mb-4 flex items-center gap-2">
@@ -430,7 +561,7 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                   d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              Informações Básicas
+              Informacoes Basicas
             </h3>
 
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -455,54 +586,54 @@
             </div>
           </div>
 
-          <!-- Localização -->
+          <!-- Localizacao -->
           <div class="mb-6">
             <h3 class="text-sm font-semibold text-blue-400 uppercase tracking-wider mb-4 flex items-center gap-2">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                   d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
               </svg>
-              Localização
+              Localizacao
             </h3>
 
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <label class="block text-sm font-medium text-slate-300 mb-2">Região Administrativa *</label>
+                <label class="block text-sm font-medium text-slate-300 mb-2">Regiao Administrativa *</label>
                 <select id="form-regiao" required
                   class="input-field w-full px-4 py-2.5 rounded-lg bg-slate-800 border border-slate-600 text-white focus:outline-none focus:border-blue-500">
                   <option value="">Selecione...</option>
                   <option value="Plano Piloto">Plano Piloto</option>
                   <option value="Gama">Gama</option>
                   <option value="Taguatinga">Taguatinga</option>
-                  <option value="Brazlândia">Brazlândia</option>
+                  <option value="Brazlandia">Brazlandia</option>
                   <option value="Sobradinho">Sobradinho</option>
                   <option value="Planaltina">Planaltina</option>
-                  <option value="Paranoá">Paranoá</option>
-                  <option value="Núcleo Bandeirante">Núcleo Bandeirante</option>
-                  <option value="Ceilândia">Ceilândia</option>
-                  <option value="Guará">Guará</option>
+                  <option value="Paranoa">Paranoa</option>
+                  <option value="Nucleo Bandeirante">Nucleo Bandeirante</option>
+                  <option value="Ceilandia">Ceilandia</option>
+                  <option value="Guara">Guara</option>
                   <option value="Cruzeiro">Cruzeiro</option>
                   <option value="Samambaia">Samambaia</option>
                   <option value="Santa Maria">Santa Maria</option>
-                  <option value="São Sebastião">São Sebastião</option>
+                  <option value="Sao Sebastiao">Sao Sebastiao</option>
                   <option value="Recanto das Emas">Recanto das Emas</option>
                   <option value="Lago Sul">Lago Sul</option>
                   <option value="Riacho Fundo">Riacho Fundo</option>
                   <option value="Lago Norte">Lago Norte</option>
-                  <option value="Candangolândia">Candangolândia</option>
-                  <option value="Águas Claras">Águas Claras</option>
+                  <option value="Candangolandia">Candangolandia</option>
+                  <option value="Aguas Claras">Aguas Claras</option>
                   <option value="Riacho Fundo II">Riacho Fundo II</option>
                   <option value="Sudoeste/Octogonal">Sudoeste/Octogonal</option>
-                  <option value="Varjão">Varjão</option>
+                  <option value="Varjao">Varjao</option>
                   <option value="Park Way">Park Way</option>
                   <option value="SCIA/Estrutural">SCIA/Estrutural</option>
                   <option value="Sobradinho II">Sobradinho II</option>
-                  <option value="Jardim Botânico">Jardim Botânico</option>
-                  <option value="Itapoã">Itapoã</option>
+                  <option value="Jardim Botanico">Jardim Botanico</option>
+                  <option value="Itapoa">Itapoa</option>
                   <option value="SIA">SIA</option>
                   <option value="Vicente Pires">Vicente Pires</option>
                   <option value="Fercal">Fercal</option>
-                  <option value="Sol Nascente/Pôr do Sol">Sol Nascente/Pôr do Sol</option>
+                  <option value="Sol Nascente/Por do Sol">Sol Nascente/Por do Sol</option>
                   <option value="Arniqueira">Arniqueira</option>
                 </select>
               </div>
@@ -539,17 +670,17 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                   d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              Status e Classificação
+              Status e Classificacao
             </h3>
 
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <div>
-                <label class="block text-sm font-medium text-slate-300 mb-2">Situação *</label>
+                <label class="block text-sm font-medium text-slate-300 mb-2">Situacao *</label>
                 <select id="form-situacao" required
                   class="input-field w-full px-4 py-2.5 rounded-lg bg-slate-800 border border-slate-600 text-white focus:outline-none focus:border-blue-500">
                   <option value="">Selecione...</option>
                   <option value="Em Andamento">Em Andamento</option>
-                  <option value="Concluída">Concluída</option>
+                  <option value="Concluida">Concluida</option>
                   <option value="Pendente">Pendente</option>
                 </select>
               </div>
@@ -568,12 +699,12 @@
                   class="input-field w-full px-4 py-2.5 rounded-lg bg-slate-800 border border-slate-600 text-white focus:outline-none focus:border-blue-500">
                   <option value="">Selecione...</option>
                   <option value="Programada">Programada</option>
-                  <option value="Não Programada">Não Programada</option>
+                  <option value="Nao Programada">Nao Programada</option>
                 </select>
               </div>
 
               <div>
-                <label class="block text-sm font-medium text-slate-300 mb-2">Índice de Conformidade (%)</label>
+                <label class="block text-sm font-medium text-slate-300 mb-2">Indice de Conformidade (%)</label>
                 <input type="number" id="form-conformidade" min="0" max="100"
                   class="input-field w-full px-4 py-2.5 rounded-lg bg-slate-800 border border-slate-600 text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
                   placeholder="85">
@@ -622,7 +753,7 @@
               </div>
 
               <div>
-                <label class="block text-sm font-medium text-slate-300 mb-2">Destinatário *</label>
+                <label class="block text-sm font-medium text-slate-300 mb-2">Destinatario *</label>
                 <input type="text" id="form-destinatario" required
                   class="input-field w-full px-4 py-2.5 rounded-lg bg-slate-800 border border-slate-600 text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
                   placeholder="Nome do destinatário">
@@ -652,26 +783,26 @@
             </div>
           </div>
 
-          <!-- Constatações -->
+          <!-- Constatacoes -->
           <div class="mb-6">
             <h3 class="text-sm font-semibold text-blue-400 uppercase tracking-wider mb-4 flex items-center gap-2">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                   d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
               </svg>
-              Constatações e Ações
+              Constatacoes e Acoes
             </h3>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label class="block text-sm font-medium text-slate-300 mb-2">Constatações</label>
+                <label class="block text-sm font-medium text-slate-300 mb-2">Constatacoes</label>
                 <textarea id="form-constatacoes" rows="3"
                   class="input-field w-full px-4 py-2.5 rounded-lg bg-slate-800 border border-slate-600 text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 resize-none"
                   placeholder="Descreva as constatações..."></textarea>
               </div>
 
               <div>
-                <label class="block text-sm font-medium text-slate-300 mb-2">Constatações Não Conformes</label>
+                <label class="block text-sm font-medium text-slate-300 mb-2">Constatacoes Nao Conformes</label>
                 <input type="number" id="form-nao-conformes" min="0"
                   class="input-field w-full px-4 py-2.5 rounded-lg bg-slate-800 border border-slate-600 text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
                   placeholder="0">
@@ -680,14 +811,14 @@
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
               <div>
-                <label class="block text-sm font-medium text-slate-300 mb-2">Recomendações</label>
+                <label class="block text-sm font-medium text-slate-300 mb-2">Recomendacoes</label>
                 <textarea id="form-recomendacoes" rows="2"
                   class="input-field w-full px-4 py-2.5 rounded-lg bg-slate-800 border border-slate-600 text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 resize-none"
                   placeholder="Descreva as recomendações..."></textarea>
               </div>
 
               <div>
-                <label class="block text-sm font-medium text-slate-300 mb-2">Determinações</label>
+                <label class="block text-sm font-medium text-slate-300 mb-2">Determinacoes</label>
                 <textarea id="form-determinacoes" rows="2"
                   class="input-field w-full px-4 py-2.5 rounded-lg bg-slate-800 border border-slate-600 text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 resize-none"
                   placeholder="Descreva as determinações..."></textarea>
@@ -695,26 +826,26 @@
             </div>
           </div>
 
-          <!-- Ações Legais -->
+          <!-- Acoes Legais -->
           <div class="mb-6">
             <h3 class="text-sm font-semibold text-blue-400 uppercase tracking-wider mb-4 flex items-center gap-2">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                   d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" />
               </svg>
-              Ações Legais
+              Acoes Legais
             </h3>
 
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <label class="block text-sm font-medium text-slate-300 mb-2">Termos de Notificação (TN)</label>
+                <label class="block text-sm font-medium text-slate-300 mb-2">Termos de Notificacao (TN)</label>
                 <input type="number" id="form-tn" min="0"
                   class="input-field w-full px-4 py-2.5 rounded-lg bg-slate-800 border border-slate-600 text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
                   placeholder="0">
               </div>
 
               <div>
-                <label class="block text-sm font-medium text-slate-300 mb-2">Autos de Infração (AI)</label>
+                <label class="block text-sm font-medium text-slate-300 mb-2">Autos de Infracao (AI)</label>
                 <input type="number" id="form-ai" min="0"
                   class="input-field w-full px-4 py-2.5 rounded-lg bg-slate-800 border border-slate-600 text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
                   placeholder="0">
@@ -739,7 +870,7 @@
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
               </svg>
-              <span id="submit-text">Salvar Fiscalização</span>
+              <span id="submit-text">Salvar Fiscalizacao</span>
             </button>
           </div>
         </form>
@@ -749,7 +880,7 @@
     <!-- Detail Panel -->
     <div id="detail-panel" class="hidden fixed top-0 right-0 h-full w-full md:w-[500px] glass-card border-l border-slate-700 z-[1500] overflow-y-auto custom-scrollbar slide-in">
       <div class="p-4 sm:p-6 border-b border-slate-700 flex items-center justify-between sticky top-0 bg-slate-800/90 backdrop-blur-sm z-10">
-        <h2 id="detail-title" class="text-lg sm:text-xl font-bold">Detalhes da Fiscalização</h2>
+        <h2 id="detail-title" class="text-lg sm:text-xl font-bold">Detalhes da Fiscalizacao</h2>
         <div class="flex items-center gap-2">
           <button id="edit-detail-btn" onclick="editCurrentFiscalizacao()" class="p-2 rounded-lg hover:bg-slate-700 transition-colors text-blue-400">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -808,7 +939,7 @@
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                 d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
-            Importar Fiscalizações
+            Importar Fiscalizacoes
           </h2>
           <button onclick="closeImportModal()" class="p-2 rounded-lg hover:bg-slate-700 transition-colors">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -819,22 +950,41 @@
 
         <div class="p-4 sm:p-6">
           <div class="mb-6">
-            <label class="block text-sm font-medium text-slate-300 mb-3">Cole seus dados (Excel, Google Sheets ou CSV)</label>
-            <textarea id="import-textarea" placeholder="Cole seus dados aqui. Suporta Tab-separated (Excel) ou CSV..."
-              class="w-full h-40 px-4 py-3 rounded-lg bg-slate-800 border border-slate-600 text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 font-mono text-sm resize-none"></textarea>
-            <p class="text-xs text-slate-500 mt-2">💡 Copie direto do Excel/Google Sheets (Ctrl+C) e cole aqui</p>
+            <label class="block text-sm font-medium text-slate-300 mb-3">Selecione o arquivo de fiscalizações (.xlsx, .xls, .xlsm ou .csv)</label>
+            <input id="fiscalizacoes-file-input" type="file" accept=".xlsx,.xls,.xlsm,.csv,text/csv" onchange="handleFiscalizacoesFileSelected(event)"
+              class="w-full px-4 py-3 rounded-lg bg-slate-800 border border-slate-600 text-white focus:outline-none focus:border-blue-500">
+            <p class="text-xs text-slate-500 mt-2">Planilhas Excel e CSV sao aceitos. O sistema detecta automaticamente a aba e o cabeçalho.</p>
+          </div>
+
+          <div id="fiscalizacoes-upload-summary" class="hidden mb-6">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+              <div class="rounded-xl bg-slate-800/60 border border-slate-700 p-4">
+                <p class="text-xs uppercase tracking-wide text-slate-500 mb-1">Arquivo</p>
+                <p id="fiscalizacoes-summary-file" class="text-sm text-slate-200 break-all">-</p>
+              </div>
+              <div class="rounded-xl bg-slate-800/60 border border-slate-700 p-4">
+                <p class="text-xs uppercase tracking-wide text-slate-500 mb-1">Aba</p>
+                <p id="fiscalizacoes-summary-sheet" class="text-sm text-slate-200">-</p>
+              </div>
+              <div class="rounded-xl bg-slate-800/60 border border-slate-700 p-4">
+                <p class="text-xs uppercase tracking-wide text-slate-500 mb-1">Linhas detectadas</p>
+                <p id="fiscalizacoes-summary-count" class="text-sm text-slate-200">0</p>
+              </div>
+            </div>
           </div>
 
           <div id="import-preview" class="hidden mb-6">
-            <h3 class="text-sm font-semibold text-slate-300 mb-3">Prévia (primeiras linhas):</h3>
+            <h3 class="text-sm font-semibold text-slate-300 mb-3">Previa (primeiras linhas):</h3>
             <div class="bg-slate-800/50 rounded-lg p-4 max-h-48 overflow-y-auto custom-scrollbar">
               <table class="w-full text-xs">
                 <thead class="sticky top-0 bg-slate-700">
                   <tr>
+                    <th class="text-left px-2 py-2 text-blue-400">Status</th>
                     <th class="text-left px-2 py-2 text-blue-400">ID</th>
-                    <th class="text-left px-2 py-2 text-blue-400">Região</th>
-                    <th class="text-left px-2 py-2 text-blue-400">Situação</th>
+                    <th class="text-left px-2 py-2 text-blue-400">Regiao</th>
+                    <th class="text-left px-2 py-2 text-blue-400">Situacao</th>
                     <th class="text-left px-2 py-2 text-blue-400">Conformidade</th>
+                    <th class="text-left px-2 py-2 text-blue-400">Observacao</th>
                   </tr>
                 </thead>
                 <tbody id="preview-body"></tbody>
@@ -842,11 +992,33 @@
             </div>
           </div>
 
+          <div id="import-simulation-summary" class="hidden mb-6 rounded-lg border border-slate-700 bg-slate-800/50 p-4">
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+              <div>
+                <p class="text-slate-500">Linhas avaliadas</p>
+                <p id="sim-total-lines" class="text-slate-200 font-semibold">0</p>
+              </div>
+              <div>
+                <p class="text-slate-500">Validas</p>
+                <p id="sim-valid-lines" class="text-emerald-300 font-semibold">0</p>
+              </div>
+              <div>
+                <p class="text-slate-500">Avisos</p>
+                <p id="sim-warning-lines" class="text-amber-300 font-semibold">0</p>
+              </div>
+              <div>
+                <p class="text-slate-500">Erros</p>
+                <p id="sim-error-lines" class="text-red-300 font-semibold">0</p>
+              </div>
+            </div>
+            <p id="sim-summary-note" class="text-xs text-slate-400 mt-3"></p>
+          </div>
+
           <div class="flex items-center justify-end gap-3">
             <button onclick="previewImport()" class="px-6 py-2.5 rounded-lg bg-slate-700 hover:bg-slate-600 transition-colors font-medium">
-              Preview
+              Simular Importacao
             </button>
-            <button onclick="executeImport()" id="import-btn" class="btn-primary px-6 py-2.5 rounded-lg font-medium text-white flex items-center gap-2">
+            <button onclick="executeImport()" id="import-btn" disabled class="btn-primary px-6 py-2.5 rounded-lg font-medium text-white flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
               </svg>
@@ -945,13 +1117,12 @@
 
   <!-- JS -->
   <script>
-    const hostname = window.location.hostname;
-    const isLocalhost = ["localhost", "127.0.0.1"].includes(hostname);
     // Opcional para frontend estatico (ex.: GitHub Pages):
     // window.__FISCALIZACOES_API_BASE_URL__ = "https://meu-servidor.com/api";
     const externalApiBaseUrl = String(window.__FISCALIZACOES_API_BASE_URL__ || "").trim();
-    // Sempre tenta falar com o backend em /api por padrão (ou valor externo configurado).
-    const resolvedApiBaseUrl = externalApiBaseUrl || "/api";
+    // Sempre usa /api por padrão; para backend externo use window.__FISCALIZACOES_API_BASE_URL__.
+    const defaultApiBaseUrl = "/api";
+    const resolvedApiBaseUrl = externalApiBaseUrl || defaultApiBaseUrl;
 
     window.APP_BACKEND_CONFIG = {
       baseUrl: resolvedApiBaseUrl,

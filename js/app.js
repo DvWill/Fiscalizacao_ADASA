@@ -22,12 +22,91 @@ let currentObra = null;
 let currentView = 'fiscalizacoes';
 let pendingObrasUpload = [];
 let pendingObrasMeta = null;
+let pendingFiscalizacoesUpload = [];
+let pendingFiscalizacoesMeta = null;
+let importSimulation = null;
+let listPage = 1;
+let listTotalPages = 1;
+let isDraftSyncing = false;
+let draftSaveTimer = null;
+let lastAppliedFilterFingerprint = '';
+
+const LIST_DEFAULT_PAGE_SIZE = 12;
+const LIST_STATE_KEY = 'fiscalizacoes_list_state_v1';
+const FILTER_STATE_KEY = 'fiscalizacoes_filter_state_v1';
+const FILTER_FAVORITES_KEY = 'fiscalizacoes_filter_favorites_v1';
+const FILTER_RECENTS_KEY = 'fiscalizacoes_filter_recents_v1';
+const FORM_DRAFT_KEY = 'fiscalizacao_form_draft_v1';
+const AUDIT_LOCAL_KEY = 'fiscalizacoes_audit_local_v1';
+const SESSION_METRICS_KEY = 'fiscalizacoes_session_metrics_v1';
+const MAP_LAYER_STATE_KEY = 'fiscalizacoes_map_layers_v1';
+const MAX_AUDIT_ENTRIES = 300;
+
+const FISCALIZACAO_FORM_FIELDS = [
+  'form-backend-id',
+  'form-id',
+  'form-processo-sei',
+  'form-ano',
+  'form-regiao',
+  'form-lat',
+  'form-lng',
+  'form-situacao',
+  'form-direta',
+  'form-programada',
+  'form-conformidade',
+  'form-tipo-doc',
+  'form-sei-doc',
+  'form-data',
+  'form-objetivo',
+  'form-destinatario',
+  'form-constatacoes',
+  'form-nao-conformes',
+  'form-recomendacoes',
+  'form-determinacoes',
+  'form-tn',
+  'form-ai',
+  'form-tac',
+  'form-imagem-data'
+];
+
+const listSettings = {
+  sortField: 'updated_at',
+  sortDirection: 'desc',
+  pageSize: LIST_DEFAULT_PAGE_SIZE
+};
+
+const sessionMetrics = {
+  saves: 0,
+  imports: 0,
+  filtersApplied: 0
+};
+
+const fieldLabels = {
+  'form-id': 'ID',
+  'form-processo-sei': 'Processo SEI',
+  'form-ano': 'Ano',
+  'form-regiao': 'Regiao',
+  'form-situacao': 'Situacao',
+  'form-direta': 'Tipo (Direta/Indireta)',
+  'form-conformidade': 'Indice de conformidade',
+  'form-data': 'Data'
+};
+
+let mapLayerVisibility = {
+  em_andamento: true,
+  concluida: true,
+  pendente: true,
+  obra_alta: true,
+  obra_media: true,
+  obra_baixa: true,
+  obra_sem_pct: true
+};
 
 const OBRAS_STORAGE_KEY = 'obras_storage_v1';
 const VIEW_MODE_KEY = 'fiscalizacoes_data_view';
 
 const defaultConfig = {
-  app_title: 'Sistema de Fiscalizações',
+  app_title: 'Sistema de Fiscalizacoes',
   subtitle: 'Monitoramento em Tempo Real'
 };
 
@@ -35,35 +114,35 @@ const regionCoordinates = {
   'Plano Piloto': [-15.7942, -47.8822],
   'Gama': [-16.0192, -48.0617],
   'Taguatinga': [-15.8364, -48.0564],
-  'Brazlândia': [-15.6759, -48.2125],
+  'Brazlandia': [-15.6759, -48.2125],
   'Sobradinho': [-15.6500, -47.7878],
   'Planaltina': [-15.6204, -47.6482],
-  'Paranoá': [-15.7735, -47.7767],
-  'Núcleo Bandeirante': [-15.8714, -47.9675],
-  'Ceilândia': [-15.8197, -48.1117],
-  'Guará': [-15.8333, -47.9833],
+  'Paranoa': [-15.7735, -47.7767],
+  'Nucleo Bandeirante': [-15.8714, -47.9675],
+  'Ceilandia': [-15.8197, -48.1117],
+  'Guara': [-15.8333, -47.9833],
   'Cruzeiro': [-15.7942, -47.9311],
   'Samambaia': [-15.8789, -48.0992],
   'Santa Maria': [-16.0197, -48.0028],
-  'São Sebastião': [-15.9025, -47.7631],
+  'Sao Sebastiao': [-15.9025, -47.7631],
   'Recanto das Emas': [-15.9167, -48.0667],
   'Lago Sul': [-15.8333, -47.8500],
   'Riacho Fundo': [-15.8833, -48.0167],
   'Lago Norte': [-15.7333, -47.8500],
-  'Candangolândia': [-15.8500, -47.9500],
-  'Águas Claras': [-15.8333, -48.0333],
+  'Candangolandia': [-15.8500, -47.9500],
+  'Aguas Claras': [-15.8333, -48.0333],
   'Riacho Fundo II': [-15.9000, -48.0500],
   'Sudoeste/Octogonal': [-15.8000, -47.9167],
-  'Varjão': [-15.7167, -47.8667],
+  'Varjao': [-15.7167, -47.8667],
   'Park Way': [-15.9000, -47.9500],
   'SCIA/Estrutural': [-15.7833, -47.9833],
   'Sobradinho II': [-15.6333, -47.8000],
-  'Jardim Botânico': [-15.8667, -47.8000],
-  'Itapoã': [-15.7500, -47.7667],
+  'Jardim Botanico': [-15.8667, -47.8000],
+  'Itapoa': [-15.7500, -47.7667],
   'SIA': [-15.8167, -47.9500],
   'Vicente Pires': [-15.8000, -48.0333],
   'Fercal': [-15.6000, -47.9000],
-  'Sol Nascente/Pôr do Sol': [-15.8000, -48.1333],
+  'Sol Nascente/Por do Sol': [-15.8000, -48.1333],
   'Arniqueira': [-15.8500, -48.0333]
 };
 
@@ -80,6 +159,15 @@ function normalizeHeaderKey(value) {
   return normalizePlainText(value)
     .replace(/[^a-z0-9]+/g, '_')
     .replace(/^_+|_+$/g, '');
+}
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 function hasMeaningfulRecordData(record) {
@@ -184,19 +272,19 @@ function inferCoordinatesFromLocal(local) {
   }
 
   const aliases = [
-    ['sol nascente / por do sol', 'Sol Nascente/PÃ´r do Sol'],
-    ['sol nascente e por do sol', 'Sol Nascente/PÃ´r do Sol'],
-    ['aguas claras', 'Ãguas Claras'],
-    ['nucleo bandeirante', 'NÃºcleo Bandeirante'],
-    ['sao sebastiao', 'SÃ£o SebastiÃ£o'],
-    ['ceilandia', 'CeilÃ¢ndia'],
-    ['guara', 'GuarÃ¡'],
-    ['paranoa', 'ParanoÃ¡'],
-    ['itapoa', 'ItapoÃ£'],
-    ['jardim botanico', 'Jardim BotÃ¢nico'],
-    ['varjao', 'VarjÃ£o'],
-    ['brazlandia', 'BrazlÃ¢ndia'],
-    ['candangolandia', 'CandangolÃ¢ndia']
+    ['sol nascente / por do sol', 'Sol Nascente/Por do Sol'],
+    ['sol nascente e por do sol', 'Sol Nascente/Por do Sol'],
+    ['aguas claras', 'Aguas Claras'],
+    ['nucleo bandeirante', 'Nucleo Bandeirante'],
+    ['sao sebastiao', 'Sao Sebastiao'],
+    ['ceilandia', 'Ceilandia'],
+    ['guara', 'Guara'],
+    ['paranoa', 'Paranoa'],
+    ['itapoa', 'Itapoa'],
+    ['jardim botanico', 'Jardim Botanico'],
+    ['varjao', 'Varjao'],
+    ['brazlandia', 'Brazlandia'],
+    ['candangolandia', 'Candangolandia']
   ];
 
   for (const [alias, region] of aliases) {
@@ -241,6 +329,471 @@ function normalizeDateDisplay(value) {
     return new Date(`${text}T00:00:00`).toLocaleDateString('pt-BR');
   }
   return text;
+}
+
+function readStoredJson(key, fallbackValue) {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return fallbackValue;
+    const parsed = JSON.parse(raw);
+    return parsed == null ? fallbackValue : parsed;
+  } catch {
+    return fallbackValue;
+  }
+}
+
+function writeStoredJson(key, value) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function nowIso() {
+  return new Date().toISOString();
+}
+
+function toSafeNumber(value) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function toIsoDate(value) {
+  const text = String(value || '').trim();
+  if (!text) return '';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
+  if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(text)) {
+    const [dayRaw, monthRaw, yearRaw] = text.split('/').map((part) => parseInt(part, 10));
+    const day = String(dayRaw).padStart(2, '0');
+    const month = String(monthRaw).padStart(2, '0');
+    return `${yearRaw}-${month}-${day}`;
+  }
+  return '';
+}
+
+function isModalOpen(id) {
+  const node = document.getElementById(id);
+  if (!node) return false;
+  return !node.classList.contains('hidden');
+}
+
+function normalizeIdentityPart(value) {
+  return normalizePlainText(String(value || '')).replace(/\s+/g, '');
+}
+
+function buildFiscalizacaoIdentity(record) {
+  const idPart = normalizeIdentityPart(record?.id);
+  const processoPart = normalizeIdentityPart(record?.processo_sei);
+  if (!idPart && !processoPart) return '';
+  return `${idPart}::${processoPart}`;
+}
+
+function bumpSessionMetric(metricName, delta = 1) {
+  if (!Object.prototype.hasOwnProperty.call(sessionMetrics, metricName)) return;
+  sessionMetrics[metricName] += delta;
+  writeStoredJson(SESSION_METRICS_KEY, sessionMetrics);
+}
+
+function loadSessionMetrics() {
+  const stored = readStoredJson(SESSION_METRICS_KEY, {});
+  sessionMetrics.saves = Number(stored.saves || 0);
+  sessionMetrics.imports = Number(stored.imports || 0);
+  sessionMetrics.filtersApplied = Number(stored.filtersApplied || 0);
+}
+
+function setOperationStatus(text, type = 'idle') {
+  const badge = document.getElementById('operation-status');
+  const dot = document.getElementById('operation-status-dot');
+  const label = document.getElementById('operation-status-text');
+  if (!badge || !dot || !label) return;
+
+  const dotClass = {
+    idle: 'bg-slate-500',
+    syncing: 'bg-blue-400',
+    success: 'bg-emerald-400',
+    warning: 'bg-amber-400',
+    error: 'bg-red-400'
+  };
+
+  badge.classList.remove('hidden');
+  dot.className = `w-2 h-2 rounded-full ${dotClass[type] || dotClass.idle}`;
+  label.textContent = text;
+}
+
+function getListSortOptions() {
+  if (currentView === 'obras') {
+    return [
+      { value: 'item', label: 'Item' },
+      { value: 'local', label: 'Local' },
+      { value: 'situacao', label: 'Situacao' },
+      { value: 'progress', label: 'Execucao' }
+    ];
+  }
+
+  return [
+    { value: 'id', label: 'ID' },
+    { value: 'ano', label: 'Ano' },
+    { value: 'situacao', label: 'Situacao' },
+    { value: 'conformidade', label: 'Conformidade' },
+    { value: 'regiao', label: 'Regiao' }
+  ];
+}
+
+function getComparableValue(record, field) {
+  if (currentView === 'obras') {
+    switch (field) {
+      case 'item':
+        return normalizePlainText(record.item);
+      case 'local':
+        return normalizePlainText(record.local);
+      case 'situacao':
+        return normalizePlainText(record.situacao_contrato);
+      case 'progress':
+        return Number.isFinite(getObraProgressValue(record)) ? getObraProgressValue(record) : -1;
+      default:
+        return normalizePlainText(record.item);
+    }
+  }
+
+  switch (field) {
+    case 'id':
+      return normalizePlainText(record.id);
+    case 'ano':
+      return Number(record.ano || 0);
+    case 'situacao':
+      return normalizePlainText(record.situacao);
+    case 'conformidade':
+      return Number.isFinite(Number(record.indice_conformidade)) ? Number(record.indice_conformidade) : -1;
+    case 'regiao':
+      return normalizePlainText(record.regiao_administrativa);
+    default:
+      return normalizePlainText(record.id);
+  }
+}
+
+function sortRecords(records) {
+  const sortField = listSettings.sortField;
+  const sortDirection = listSettings.sortDirection === 'asc' ? 1 : -1;
+
+  return [...records].sort((a, b) => {
+    const left = getComparableValue(a, sortField);
+    const right = getComparableValue(b, sortField);
+
+    if (left === right) return 0;
+    if (left > right) return sortDirection;
+    return -sortDirection;
+  });
+}
+
+function paginateRecords(records) {
+  const pageSize = Number(listSettings.pageSize || LIST_DEFAULT_PAGE_SIZE);
+  const totalPages = Math.max(1, Math.ceil(records.length / pageSize));
+  listTotalPages = totalPages;
+  if (listPage > totalPages) listPage = totalPages;
+  if (listPage < 1) listPage = 1;
+
+  const start = (listPage - 1) * pageSize;
+  const end = start + pageSize;
+  return records.slice(start, end);
+}
+
+function updatePaginationUI(totalItems) {
+  const wrapper = document.getElementById('list-pagination');
+  const prev = document.getElementById('pagination-prev');
+  const next = document.getElementById('pagination-next');
+  const info = document.getElementById('pagination-info');
+  if (!wrapper || !prev || !next || !info) return;
+
+  const shouldShow = totalItems > Number(listSettings.pageSize || LIST_DEFAULT_PAGE_SIZE);
+  wrapper.classList.toggle('hidden', !shouldShow);
+  info.textContent = `Pagina ${listPage} de ${listTotalPages}`;
+  prev.disabled = listPage <= 1;
+  next.disabled = listPage >= listTotalPages;
+  prev.classList.toggle('opacity-50', prev.disabled);
+  next.classList.toggle('opacity-50', next.disabled);
+  prev.classList.toggle('cursor-not-allowed', prev.disabled);
+  next.classList.toggle('cursor-not-allowed', next.disabled);
+}
+
+function saveListState() {
+  writeStoredJson(LIST_STATE_KEY, {
+    sortField: listSettings.sortField,
+    sortDirection: listSettings.sortDirection,
+    pageSize: listSettings.pageSize
+  });
+}
+
+function loadListState() {
+  const stored = readStoredJson(LIST_STATE_KEY, {});
+  if (stored.sortField) listSettings.sortField = stored.sortField;
+  if (stored.sortDirection === 'asc' || stored.sortDirection === 'desc') {
+    listSettings.sortDirection = stored.sortDirection;
+  }
+  if (Number.isFinite(Number(stored.pageSize)) && Number(stored.pageSize) > 0) {
+    listSettings.pageSize = Number(stored.pageSize);
+  }
+}
+
+function saveFilterState() {
+  writeStoredJson(FILTER_STATE_KEY, {
+    view: currentView,
+    search: document.getElementById('filter-search')?.value || '',
+    regiao: document.getElementById('filter-regiao')?.value || '',
+    situacao: document.getElementById('filter-situacao')?.value || '',
+    ano: document.getElementById('filter-ano')?.value || '',
+    conformidade: Number(document.getElementById('filter-conformidade')?.value || 0)
+  });
+}
+
+function restoreFilterState() {
+  const stored = readStoredJson(FILTER_STATE_KEY, null);
+  if (!stored) return;
+
+  if (stored.view === 'obras' || stored.view === 'fiscalizacoes') {
+    currentView = stored.view;
+  }
+
+  const search = document.getElementById('filter-search');
+  const regiao = document.getElementById('filter-regiao');
+  const situacao = document.getElementById('filter-situacao');
+  const ano = document.getElementById('filter-ano');
+  const conformidade = document.getElementById('filter-conformidade');
+
+  if (search) search.value = stored.search || '';
+  if (regiao) regiao.value = stored.regiao || '';
+  if (situacao) situacao.value = stored.situacao || '';
+  if (ano) ano.value = stored.ano || '';
+  if (conformidade) conformidade.value = String(Number(stored.conformidade || 0));
+  updateConformidadeLabel();
+}
+
+function getCurrentFilterSnapshot() {
+  return {
+    view: currentView,
+    search: document.getElementById('filter-search')?.value || '',
+    regiao: document.getElementById('filter-regiao')?.value || '',
+    situacao: document.getElementById('filter-situacao')?.value || '',
+    ano: document.getElementById('filter-ano')?.value || '',
+    conformidade: Number(document.getElementById('filter-conformidade')?.value || 0)
+  };
+}
+
+function applyFilterSnapshot(snapshot) {
+  if (!snapshot) return;
+  if (snapshot.view === 'obras' || snapshot.view === 'fiscalizacoes') {
+    if (snapshot.view !== currentView) {
+      switchDataView(snapshot.view);
+    }
+  }
+
+  const search = document.getElementById('filter-search');
+  const regiao = document.getElementById('filter-regiao');
+  const situacao = document.getElementById('filter-situacao');
+  const ano = document.getElementById('filter-ano');
+  const conformidade = document.getElementById('filter-conformidade');
+
+  if (search) search.value = snapshot.search || '';
+  if (regiao) regiao.value = snapshot.regiao || '';
+  if (situacao) situacao.value = snapshot.situacao || '';
+  if (ano) ano.value = snapshot.ano || '';
+  if (conformidade) conformidade.value = String(Number(snapshot.conformidade || 0));
+  updateConformidadeLabel();
+  applyFilters();
+}
+
+function getFilterFavorites() {
+  const favorites = readStoredJson(FILTER_FAVORITES_KEY, []);
+  return Array.isArray(favorites) ? favorites : [];
+}
+
+function saveFilterFavorites(favorites) {
+  writeStoredJson(FILTER_FAVORITES_KEY, favorites.slice(0, 8));
+}
+
+function getRecentFilters() {
+  const recents = readStoredJson(FILTER_RECENTS_KEY, []);
+  return Array.isArray(recents) ? recents : [];
+}
+
+function saveRecentFilters(recents) {
+  writeStoredJson(FILTER_RECENTS_KEY, recents.slice(0, 5));
+}
+
+function buildFilterSummaryText(filter) {
+  const parts = [];
+  if (filter.regiao) parts.push(filter.regiao);
+  if (filter.situacao) parts.push(filter.situacao);
+  if (filter.ano) parts.push(filter.ano);
+  if (filter.search) parts.push(`"${filter.search}"`);
+  if (!parts.length) return 'Sem restricao';
+  return parts.slice(0, 2).join(' | ');
+}
+
+function addCurrentFilterToRecent() {
+  const snapshot = getCurrentFilterSnapshot();
+  const fingerprint = JSON.stringify(snapshot);
+  const recents = getRecentFilters().filter((item) => item.fingerprint !== fingerprint);
+
+  recents.unshift({
+    id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
+    fingerprint,
+    label: buildFilterSummaryText(snapshot),
+    filter: snapshot,
+    at: nowIso()
+  });
+
+  saveRecentFilters(recents);
+}
+
+function saveCurrentFilterFavorite() {
+  const snapshot = getCurrentFilterSnapshot();
+  const summary = buildFilterSummaryText(snapshot);
+  const name = window.prompt('Nome para este filtro favorito:', summary);
+  if (!name || !name.trim()) return;
+
+  const favorites = getFilterFavorites();
+  favorites.unshift({
+    id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
+    name: name.trim(),
+    filter: snapshot,
+    createdAt: nowIso()
+  });
+  saveFilterFavorites(favorites);
+  renderSavedFilterButtons();
+  showToast('Filtro favorito salvo.', 'success');
+}
+window.saveCurrentFilterFavorite = saveCurrentFilterFavorite;
+
+function removeFilterFavorite(favoriteId) {
+  const nextFavorites = getFilterFavorites().filter((favorite) => favorite.id !== favoriteId);
+  saveFilterFavorites(nextFavorites);
+  renderSavedFilterButtons();
+}
+window.removeFilterFavorite = removeFilterFavorite;
+
+function applyFavoriteFilter(favoriteId) {
+  const favorite = getFilterFavorites().find((item) => item.id === favoriteId);
+  if (!favorite) return;
+  applyFilterSnapshot(favorite.filter);
+}
+window.applyFavoriteFilter = applyFavoriteFilter;
+
+function applyRecentFilter(index) {
+  const item = getRecentFilters()[index];
+  if (!item) return;
+  applyFilterSnapshot(item.filter);
+}
+window.applyRecentFilter = applyRecentFilter;
+
+function renderSavedFilterButtons() {
+  const favoritesContainer = document.getElementById('favorite-filter-buttons');
+  const recentsContainer = document.getElementById('recent-filter-buttons');
+  const emptyFavorites = document.getElementById('favorite-filter-empty');
+  const emptyRecents = document.getElementById('recent-filter-empty');
+
+  if (!favoritesContainer || !recentsContainer) return;
+
+  const favorites = getFilterFavorites();
+  favoritesContainer.innerHTML = favorites.map((favorite) => `
+    <div class="inline-flex items-center gap-1 rounded-lg border border-slate-600 bg-slate-700/70 px-2 py-1">
+      <button type="button"
+        onclick="applyFavoriteFilter('${favorite.id}')"
+        class="text-xs text-slate-100 hover:text-white max-w-[120px] truncate"
+        title="${escapeHtml(favorite.name)}">
+        ${escapeHtml(favorite.name)}
+      </button>
+      <button type="button"
+        onclick="removeFilterFavorite('${favorite.id}')"
+        class="text-[11px] text-slate-400 hover:text-red-300"
+        aria-label="Remover favorito ${escapeHtml(favorite.name)}">
+        x
+      </button>
+    </div>
+  `).join('');
+
+  const recents = getRecentFilters();
+  recentsContainer.innerHTML = recents.map((item, index) => `
+    <button type="button"
+      onclick="applyRecentFilter(${index})"
+      class="px-2 py-1 rounded-lg border border-slate-700 bg-slate-800/70 hover:bg-slate-700 text-xs text-slate-300 transition-colors"
+      title="${escapeHtml(item.label)}">
+      ${escapeHtml(item.label)}
+    </button>
+  `).join('');
+
+  if (emptyFavorites) emptyFavorites.classList.toggle('hidden', favorites.length > 0);
+  if (emptyRecents) emptyRecents.classList.toggle('hidden', recents.length > 0);
+}
+
+function renderQuickFilterButtons() {
+  const container = document.getElementById('quick-filter-buttons');
+  if (!container) return;
+
+  const buttons = currentView === 'obras'
+    ? [
+      { key: 'obras_sem_coord', label: 'Sem coord.' },
+      { key: 'obras_execucao_baixa', label: 'Execucao < 40%' },
+      { key: 'obras_em_execucao', label: 'Em execucao' }
+    ]
+    : [
+      { key: 'fisc_pendente', label: 'Pendentes' },
+      { key: 'fisc_concluida', label: 'Concluidas' },
+      { key: 'fisc_sem_coord', label: 'Sem coord.' }
+    ];
+
+  container.innerHTML = buttons.map((button) => `
+    <button type="button"
+      onclick="applyQuickFilter('${button.key}')"
+      class="px-2.5 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-xs font-medium transition-colors">
+      ${escapeHtml(button.label)}
+    </button>
+  `).join('');
+
+  renderSavedFilterButtons();
+}
+window.applyQuickFilter = applyQuickFilter;
+
+function applyQuickFilter(filterKey) {
+  resetFilterInputs();
+
+  if (filterKey === 'fisc_pendente') {
+    document.getElementById('filter-situacao').value = 'Pendente';
+  } else if (filterKey === 'fisc_concluida') {
+    document.getElementById('filter-situacao').value = 'Concluida';
+  } else if (filterKey === 'fisc_sem_coord') {
+    document.getElementById('filter-search').value = 'sem-coord';
+  } else if (filterKey === 'obras_sem_coord') {
+    document.getElementById('filter-search').value = 'sem-coord';
+  } else if (filterKey === 'obras_execucao_baixa') {
+    document.getElementById('filter-search').value = 'execucao-baixa';
+  } else if (filterKey === 'obras_em_execucao') {
+    document.getElementById('filter-situacao').value = 'Em execucao';
+  }
+
+  applyFilters();
+}
+
+function applySpecialSearchFilters(record, normalizedSearch) {
+  if (!normalizedSearch) return true;
+  if (normalizedSearch !== 'sem-coord' && normalizedSearch !== 'execucao-baixa') {
+    return true;
+  }
+
+  if (currentView === 'obras') {
+    if (normalizedSearch === 'sem-coord') {
+      return !hasObraCoordinates(record);
+    }
+    if (normalizedSearch === 'execucao-baixa') {
+      const progress = getObraProgressValue(record);
+      return Number.isFinite(progress) && progress < 40;
+    }
+  } else if (normalizedSearch === 'sem-coord') {
+    return !(Number.isFinite(Number(record.latitude)) && Number.isFinite(Number(record.longitude)));
+  }
+
+  return false;
 }
 
 function getObraProgressValue(obra) {
@@ -444,6 +997,7 @@ const dataHandler = {
 };
 
 async function initDataSDK() {
+  setOperationStatus('Sincronizando dados...', 'syncing');
   const result = await window.dataSdk.init(dataHandler);
   const obrasResult = await loadObrasData();
   if (!result.isOk) showToast('Erro ao inicializar sistema de dados', 'error');
@@ -457,12 +1011,121 @@ async function initDataSDK() {
   updateFiltersOptions();
   applyFilters();
   updateDashboard();
+  if (!result.isOk || !obrasResult.isOk) {
+    setOperationStatus('Falha parcial ao carregar dados', 'warning');
+  } else {
+    setOperationStatus('Sistema pronto', 'success');
+  }
 
   return {
     isOk: result.isOk && obrasResult.isOk,
     source: result.source === 'api' && obrasResult.source === 'api' ? 'api' : 'local'
   };
 }
+
+function buildDuplicateReport(records = allFiscalizacoes) {
+  const groups = new Map();
+  const ordered = [];
+  const duplicates = [];
+
+  (records || []).forEach((record) => {
+    const identity = buildFiscalizacaoIdentity(record);
+    if (!identity) {
+      ordered.push(record);
+      return;
+    }
+
+    if (!groups.has(identity)) {
+      groups.set(identity, []);
+    }
+    groups.get(identity).push(record);
+  });
+
+  groups.forEach((group) => {
+    if (!group.length) return;
+    ordered.push(group[0]);
+    if (group.length > 1) {
+      duplicates.push({
+        identity: buildFiscalizacaoIdentity(group[0]),
+        keep: group[0],
+        remove: group.slice(1)
+      });
+    }
+  });
+
+  const removedCount = duplicates.reduce((sum, item) => sum + item.remove.length, 0);
+  return {
+    dedupedRecords: ordered,
+    duplicateGroups: duplicates.length,
+    duplicateRecords: removedCount,
+    details: duplicates
+  };
+}
+
+async function replaceFiscalizacoesData(records) {
+  if (!window.dataSdk?.isApiConfigured?.()) {
+    window.dataSdk._data = records.map((record) => ({
+      __backendId: record.__backendId || (crypto.randomUUID ? crypto.randomUUID() : String(Date.now())),
+      ...record
+    }));
+    const ok = window.dataSdk._persist();
+    if (!ok) {
+      return { isOk: false, error: 'Falha ao salvar no armazenamento local.' };
+    }
+    window.dataSdk._notify();
+    return { isOk: true, source: 'local' };
+  }
+
+  const payload = await window.dataSdk._fetchJson(window.dataSdk._buildUrl('/fiscalizacoes'), {
+    method: 'PUT',
+    body: JSON.stringify({ records })
+  });
+
+  if (!payload || !Array.isArray(payload.records)) {
+    return { isOk: false, error: 'Falha ao atualizar os registros no banco.' };
+  }
+
+  window.dataSdk._data = payload.records;
+  window.dataSdk._persist();
+  window.dataSdk._notify();
+  return { isOk: true, source: 'api' };
+}
+
+async function deduplicateFiscalizacoes() {
+  const report = buildDuplicateReport(allFiscalizacoes);
+  if (report.duplicateRecords === 0) {
+    showToast('Nao ha duplicados para remover.', 'info');
+    return;
+  }
+
+  const confirmed = window.confirm(
+    `Foram encontrados ${report.duplicateRecords} registros duplicados em ${report.duplicateGroups} grupos.\n` +
+    'Deseja remover duplicados mantendo apenas a primeira ocorrencia de cada ID + Processo SEI?'
+  );
+  if (!confirmed) return;
+
+  setOperationStatus('Removendo duplicidades...', 'syncing');
+  showLoading('Removendo duplicidades...');
+
+  const result = await replaceFiscalizacoesData(report.dedupedRecords);
+  hideLoading();
+
+  if (!result.isOk) {
+    setOperationStatus('Falha ao deduplicar registros', 'error');
+    showToast(result.error || 'Nao foi possivel remover duplicados.', 'error');
+    return;
+  }
+
+  await recordAuditEvent('deduplicate', null, null, {
+    removed: report.duplicateRecords,
+    groups: report.duplicateGroups,
+    source: result.source
+  });
+  setOperationStatus(`Duplicados removidos (${report.duplicateRecords})`, 'success');
+  showToast(`${report.duplicateRecords} duplicados removidos com sucesso.`, 'success');
+  updateDashboard();
+}
+window.deduplicateFiscalizacoes = deduplicateFiscalizacoes;
 
 function updateStorageModeStatus() {
   const status = document.getElementById('storage-mode-status');
@@ -507,6 +1170,7 @@ async function handleStorageModeChange(event) {
   }
 
   window.dataSdk.setStorageMode(nextMode);
+  setOperationStatus(nextMode === 'api' ? 'Conectando ao banco...' : 'Aplicando modo local...', 'syncing');
   showLoading(nextMode === 'api' ? 'Conectando API...' : 'Carregando dados locais...');
 
   const result = await initDataSDK();
@@ -514,15 +1178,18 @@ async function handleStorageModeChange(event) {
   hideLoading();
 
   if (!result.isOk) {
+    setOperationStatus('Falha ao trocar modo de armazenamento', 'error');
     showToast('Erro ao trocar o modo de salvamento', 'error');
     return;
   }
 
   if (nextMode === 'api' && result.source !== 'api') {
+    setOperationStatus('Banco indisponivel, usando dados locais', 'warning');
     showToast('API indisponivel. Dados locais carregados.', 'warning');
     return;
   }
 
+  setOperationStatus(result.source === 'api' ? 'Conectado ao banco' : 'Modo local ativo', 'success');
   showToast(
     result.source === 'api' ? 'Modo API externa ativado' : 'Modo local ativado',
     'success'
@@ -555,6 +1222,134 @@ function initStorageModeSelector() {
   updateStorageModeStatus();
 }
 
+function loadMapLayerState() {
+  const stored = readStoredJson(MAP_LAYER_STATE_KEY, null);
+  if (!stored || typeof stored !== 'object') return;
+  mapLayerVisibility = {
+    ...mapLayerVisibility,
+    ...stored
+  };
+}
+
+function saveMapLayerState() {
+  writeStoredJson(MAP_LAYER_STATE_KEY, mapLayerVisibility);
+}
+
+function getFiscalizacaoLayerKey(situacao) {
+  const normalized = normalizePlainText(situacao);
+  if (normalized.includes('andamento')) return 'em_andamento';
+  if (normalized.includes('concl')) return 'concluida';
+  return 'pendente';
+}
+
+function getObraLayerKey(obra) {
+  const progress = getObraProgressValue(obra);
+  if (!Number.isFinite(progress)) return 'obra_sem_pct';
+  if (progress >= 80) return 'obra_alta';
+  if (progress >= 40) return 'obra_media';
+  return 'obra_baixa';
+}
+
+function canRenderMarker(record) {
+  if (currentView === 'obras') {
+    const layerKey = getObraLayerKey(record);
+    return Boolean(mapLayerVisibility[layerKey]);
+  }
+
+  const layerKey = getFiscalizacaoLayerKey(record.situacao);
+  return Boolean(mapLayerVisibility[layerKey]);
+}
+
+function renderMapLayerControls() {
+  const container = document.getElementById('map-layer-toggles');
+  if (!container) return;
+
+  const controls = currentView === 'obras'
+    ? [
+      { key: 'obra_alta', label: 'Execucao >= 80%' },
+      { key: 'obra_media', label: 'Execucao 40%-79%' },
+      { key: 'obra_baixa', label: 'Execucao < 40%' },
+      { key: 'obra_sem_pct', label: 'Sem percentual' }
+    ]
+    : [
+      { key: 'em_andamento', label: 'Em Andamento' },
+      { key: 'concluida', label: 'Concluida' },
+      { key: 'pendente', label: 'Pendente' }
+    ];
+
+  container.innerHTML = controls.map((control) => `
+    <label class="flex items-center justify-between gap-2 text-[11px] text-slate-300">
+      <span>${escapeHtml(control.label)}</span>
+      <input type="checkbox"
+        data-layer-key="${escapeHtml(control.key)}"
+        ${mapLayerVisibility[control.key] ? 'checked' : ''}
+        class="h-3.5 w-3.5 rounded border-slate-500 bg-slate-700 text-blue-500 focus:ring-blue-500">
+    </label>
+  `).join('');
+
+  container.querySelectorAll('input[type="checkbox"][data-layer-key]').forEach((input) => {
+    input.addEventListener('change', (event) => {
+      const key = event.target?.dataset?.layerKey;
+      if (!key) return;
+      mapLayerVisibility[key] = Boolean(event.target.checked);
+      saveMapLayerState();
+      updateMapMarkers();
+    });
+  });
+}
+
+function applyMapFocus() {
+  const region = document.getElementById('map-focus-region')?.value || '';
+  const status = document.getElementById('map-focus-status')?.value || '';
+  const hasFilter = Boolean(region || status);
+
+  if (!map) return;
+
+  if (currentView === 'obras') {
+    const filtered = filteredObras.filter((obra) => {
+      if (!hasObraCoordinates(obra)) return false;
+      if (region && obra.local !== region) return false;
+      if (status && obra.situacao_contrato !== status) return false;
+      return true;
+    });
+
+    if (!hasFilter) {
+      updateMapMarkers();
+      return;
+    }
+
+    if (filtered.length === 0) {
+      showToast('Nenhum marcador encontrado para este foco.', 'warning');
+      return;
+    }
+
+    const bounds = L.latLngBounds(filtered.map((obra) => [obra.latitude, obra.longitude]));
+    map.fitBounds(bounds, { padding: [70, 70], maxZoom: 14 });
+    return;
+  }
+
+  const filtered = filteredFiscalizacoes.filter((fisc) => {
+    if (!(Number.isFinite(Number(fisc.latitude)) && Number.isFinite(Number(fisc.longitude)))) return false;
+    if (region && fisc.regiao_administrativa !== region) return false;
+    if (status && fisc.situacao !== status) return false;
+    return true;
+  });
+
+  if (!hasFilter) {
+    updateMapMarkers();
+    return;
+  }
+
+  if (filtered.length === 0) {
+    showToast('Nenhum marcador encontrado para este foco.', 'warning');
+    return;
+  }
+
+  const bounds = L.latLngBounds(filtered.map((fisc) => [fisc.latitude, fisc.longitude]));
+  map.fitBounds(bounds, { padding: [70, 70], maxZoom: 14 });
+}
+window.applyMapFocus = applyMapFocus;
+
 function updateMapLegend() {
   const title = document.getElementById('map-legend-title');
   const items = document.getElementById('map-legend-items');
@@ -580,6 +1375,7 @@ function updateMapLegend() {
         <span class="text-xs text-slate-400">Sem percentual informado</span>
       </div>
     `;
+    renderMapLayerControls();
     return;
   }
 
@@ -598,6 +1394,7 @@ function updateMapLegend() {
       <span class="text-xs text-slate-400">Pendente</span>
     </div>
   `;
+  renderMapLayerControls();
 }
 
 function updateDataViewUI() {
@@ -723,7 +1520,60 @@ function toggleFiltersPanel(open) {
 window.toggleFiltersPanel = toggleFiltersPanel;
 
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') toggleFiltersPanel(false);
+  if (e.key === 'Escape') {
+    if (isModalOpen('form-modal')) {
+      closeModal();
+      return;
+    }
+    if (isModalOpen('import-modal')) {
+      closeImportModal();
+      return;
+    }
+    if (isModalOpen('dashboard-panel')) {
+      toggleDashboard();
+      return;
+    }
+    if (isModalOpen('obras-upload-modal')) {
+      closeObrasUploadModal();
+      return;
+    }
+    toggleFiltersPanel(false);
+    return;
+  }
+
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's' && isModalOpen('form-modal')) {
+    e.preventDefault();
+    document.getElementById('fiscalizacao-form')?.requestSubmit();
+    return;
+  }
+
+  if (e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    const activeTag = document.activeElement?.tagName?.toLowerCase();
+    if (activeTag !== 'input' && activeTag !== 'textarea' && activeTag !== 'select') {
+      e.preventDefault();
+      const search = document.getElementById('filter-search');
+      search?.focus();
+      search?.select();
+    }
+    return;
+  }
+
+  if (e.altKey && e.key === '1') {
+    e.preventDefault();
+    switchDataView('fiscalizacoes');
+    return;
+  }
+
+  if (e.altKey && e.key === '2') {
+    e.preventDefault();
+    switchDataView('obras');
+    return;
+  }
+
+  if (e.altKey && e.key.toLowerCase() === 'f') {
+    e.preventDefault();
+    toggleFiltersPanel(true);
+  }
 });
 
 // ======== Markers ========
@@ -731,32 +1581,30 @@ function createMarkerIcon(situacao) {
   let color;
   switch (situacao) {
     case 'Em Andamento': color = '#f59e0b'; break;
-    case 'Concluída': color = '#10b981'; break;
+    case 'Concluida': color = '#10b981'; break;
     case 'Pendente': color = '#ef4444'; break;
     default: color = '#3b82f6';
   }
 
   return L.divIcon({
-    className: 'custom-marker',
+    className: 'custom-marker fiscalizacao-marker',
     html: `
-      <div style="
-        width: 32px;
-        height: 32px;
-        background: linear-gradient(135deg, ${color}dd, ${color});
-        border-radius: 50% 50% 50% 0;
-        transform: rotate(-45deg);
-        border: 3px solid white;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-      ">
-        <div style="transform: rotate(45deg); font-size: 14px;">📋</div>
+      <div style="width:30px;height:34px;display:flex;align-items:center;justify-content:center;">
+        <svg width="30" height="34" viewBox="0 0 30 34" fill="none" aria-hidden="true">
+          <path
+            d="M15 1.5C9.75 1.5 5.5 5.75 5.5 11C5.5 17.62 12.31 25.66 14.24 27.77C14.64 28.21 15.36 28.21 15.76 27.77C17.69 25.66 24.5 17.62 24.5 11C24.5 5.75 20.25 1.5 15 1.5Z"
+            fill="${color}"
+            stroke="white"
+            stroke-width="2"
+          />
+          <rect x="11" y="8.5" width="8" height="9" rx="1.5" fill="white" />
+          <path d="M13 11.5H17M13 14.5H17" stroke="${color}" stroke-width="1.5" stroke-linecap="round" />
+        </svg>
       </div>
     `,
-    iconSize: [32, 32],
-    iconAnchor: [16, 32],
-    popupAnchor: [0, -32]
+    iconSize: [30, 34],
+    iconAnchor: [15, 34],
+    popupAnchor: [0, -30]
   });
 }
 
@@ -766,31 +1614,20 @@ function createObraMarkerIcon(obra) {
   return L.divIcon({
     className: 'custom-marker obra-marker',
     html: `
-      <div style="
-        width: 34px;
-        height: 34px;
-        background: linear-gradient(135deg, ${color}dd, ${color});
-        border-radius: 12px 12px 12px 2px;
-        transform: rotate(45deg);
-        border: 3px solid white;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-      ">
-        <div style="
-          transform: rotate(-45deg);
-          width: 12px;
-          height: 12px;
-          border: 2px solid white;
-          border-radius: 999px;
-          border-right-color: transparent;
-          border-top-color: transparent;
-        "></div>
+      <div style="width:30px;height:34px;display:flex;align-items:center;justify-content:center;">
+        <svg width="30" height="34" viewBox="0 0 30 34" fill="none" aria-hidden="true">
+          <path
+            d="M15 1.5C9.75 1.5 5.5 5.75 5.5 11C5.5 17.62 12.31 25.66 14.24 27.77C14.64 28.21 15.36 28.21 15.76 27.77C17.69 25.66 24.5 17.62 24.5 11C24.5 5.75 20.25 1.5 15 1.5Z"
+            fill="${color}"
+            stroke="white"
+            stroke-width="2"
+          />
+          <path d="M10.75 10.5H19.25M10.75 13.5H19.25M10.75 16.5H15.25" stroke="white" stroke-width="2" stroke-linecap="round" />
+        </svg>
       </div>
     `,
-    iconSize: [34, 34],
-    iconAnchor: [17, 34],
+    iconSize: [30, 34],
+    iconAnchor: [15, 34],
     popupAnchor: [0, -30]
   });
 }
@@ -802,6 +1639,7 @@ function updateMapMarkers() {
   if (currentView === 'obras') {
     filteredObras.forEach((obra) => {
       if (!hasObraCoordinates(obra)) return;
+      if (!canRenderMarker(obra)) return;
 
       const marker = L.marker([obra.latitude, obra.longitude], {
         icon: createObraMarkerIcon(obra)
@@ -820,6 +1658,7 @@ function updateMapMarkers() {
   } else {
     filteredFiscalizacoes.forEach(fisc => {
       if (fisc.latitude && fisc.longitude) {
+        if (!canRenderMarker(fisc)) return;
         const marker = L.marker([fisc.latitude, fisc.longitude], {
           icon: createMarkerIcon(fisc.situacao)
         });
@@ -845,28 +1684,38 @@ function updateMapMarkers() {
 
 function createPopupContent(fisc) {
   const statusClass = fisc.situacao === 'Em Andamento' ? 'status-andamento' :
-                      fisc.situacao === 'Concluída' ? 'status-concluida' : 'status-pendente';
+                      fisc.situacao === 'Concluida' ? 'status-concluida' : 'status-pendente';
+  const idLabel = escapeHtml(fisc.id || '-');
+  const statusLabel = escapeHtml(fisc.situacao || '-');
+  const regiaoLabel = escapeHtml(fisc.regiao_administrativa || '-');
+  const processoLabel = escapeHtml(fisc.processo_sei || '-');
+  const conformidade = parseLocalizedNumber(fisc.indice_conformidade);
+  const hasConformidade = Number.isFinite(conformidade);
+  const conformidadePct = hasConformidade ? Math.max(0, Math.min(100, conformidade)) : null;
+  const conformidadeDisplay = hasConformidade
+    ? `${conformidadePct.toFixed(1).replace(/\.0$/, '')}%`
+    : '';
 
   return `
     <div style="padding: 16px; font-family: 'Plus Jakarta Sans', sans-serif;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-        <span style="font-weight:700;font-size:16px;color:#1e293b;">${fisc.id}</span>
-        <span class="${statusClass}" style="font-size:11px;padding:3px 8px;">${fisc.situacao}</span>
+        <span style="font-weight:700;font-size:16px;color:#1e293b;">${idLabel}</span>
+        <span class="${statusClass}" style="font-size:11px;padding:3px 8px;">${statusLabel}</span>
       </div>
       <div style="color:#64748b;font-size:13px;margin-bottom:8px;">
-        <strong>Região:</strong> ${fisc.regiao_administrativa || '-'}
+        <strong>Regiao:</strong> ${regiaoLabel}
       </div>
       <div style="color:#64748b;font-size:13px;margin-bottom:8px;">
-        <strong>Processo:</strong> ${fisc.processo_sei || '-'}
+        <strong>Processo:</strong> ${processoLabel}
       </div>
-      ${fisc.indice_conformidade ? `
+      ${hasConformidade ? `
         <div style="margin-top:12px;">
           <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
             <span style="font-size:12px;color:#64748b;">Conformidade</span>
-            <span style="font-size:12px;font-weight:600;color:#1e293b;">${fisc.indice_conformidade}%</span>
+            <span style="font-size:12px;font-weight:600;color:#1e293b;">${conformidadeDisplay}</span>
           </div>
           <div style="background:#e2e8f0;border-radius:4px;height:6px;overflow:hidden;">
-            <div style="background:linear-gradient(90deg,#3b82f6,#2563eb);height:100%;width:${fisc.indice_conformidade}%;"></div>
+            <div style="background:linear-gradient(90deg,#3b82f6,#2563eb);height:100%;width:${conformidadePct}%;"></div>
           </div>
         </div>
       ` : ''}
@@ -877,25 +1726,31 @@ function createPopupContent(fisc) {
 function createObraPopupContent(obra) {
   const color = getObraMarkerColor(obra);
   const progresso = getObraProgressValue(obra);
+  const itemLabel = escapeHtml(obra.item || 'Obra');
+  const progressLabel = escapeHtml(progresso != null ? formatPercent(progresso) : 'Obra');
+  const localLabel = escapeHtml(obra.local || '-');
+  const situacaoLabel = escapeHtml(obra.situacao_contrato || '-');
+  const acaoLabel = escapeHtml(obra.acao || '-');
+  const objetoContratoLabel = escapeHtml(obra.objeto_contrato || '');
 
   return `
     <div style="padding: 16px; font-family: 'Plus Jakarta Sans', sans-serif;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:8px;">
-        <span style="font-weight:700;font-size:15px;color:#1e293b;">${obra.item || 'Obra'}</span>
-        <span style="font-size:11px;padding:4px 8px;border-radius:999px;background:${color};color:white;">${progresso != null ? formatPercent(progresso) : 'Obra'}</span>
+        <span style="font-weight:700;font-size:15px;color:#1e293b;">${itemLabel}</span>
+        <span style="font-size:11px;padding:4px 8px;border-radius:999px;background:${color};color:white;">${progressLabel}</span>
       </div>
       <div style="color:#64748b;font-size:13px;margin-bottom:8px;">
-        <strong>Local:</strong> ${obra.local || '-'}
+        <strong>Local:</strong> ${localLabel}
       </div>
       <div style="color:#64748b;font-size:13px;margin-bottom:8px;">
-        <strong>Situacao:</strong> ${obra.situacao_contrato || '-'}
+        <strong>Situacao:</strong> ${situacaoLabel}
       </div>
       <div style="color:#64748b;font-size:13px;margin-bottom:8px;">
-        <strong>Acao:</strong> ${obra.acao || '-'}
+        <strong>Acao:</strong> ${acaoLabel}
       </div>
       ${obra.objeto_contrato ? `
         <div style="margin-top:12px;color:#475569;font-size:12px;line-height:1.4;">
-          ${obra.objeto_contrato}
+          ${objetoContratoLabel}
         </div>
       ` : ''}
     </div>
@@ -931,6 +1786,7 @@ function handleMapClick(e) {
 
   document.getElementById('form-lat').value = lat.toFixed(6);
   document.getElementById('form-lng').value = lng.toFixed(6);
+  scheduleDraftSave();
 
   disableMapSelection();
   document.getElementById('form-modal').classList.remove('hidden');
@@ -989,57 +1845,115 @@ function updateFiltersOptions() {
       if (sistema === currentSistema) option.selected = true;
       sistemaSelect.appendChild(option);
     });
-    return;
+
+    populateMapFocusOptions(locais, situacoes);
+  } else {
+    const regioes = [...new Set(allFiscalizacoes.map(f => f.regiao_administrativa).filter(Boolean))].sort();
+    const anos = [...new Set(allFiscalizacoes.map(f => f.ano).filter(Boolean))].sort((a, b) => b - a);
+    const situacoes = [...new Set(allFiscalizacoes.map(f => f.situacao).filter(Boolean))].sort();
+
+    const regiaoSelect = document.getElementById('filter-regiao');
+    const currentRegiao = regiaoSelect.value;
+    regiaoSelect.innerHTML = '<option value="">Todas as Regioes</option>';
+    regioes.forEach((r) => {
+      const option = document.createElement('option');
+      option.value = r;
+      option.textContent = r;
+      if (r === currentRegiao) option.selected = true;
+      regiaoSelect.appendChild(option);
+    });
+
+    const anoSelect = document.getElementById('filter-ano');
+    const currentAno = anoSelect.value;
+    anoSelect.innerHTML = '<option value="">Todos os Anos</option>';
+    anos.forEach((a) => {
+      const option = document.createElement('option');
+      option.value = a;
+      option.textContent = a;
+      if (String(a) === currentAno) option.selected = true;
+      anoSelect.appendChild(option);
+    });
+
+    populateMapFocusOptions(regioes, situacoes);
   }
 
-  const regioes = [...new Set(allFiscalizacoes.map(f => f.regiao_administrativa).filter(Boolean))].sort();
-  const anos = [...new Set(allFiscalizacoes.map(f => f.ano).filter(Boolean))].sort((a, b) => b - a);
-
-  const regiaoSelect = document.getElementById('filter-regiao');
-  const currentRegiao = regiaoSelect.value;
-  regiaoSelect.innerHTML = '<option value="">Todas as Regiões</option>';
-  regioes.forEach(r => {
-    const option = document.createElement('option');
-    option.value = r;
-    option.textContent = r;
-    if (r === currentRegiao) option.selected = true;
-    regiaoSelect.appendChild(option);
-  });
-
-  const anoSelect = document.getElementById('filter-ano');
-  const currentAno = anoSelect.value;
-  anoSelect.innerHTML = '<option value="">Todos os Anos</option>';
-  anos.forEach(a => {
-    const option = document.createElement('option');
-    option.value = a;
-    option.textContent = a;
-    if (String(a) === currentAno) option.selected = true;
-    anoSelect.appendChild(option);
-  });
+  renderQuickFilterButtons();
+  populateSortFieldOptions();
 }
 
-function applyFilters() {
+function populateSortFieldOptions() {
+  const sortSelect = document.getElementById('list-sort-field');
+  const directionSelect = document.getElementById('list-sort-direction');
+  const pageSizeSelect = document.getElementById('list-page-size');
+  if (!sortSelect || !directionSelect || !pageSizeSelect) return;
+
+  const options = getListSortOptions();
+  if (!options.some(option => option.value === listSettings.sortField)) {
+    listSettings.sortField = options[0]?.value || 'id';
+  }
+
+  sortSelect.innerHTML = options.map((option) =>
+    `<option value="${escapeHtml(option.value)}">${escapeHtml(option.label)}</option>`
+  ).join('');
+  sortSelect.value = listSettings.sortField;
+  directionSelect.value = listSettings.sortDirection;
+  pageSizeSelect.value = String(listSettings.pageSize);
+}
+
+function populateMapFocusOptions(regioesOuLocais, situacoes) {
+  const regionSelect = document.getElementById('map-focus-region');
+  const statusSelect = document.getElementById('map-focus-status');
+  if (!regionSelect || !statusSelect) return;
+
+  const currentRegion = regionSelect.value;
+  const currentStatus = statusSelect.value;
+
+  regionSelect.innerHTML = '<option value="">Todas as regioes/locais</option>';
+  regioesOuLocais.forEach((value) => {
+    const option = document.createElement('option');
+    option.value = value;
+    option.textContent = value;
+    if (value === currentRegion) option.selected = true;
+    regionSelect.appendChild(option);
+  });
+
+  statusSelect.innerHTML = '<option value="">Todos os status</option>';
+  situacoes.forEach((value) => {
+    const option = document.createElement('option');
+    option.value = value;
+    option.textContent = value;
+    if (value === currentStatus) option.selected = true;
+    statusSelect.appendChild(option);
+  });
+}
+function applyFilters(options = {}) {
+  const preservePage = Boolean(options.preservePage);
   const search = document.getElementById('filter-search').value;
   const regiao = document.getElementById('filter-regiao').value;
   const situacao = document.getElementById('filter-situacao').value;
   const ano = document.getElementById('filter-ano').value;
   const conformidade = parseInt(document.getElementById('filter-conformidade').value, 10);
+  const normalizedSearch = normalizePlainText(search);
+
+  if (!preservePage) {
+    listPage = 1;
+  }
 
   if (currentView === 'obras') {
-    const normalizedSearch = normalizePlainText(search);
-
     filteredObras = allObras.filter((obra) => {
       if (normalizedSearch) {
-        const haystack = normalizePlainText([
-          obra.item,
-          obra.local,
-          obra.acao,
-          obra.objeto_contrato,
-          obra.numero_processo_sei,
-          obra.fornecedor
-        ].join(' '));
-
-        if (!haystack.includes(normalizedSearch)) return false;
+        const specialFilterPass = applySpecialSearchFilters(obra, normalizedSearch);
+        if (!specialFilterPass) {
+          const haystack = normalizePlainText([
+            obra.item,
+            obra.local,
+            obra.acao,
+            obra.objeto_contrato,
+            obra.numero_processo_sei,
+            obra.fornecedor
+          ].join(' '));
+          if (!haystack.includes(normalizedSearch)) return false;
+        }
       }
 
       if (regiao && obra.local !== regiao) return false;
@@ -1051,39 +1965,104 @@ function applyFilters() {
     updateMapMarkers();
     renderObrasList();
     document.getElementById('count-badge').textContent = filteredObras.length;
-    return;
+  } else {
+    filteredFiscalizacoes = allFiscalizacoes.filter((f) => {
+      if (normalizedSearch) {
+        const specialFilterPass = applySpecialSearchFilters(f, normalizedSearch);
+        if (!specialFilterPass) {
+          const haystack = normalizePlainText([
+            f.id,
+            f.processo_sei,
+            f.destinatario,
+            f.regiao_administrativa,
+            f.objetivo,
+            f.situacao
+          ].join(' '));
+          if (!haystack.includes(normalizedSearch)) return false;
+        }
+      }
+
+      if (regiao && f.regiao_administrativa !== regiao) return false;
+      if (situacao && f.situacao !== situacao) return false;
+      if (ano && String(f.ano) !== ano) return false;
+      if (conformidade && (!f.indice_conformidade || f.indice_conformidade < conformidade)) return false;
+      return true;
+    });
+
+    updateMapMarkers();
+    renderFiscalizacoesList();
+    document.getElementById('count-badge').textContent = filteredFiscalizacoes.length;
   }
 
-  filteredFiscalizacoes = allFiscalizacoes.filter(f => {
-    const normalizedSearch = search.toLowerCase();
+  const snapshot = getCurrentFilterSnapshot();
+  const fingerprint = JSON.stringify(snapshot);
+  if (fingerprint !== lastAppliedFilterFingerprint) {
+    addCurrentFilterToRecent();
+    lastAppliedFilterFingerprint = fingerprint;
+  }
 
-    if (normalizedSearch && !f.id?.toLowerCase().includes(normalizedSearch) &&
-        !f.processo_sei?.toLowerCase().includes(normalizedSearch) &&
-        !f.destinatario?.toLowerCase().includes(normalizedSearch)) return false;
-
-    if (regiao && f.regiao_administrativa !== regiao) return false;
-    if (situacao && f.situacao !== situacao) return false;
-    if (ano && String(f.ano) !== ano) return false;
-    if (conformidade && (!f.indice_conformidade || f.indice_conformidade < conformidade)) return false;
-    return true;
-  });
-
-  updateMapMarkers();
-  renderFiscalizacoesList();
-  document.getElementById('count-badge').textContent = filteredFiscalizacoes.length;
+  saveFilterState();
+  bumpSessionMetric('filtersApplied');
+  updateDashboard();
 }
 window.applyFilters = applyFilters;
 
-function clearFilters() {
+function resetFilterInputs() {
   document.getElementById('filter-search').value = '';
   document.getElementById('filter-regiao').value = '';
   document.getElementById('filter-situacao').value = '';
   document.getElementById('filter-ano').value = '';
   document.getElementById('filter-conformidade').value = 0;
   document.getElementById('conformidade-label').textContent = '0%+';
+}
+
+function clearFilters() {
+  resetFilterInputs();
   applyFilters();
 }
 window.clearFilters = clearFilters;
+
+function onSortOrPageSettingsChanged() {
+  const sortField = document.getElementById('list-sort-field')?.value;
+  const sortDirection = document.getElementById('list-sort-direction')?.value;
+  const pageSize = Number(document.getElementById('list-page-size')?.value || LIST_DEFAULT_PAGE_SIZE);
+
+  if (sortField) listSettings.sortField = sortField;
+  if (sortDirection === 'asc' || sortDirection === 'desc') {
+    listSettings.sortDirection = sortDirection;
+  }
+  listSettings.pageSize = Number.isFinite(pageSize) && pageSize > 0 ? pageSize : LIST_DEFAULT_PAGE_SIZE;
+
+  listPage = 1;
+  saveListState();
+  applyFilters();
+}
+
+function goToPage(offset) {
+  const target = listPage + offset;
+  if (target < 1 || target > listTotalPages) return;
+  listPage = target;
+  applyFilters({ preservePage: true });
+}
+window.goToPage = goToPage;
+
+function initEnhancedControls() {
+  const sortField = document.getElementById('list-sort-field');
+  const sortDirection = document.getElementById('list-sort-direction');
+  const pageSize = document.getElementById('list-page-size');
+  const prev = document.getElementById('pagination-prev');
+  const next = document.getElementById('pagination-next');
+  const mapFocusApply = document.getElementById('map-focus-apply');
+  const saveFavoriteBtn = document.getElementById('save-filter-favorite-btn');
+
+  sortField?.addEventListener('change', onSortOrPageSettingsChanged);
+  sortDirection?.addEventListener('change', onSortOrPageSettingsChanged);
+  pageSize?.addEventListener('change', onSortOrPageSettingsChanged);
+  prev?.addEventListener('click', () => goToPage(-1));
+  next?.addEventListener('click', () => goToPage(1));
+  mapFocusApply?.addEventListener('click', applyMapFocus);
+  saveFavoriteBtn?.addEventListener('click', saveCurrentFilterFavorite);
+}
 
 function updateConformidadeLabel() {
   const value = document.getElementById('filter-conformidade').value;
@@ -1093,6 +2072,7 @@ window.updateConformidadeLabel = updateConformidadeLabel;
 
 function renderFiscalizacoesList() {
   const container = document.getElementById('fiscalizacoes-list');
+  const pagination = document.getElementById('list-pagination');
 
   if (filteredFiscalizacoes.length === 0) {
     container.innerHTML = `
@@ -1101,40 +2081,56 @@ function renderFiscalizacoesList() {
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
             d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
         </svg>
-        <p class="text-sm">Nenhuma fiscalização encontrada</p>
+        <p class="text-sm">Nenhuma fiscalizacao encontrada</p>
         <p class="text-xs mt-1">Ajuste os filtros ou adicione uma nova</p>
       </div>
     `;
+    pagination?.classList.add('hidden');
     return;
   }
 
-  container.innerHTML = filteredFiscalizacoes.map(fisc => {
+  const sorted = sortRecords(filteredFiscalizacoes);
+  const pageItems = paginateRecords(sorted);
+
+  container.innerHTML = pageItems.map((fisc) => {
     const statusClass = fisc.situacao === 'Em Andamento' ? 'status-andamento' :
-                        fisc.situacao === 'Concluída' ? 'status-concluida' : 'status-pendente';
+                        fisc.situacao === 'Concluida' ? 'status-concluida' : 'status-pendente';
+    const idLabel = escapeHtml(fisc.id || '-');
+    const statusLabel = escapeHtml(fisc.situacao || '-');
+    const regiaoLabel = escapeHtml(fisc.regiao_administrativa || 'Sem regiao');
+    const conformidade = Number.isFinite(Number(fisc.indice_conformidade))
+      ? Number(fisc.indice_conformidade)
+      : null;
 
     return `
-      <div class="p-3 rounded-lg bg-slate-800/50 hover:bg-slate-700/50 cursor-pointer transition-colors border border-slate-700/50"
+      <div class="p-3 rounded-lg bg-slate-800/50 hover:bg-slate-700/50 cursor-pointer transition-colors border border-slate-700/50 focus-visible:ring-2 focus-visible:ring-blue-500"
+           role="button"
+           tabindex="0"
+           onkeydown="if(event.key==='Enter' || event.key===' '){event.preventDefault(); focusFiscalizacao('${fisc.__backendId}');}"
            onclick="focusFiscalizacao('${fisc.__backendId}')">
         <div class="flex items-center justify-between mb-2">
-          <span class="font-semibold text-sm">${fisc.id}</span>
-          <span class="${statusClass}" style="font-size: 10px; padding: 2px 8px;">${fisc.situacao}</span>
+          <span class="font-semibold text-sm">${idLabel}</span>
+          <span class="${statusClass}" style="font-size: 10px; padding: 2px 8px;">${statusLabel}</span>
         </div>
-        <p class="text-xs text-slate-400 truncate">${fisc.regiao_administrativa || 'Sem região'}</p>
-        ${fisc.indice_conformidade ? `
+        <p class="text-xs text-slate-400 truncate">${regiaoLabel}</p>
+        ${conformidade != null ? `
           <div class="mt-2 flex items-center gap-2">
             <div class="flex-1 h-1.5 bg-slate-700 rounded-full overflow-hidden">
-              <div class="h-full bg-blue-500 rounded-full" style="width: ${fisc.indice_conformidade}%"></div>
+              <div class="h-full bg-blue-500 rounded-full" style="width: ${Math.max(0, Math.min(100, conformidade))}%"></div>
             </div>
-            <span class="text-xs text-blue-400">${fisc.indice_conformidade}%</span>
+            <span class="text-xs text-blue-400">${formatPercent(conformidade)}</span>
           </div>
         ` : ''}
       </div>
     `;
   }).join('');
+
+  updatePaginationUI(filteredFiscalizacoes.length);
 }
 
 function renderObrasList() {
   const container = document.getElementById('fiscalizacoes-list');
+  const pagination = document.getElementById('list-pagination');
 
   if (filteredObras.length === 0) {
     container.innerHTML = allObras.length === 0 ? `
@@ -1156,27 +2152,40 @@ function renderObrasList() {
         <p class="text-xs mt-1">Ajuste os filtros ou carregue outra planilha</p>
       </div>
     `;
+    pagination?.classList.add('hidden');
     return;
   }
 
-  container.innerHTML = filteredObras.map((obra) => {
+  const sorted = sortRecords(filteredObras);
+  const pageItems = paginateRecords(sorted);
+
+  container.innerHTML = pageItems.map((obra) => {
     const color = getObraMarkerColor(obra);
     const progress = getObraProgressValue(obra);
+    const itemLabel = escapeHtml(obra.item || 'Obra');
+    const localLabel = escapeHtml(obra.local || 'Sem local informado');
+    const situacaoLabel = escapeHtml(obra.situacao_contrato || 'Sem situacao');
+    const chipLabel = progress != null ? formatPercent(progress) : (hasObraCoordinates(obra) ? 'Sem %' : 'Sem coord.');
 
     return `
-      <div class="p-3 rounded-lg bg-slate-800/50 hover:bg-slate-700/50 cursor-pointer transition-colors border border-slate-700/50"
+      <div class="p-3 rounded-lg bg-slate-800/50 hover:bg-slate-700/50 cursor-pointer transition-colors border border-slate-700/50 focus-visible:ring-2 focus-visible:ring-emerald-500"
+           role="button"
+           tabindex="0"
+           onkeydown="if(event.key==='Enter' || event.key===' '){event.preventDefault(); focusObra('${obra.__obraId}');}"
            onclick="focusObra('${obra.__obraId}')">
         <div class="flex items-start justify-between gap-3 mb-2">
-          <span class="font-semibold text-sm leading-tight">${obra.item || 'Obra'}</span>
+          <span class="font-semibold text-sm leading-tight">${itemLabel}</span>
           <span style="font-size:10px;padding:2px 8px;border-radius:999px;background:${color};color:white;white-space:nowrap;">
-            ${progress != null ? formatPercent(progress) : (hasObraCoordinates(obra) ? 'Sem %' : 'Sem coord.')}
+            ${escapeHtml(chipLabel)}
           </span>
         </div>
-        <p class="text-xs text-slate-300 truncate">${obra.local || 'Sem local informado'}</p>
-        <p class="text-xs text-slate-500 mt-1 truncate">${obra.situacao_contrato || 'Sem situacao'}</p>
+        <p class="text-xs text-slate-300 truncate">${localLabel}</p>
+        <p class="text-xs text-slate-500 mt-1 truncate">${situacaoLabel}</p>
       </div>
     `;
   }).join('');
+
+  updatePaginationUI(filteredObras.length);
 }
 
 function focusFiscalizacao(backendId) {
@@ -1230,7 +2239,7 @@ function showDetailPanel(fisc) {
   const content = document.getElementById('detail-content');
 
   const statusClass = fisc.situacao === 'Em Andamento' ? 'status-andamento' :
-                      fisc.situacao === 'Concluída' ? 'status-concluida' : 'status-pendente';
+                      fisc.situacao === 'Concluida' ? 'status-concluida' : 'status-pendente';
 
   setDetailPanelActionsVisible(true);
   document.getElementById('detail-title').textContent = fisc.id || 'Detalhes da Fiscalizacao';
@@ -1243,20 +2252,20 @@ function showDetailPanel(fisc) {
       </div>
 
       <div class="space-y-3">
-        <h3 class="text-sm font-semibold text-blue-400 uppercase tracking-wider">Informações Básicas</h3>
+        <h3 class="text-sm font-semibold text-blue-400 uppercase tracking-wider">Informacoes Basicas</h3>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          ${createDetailField('Nº Processo SEI', fisc.processo_sei)}
+          ${createDetailField('No Processo SEI', fisc.processo_sei)}
           ${createDetailField('Ano', fisc.ano)}
-          ${createDetailField('Região', fisc.regiao_administrativa)}
-          ${createDetailField('Destinatário', fisc.destinatario)}
+          ${createDetailField('Regiao', fisc.regiao_administrativa)}
+          ${createDetailField('Destinatario', fisc.destinatario)}
         </div>
       </div>
 
       <div class="space-y-3">
-        <h3 class="text-sm font-semibold text-blue-400 uppercase tracking-wider">Classificação</h3>
+        <h3 class="text-sm font-semibold text-blue-400 uppercase tracking-wider">Classificacao</h3>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           ${createDetailField('Tipo', fisc.direta_indireta)}
-          ${createDetailField('Programação', fisc.programada)}
+          ${createDetailField('Programacao', fisc.programada)}
         </div>
       </div>
 
@@ -1264,7 +2273,7 @@ function showDetailPanel(fisc) {
         <h3 class="text-sm font-semibold text-blue-400 uppercase tracking-wider">Documento</h3>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           ${createDetailField('Tipo', fisc.tipo_documento)}
-          ${createDetailField('Nº SEI', fisc.sei_documento)}
+          ${createDetailField('No SEI', fisc.sei_documento)}
           ${createDetailField('Data', fisc.data ? new Date(fisc.data).toLocaleDateString('pt-BR') : null)}
         </div>
 
@@ -1278,7 +2287,7 @@ function showDetailPanel(fisc) {
 
       ${(fisc.latitude && fisc.longitude) ? `
         <div class="space-y-3">
-          <h3 class="text-sm font-semibold text-blue-400 uppercase tracking-wider">Localização</h3>
+          <h3 class="text-sm font-semibold text-blue-400 uppercase tracking-wider">Localizacao</h3>
           <div class="bg-slate-800/50 rounded-lg p-3">
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
@@ -1298,7 +2307,7 @@ function showDetailPanel(fisc) {
         <div class="space-y-3">
           <h3 class="text-sm font-semibold text-blue-400 uppercase tracking-wider">Imagem</h3>
           <div class="rounded-xl overflow-hidden border border-slate-700 bg-slate-900/80">
-            <img src="${fisc.imagem}" alt="Imagem da fiscalização" class="w-full object-cover max-h-96">
+            <img src="${fisc.imagem}" alt="Imagem da fiscalizacao" class="w-full object-cover max-h-96">
           </div>
         </div>
       ` : ''}
@@ -1422,21 +2431,274 @@ function closeDetailPanel() {
 }
 window.closeDetailPanel = closeDetailPanel;
 
+function setDraftStatus(text, tone = 'idle') {
+  const status = document.getElementById('form-draft-status');
+  if (!status) return;
+
+  status.textContent = text;
+  status.classList.remove('text-slate-300', 'text-amber-300', 'text-emerald-300', 'text-red-300');
+
+  const toneClass = {
+    idle: 'text-slate-300',
+    pending: 'text-amber-300',
+    saved: 'text-emerald-300',
+    error: 'text-red-300'
+  };
+
+  status.classList.add(toneClass[tone] || toneClass.idle);
+}
+
+function collectFormDraft() {
+  const draft = {};
+  FISCALIZACAO_FORM_FIELDS.forEach((fieldId) => {
+    const node = document.getElementById(fieldId);
+    if (!node) return;
+    draft[fieldId] = node.value ?? '';
+  });
+  draft.__savedAt = nowIso();
+  draft.__editingId = document.getElementById('form-backend-id')?.value || '';
+  return draft;
+}
+
+function applyFormDraft(draft) {
+  if (!draft || typeof draft !== 'object') return;
+  isDraftSyncing = true;
+  FISCALIZACAO_FORM_FIELDS.forEach((fieldId) => {
+    if (!Object.prototype.hasOwnProperty.call(draft, fieldId)) return;
+    const node = document.getElementById(fieldId);
+    if (!node) return;
+    node.value = draft[fieldId] ?? '';
+  });
+  isDraftSyncing = false;
+  updateImagemPreview({
+    data: draft['form-imagem-data'] || '',
+    name: draft['form-imagem-data'] ? 'Imagem em rascunho' : ''
+  });
+}
+
+function clearFormDraft() {
+  localStorage.removeItem(FORM_DRAFT_KEY);
+  setDraftStatus('Sem alteracoes pendentes', 'idle');
+}
+
+function saveFormDraftNow() {
+  if (isDraftSyncing) return;
+  if (!isModalOpen('form-modal')) return;
+
+  const draft = collectFormDraft();
+  if (!writeStoredJson(FORM_DRAFT_KEY, draft)) {
+    setDraftStatus('Falha ao salvar rascunho local', 'error');
+    return;
+  }
+  setDraftStatus(`Rascunho salvo ${new Date(draft.__savedAt).toLocaleTimeString('pt-BR')}`, 'saved');
+}
+
+function scheduleDraftSave() {
+  if (isDraftSyncing) return;
+  setDraftStatus('Salvando rascunho...', 'pending');
+  clearTimeout(draftSaveTimer);
+  draftSaveTimer = setTimeout(saveFormDraftNow, 450);
+}
+
+function maybeRestoreDraftOnCreate() {
+  const draft = readStoredJson(FORM_DRAFT_KEY, null);
+  if (!draft) {
+    setDraftStatus('Sem alteracoes pendentes', 'idle');
+    return;
+  }
+
+  if (String(draft.__editingId || '').trim()) {
+    setDraftStatus('Sem alteracoes pendentes', 'idle');
+    return;
+  }
+
+  const hasData = FISCALIZACAO_FORM_FIELDS.some((fieldId) => String(draft[fieldId] || '').trim() !== '');
+  if (!hasData) {
+    setDraftStatus('Sem alteracoes pendentes', 'idle');
+    return;
+  }
+
+  applyFormDraft(draft);
+  const savedAt = draft.__savedAt ? new Date(draft.__savedAt).toLocaleString('pt-BR') : 'recentemente';
+  setDraftStatus(`Rascunho restaurado (${savedAt})`, 'saved');
+  showToast('Rascunho local restaurado no formulario.', 'info');
+}
+
+function maybeRestoreDraftOnEdit(backendId) {
+  const draft = readStoredJson(FORM_DRAFT_KEY, null);
+  if (!draft) return;
+  if (String(draft.__editingId || '').trim() !== String(backendId || '').trim()) return;
+
+  applyFormDraft(draft);
+  const savedAt = draft.__savedAt ? new Date(draft.__savedAt).toLocaleString('pt-BR') : 'recentemente';
+  setDraftStatus(`Rascunho de edicao restaurado (${savedAt})`, 'saved');
+  showToast('Rascunho da edicao restaurado.', 'info');
+}
+
+function clearFormFieldErrors() {
+  const summary = document.getElementById('form-error-summary');
+  const list = document.getElementById('form-error-list');
+  if (summary) summary.classList.add('hidden');
+  if (list) list.innerHTML = '';
+
+  FISCALIZACAO_FORM_FIELDS.forEach((fieldId) => {
+    const node = document.getElementById(fieldId);
+    if (!node) return;
+    node.classList.remove('field-error');
+    node.removeAttribute('aria-invalid');
+  });
+}
+
+function buildFormValidationErrors() {
+  const errors = [];
+  const id = String(document.getElementById('form-id')?.value || '').trim();
+  const processo = String(document.getElementById('form-processo-sei')?.value || '').trim();
+  const ano = toSafeNumber(document.getElementById('form-ano')?.value);
+  const regiao = String(document.getElementById('form-regiao')?.value || '').trim();
+  const situacao = String(document.getElementById('form-situacao')?.value || '').trim();
+  const direta = String(document.getElementById('form-direta')?.value || '').trim();
+  const conformidadeRaw = String(document.getElementById('form-conformidade')?.value || '').trim();
+  const conformidade = conformidadeRaw === '' ? null : toSafeNumber(conformidadeRaw.replace(',', '.'));
+  const latRaw = String(document.getElementById('form-lat')?.value || '').trim();
+  const lngRaw = String(document.getElementById('form-lng')?.value || '').trim();
+  const data = String(document.getElementById('form-data')?.value || '').trim();
+
+  if (!id) errors.push({ field: 'form-id', message: 'Informe o ID da fiscalizacao.' });
+  if (!processo) errors.push({ field: 'form-processo-sei', message: 'Informe o numero do processo SEI.' });
+  if (!Number.isFinite(ano)) {
+    errors.push({ field: 'form-ano', message: 'Ano invalido.' });
+  } else if (ano < 2000 || ano > 2100) {
+    errors.push({ field: 'form-ano', message: 'Ano deve estar entre 2000 e 2100.' });
+  }
+  if (!regiao) errors.push({ field: 'form-regiao', message: 'Selecione uma regiao administrativa.' });
+  if (!situacao) errors.push({ field: 'form-situacao', message: 'Selecione a situacao.' });
+  if (!direta) errors.push({ field: 'form-direta', message: 'Selecione se e Direta ou Indireta.' });
+
+  if (conformidade != null) {
+    if (!Number.isFinite(conformidade)) {
+      errors.push({ field: 'form-conformidade', message: 'Indice de conformidade invalido.' });
+    } else if (conformidade < 0 || conformidade > 100) {
+      errors.push({ field: 'form-conformidade', message: 'Indice de conformidade deve ficar entre 0 e 100.' });
+    }
+  }
+
+  if ((latRaw && !lngRaw) || (!latRaw && lngRaw)) {
+    errors.push({
+      field: latRaw ? 'form-lng' : 'form-lat',
+      message: 'Preencha latitude e longitude juntas, ou deixe as duas vazias.'
+    });
+  }
+
+  if (latRaw) {
+    const lat = toSafeNumber(latRaw.replace(',', '.'));
+    if (!Number.isFinite(lat) || lat < -90 || lat > 90) {
+      errors.push({ field: 'form-lat', message: 'Latitude invalida (use valor entre -90 e 90).' });
+    }
+  }
+
+  if (lngRaw) {
+    const lng = toSafeNumber(lngRaw.replace(',', '.'));
+    if (!Number.isFinite(lng) || lng < -180 || lng > 180) {
+      errors.push({ field: 'form-lng', message: 'Longitude invalida (use valor entre -180 e 180).' });
+    }
+  }
+
+  if (data && !toIsoDate(data)) {
+    errors.push({ field: 'form-data', message: 'Data invalida. Use AAAA-MM-DD ou DD/MM/AAAA.' });
+  }
+
+  return errors;
+}
+
+function showFormValidationErrors(errors) {
+  clearFormFieldErrors();
+  if (!errors.length) return true;
+
+  const summary = document.getElementById('form-error-summary');
+  const list = document.getElementById('form-error-list');
+  if (summary && list) {
+    list.innerHTML = errors.map((error) => {
+      const label = fieldLabels[error.field] || error.field;
+      return `<li><strong>${escapeHtml(label)}:</strong> ${escapeHtml(error.message)}</li>`;
+    }).join('');
+    summary.classList.remove('hidden');
+  }
+
+  errors.forEach((error) => {
+    const node = document.getElementById(error.field);
+    if (!node) return;
+    node.classList.add('field-error');
+    node.setAttribute('aria-invalid', 'true');
+  });
+
+  const first = document.getElementById(errors[0].field);
+  first?.focus();
+  return false;
+}
+
+function initFormRealtimeValidation() {
+  const form = document.getElementById('fiscalizacao-form');
+  if (!form) return;
+
+  form.addEventListener('input', (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+    const id = target.id;
+    if (!id) return;
+    if (FISCALIZACAO_FORM_FIELDS.includes(id)) {
+      scheduleDraftSave();
+      target.classList.remove('field-error');
+      target.removeAttribute('aria-invalid');
+    }
+  });
+}
+
+async function recordAuditEvent(action, beforeRecord, afterRecord, metadata = {}) {
+  const entry = {
+    id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
+    action,
+    backendId: afterRecord?.__backendId || beforeRecord?.__backendId || metadata.backendId || null,
+    source: window.dataSdk?.getActiveMode?.() || 'local',
+    before: beforeRecord || null,
+    after: afterRecord || null,
+    metadata,
+    createdAt: nowIso()
+  };
+
+  const localAudit = readStoredJson(AUDIT_LOCAL_KEY, []);
+  if (Array.isArray(localAudit)) {
+    localAudit.unshift(entry);
+    writeStoredJson(AUDIT_LOCAL_KEY, localAudit.slice(0, MAX_AUDIT_ENTRIES));
+  }
+
+  if (!window.dataSdk?.isApiConfigured?.()) return;
+  try {
+    await window.dataSdk._fetchJson(window.dataSdk._buildUrl('/fiscalizacoes-audit'), {
+      method: 'POST',
+      body: JSON.stringify(entry)
+    });
+  } catch {
+    // Keep local fallback silently.
+  }
+}
+
 // ======== Add/Edit Modal ========
 function openAddModal() {
   document.getElementById('modal-title').innerHTML = `
     <svg class="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
     </svg>
-    Nova Fiscalização
+    Nova Fiscalizacao
   `;
-  document.getElementById('submit-text').textContent = 'Salvar Fiscalização';
+  document.getElementById('submit-text').textContent = 'Salvar Fiscalizacao';
   document.getElementById('fiscalizacao-form').reset();
   document.getElementById('form-backend-id').value = '';
   document.getElementById('form-ano').value = new Date().getFullYear();
   document.getElementById('form-direta').value = 'Direta';
+  clearFormFieldErrors();
   document.getElementById('form-modal').classList.remove('hidden');
   updateImagemPreview();
+  maybeRestoreDraftOnCreate();
 }
 window.openAddModal = openAddModal;
 
@@ -1448,9 +2710,9 @@ function editCurrentFiscalizacao() {
       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
         d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
     </svg>
-    Editar Fiscalização
+    Editar Fiscalizacao
   `;
-  document.getElementById('submit-text').textContent = 'Atualizar Fiscalização';
+  document.getElementById('submit-text').textContent = 'Atualizar Fiscalizacao';
 
   document.getElementById('form-backend-id').value = currentFiscalizacao.__backendId;
   document.getElementById('form-id').value = currentFiscalizacao.id || '';
@@ -1479,6 +2741,9 @@ function editCurrentFiscalizacao() {
     data: currentFiscalizacao.imagem || '',
     name: currentFiscalizacao.imagem ? 'Imagem anexada' : ''
   });
+  clearFormFieldErrors();
+  setDraftStatus('Edicao em andamento (rascunho local ativo)', 'pending');
+  maybeRestoreDraftOnEdit(currentFiscalizacao.__backendId);
 
   closeDetailPanel();
   document.getElementById('form-modal').classList.remove('hidden');
@@ -1487,6 +2752,7 @@ window.editCurrentFiscalizacao = editCurrentFiscalizacao;
 
 function closeModal() {
   document.getElementById('form-modal').classList.add('hidden');
+  clearTimeout(draftSaveTimer);
   if (tempMarker) {
     map.removeLayer(tempMarker);
     tempMarker = null;
@@ -1527,7 +2793,7 @@ function handleImagemSelected(event) {
 
   const maxBytes = 2 * 1024 * 1024;
   if (file.size > maxBytes) {
-    showToast('Imagem deve ter no máximo 2MB.', 'warning');
+    showToast('Imagem deve ter no maximo 2MB.', 'warning');
     event.target.value = '';
     updateImagemPreview();
     return;
@@ -1536,7 +2802,7 @@ function handleImagemSelected(event) {
   const reader = new FileReader();
   reader.onload = () => updateImagemPreview({ data: reader.result, name: file.name });
   reader.onerror = () => {
-    showToast('Não foi possível ler a imagem.', 'error');
+    showToast('Nao foi possivel ler a imagem.', 'error');
     updateImagemPreview();
   };
   reader.readAsDataURL(file);
@@ -1552,11 +2818,17 @@ window.clearImagemField = clearImagemField;
 async function handleSubmit(event) {
   event.preventDefault();
 
+  const validationErrors = buildFormValidationErrors();
+  if (!showFormValidationErrors(validationErrors)) {
+    showToast('Corrija os campos destacados para continuar.', 'warning');
+    return;
+  }
+
   const backendId = document.getElementById('form-backend-id').value;
   const isEditing = !!backendId;
 
   if (!isEditing && allFiscalizacoes.length >= 999) {
-    showToast('Limite de 999 fiscalizações atingido. Exclua algumas para continuar.', 'error');
+    showToast('Limite de 999 fiscalizacoes atingido. Exclua algumas para continuar.', 'error');
     return;
   }
 
@@ -1596,12 +2868,29 @@ async function handleSubmit(event) {
     longitude: lng || null
   };
 
+  if (!isEditing) {
+    const newIdentity = buildFiscalizacaoIdentity(fiscData);
+    const duplicate = allFiscalizacoes.find((record) => {
+      if (!record) return false;
+      return buildFiscalizacaoIdentity(record) === newIdentity;
+    });
+    if (newIdentity && duplicate) {
+      const duplicateId = duplicate.id || '(sem ID)';
+      showToast(`Ja existe fiscalizacao com mesmo ID/Processo (${duplicateId}).`, 'warning');
+      setOperationStatus('Duplicidade detectada no cadastro', 'warning');
+      return;
+    }
+  }
+
+  setOperationStatus(isEditing ? 'Atualizando registro...' : 'Salvando registro...', 'syncing');
   showLoading(isEditing ? 'Atualizando...' : 'Salvando...');
 
   let result;
+  let beforeRecord = null;
   if (isEditing) {
     const existingRecord = allFiscalizacoes.find(f => f.__backendId === backendId);
     if (existingRecord) {
+      beforeRecord = { ...existingRecord };
       result = await window.dataSdk.update({ ...existingRecord, ...fiscData, __backendId: backendId });
     } else {
       result = { isOk: false };
@@ -1613,10 +2902,21 @@ async function handleSubmit(event) {
   hideLoading();
 
   if (result && result.isOk) {
-    showToast(isEditing ? 'Fiscalização atualizada!' : 'Fiscalização criada!', 'success');
+    const savedRecord = isEditing
+      ? allFiscalizacoes.find((item) => item.__backendId === backendId) || { ...beforeRecord, ...fiscData, __backendId: backendId }
+      : allFiscalizacoes[allFiscalizacoes.length - 1] || fiscData;
+    await recordAuditEvent(isEditing ? 'update' : 'create', beforeRecord, savedRecord, {
+      view: currentView
+    });
+    bumpSessionMetric('saves');
+    clearFormDraft();
+    setOperationStatus('Ultima operacao concluida', 'success');
+    showToast(isEditing ? 'Fiscalizacao atualizada!' : 'Fiscalizacao criada!', 'success');
     closeModal();
+    updateDashboard();
   } else {
-    showToast('Erro ao salvar fiscalização', 'error');
+    setOperationStatus('Falha de conexao ou permissao ao salvar', 'error');
+    showToast('Erro ao salvar fiscalizacao', 'error');
   }
 }
 window.handleSubmit = handleSubmit;
@@ -1639,17 +2939,23 @@ async function executeDelete() {
   if (!deleteTarget) return;
 
   document.getElementById('delete-confirm').classList.add('hidden');
+  setOperationStatus('Removendo registro...', 'syncing');
   showLoading('Excluindo...');
 
+  const beforeRecord = { ...deleteTarget };
   const result = await window.dataSdk.delete(deleteTarget);
 
   hideLoading();
 
   if (result.isOk) {
-    showToast('Fiscalização excluída!', 'success');
+    await recordAuditEvent('delete', beforeRecord, null, { view: currentView });
+    setOperationStatus('Registro removido com sucesso', 'success');
+    showToast('Fiscalizacao excluida!', 'success');
     closeDetailPanel();
+    updateDashboard();
   } else {
-    showToast('Erro ao excluir fiscalização', 'error');
+    setOperationStatus('Falha ao remover registro', 'error');
+    showToast('Erro ao excluir fiscalizacao', 'error');
   }
 
   deleteTarget = null;
@@ -1662,77 +2968,6 @@ function toggleDashboard() {
   if (!panel.classList.contains('hidden')) updateDashboard();
 }
 window.toggleDashboard = toggleDashboard;
-
-function updateDashboard() {
-  const total = allFiscalizacoes.length;
-  const andamento = allFiscalizacoes.filter((f) => isSituacaoAndamento(f.situacao)).length;
-  const concluida = allFiscalizacoes.filter((f) => isSituacaoConcluida(f.situacao)).length;
-  const pendente = allFiscalizacoes.filter((f) => isSituacaoPendente(f.situacao)).length;
-
-  const conformidades = allFiscalizacoes
-    .map((f) => Number(f.indice_conformidade))
-    .filter((value) => Number.isFinite(value));
-  const avgConformidade = conformidades.length > 0
-    ? Math.round(conformidades.reduce((a, b) => a + b, 0) / conformidades.length)
-    : 0;
-
-  const totalAI = allFiscalizacoes.reduce((sum, f) => sum + toFiniteNumber(f.autos_infracao), 0);
-  const totalTN = allFiscalizacoes.reduce((sum, f) => sum + toFiniteNumber(f.termos_notificacao), 0);
-
-  document.getElementById('metric-total').textContent = total;
-  document.getElementById('metric-andamento').textContent = andamento;
-  document.getElementById('metric-concluida').textContent = concluida;
-  document.getElementById('metric-pendente').textContent = pendente;
-  document.getElementById('metric-conformidade').textContent = `${avgConformidade}%`;
-  document.getElementById('metric-ai').textContent = totalAI;
-  document.getElementById('metric-tn').textContent = totalTN;
-
-  const maxStatus = Math.max(andamento, concluida, pendente, 1);
-  document.getElementById('chart-situacao').innerHTML = `
-    <div class="flex flex-col items-center">
-      <div class="w-16 bg-slate-700 rounded-t-lg relative" style="height: ${(andamento / maxStatus) * 150}px; min-height: 20px;">
-        <div class="absolute inset-0 bg-gradient-to-t from-amber-500 to-yellow-400 rounded-t-lg"></div>
-      </div>
-      <p class="text-xl font-bold mt-2 text-amber-400">${andamento}</p>
-      <p class="text-xs text-slate-400">Andamento</p>
-    </div>
-    <div class="flex flex-col items-center">
-      <div class="w-16 bg-slate-700 rounded-t-lg relative" style="height: ${(concluida / maxStatus) * 150}px; min-height: 20px;">
-        <div class="absolute inset-0 bg-gradient-to-t from-emerald-500 to-green-400 rounded-t-lg"></div>
-      </div>
-      <p class="text-xl font-bold mt-2 text-emerald-400">${concluida}</p>
-      <p class="text-xs text-slate-400">Concluída</p>
-    </div>
-    <div class="flex flex-col items-center">
-      <div class="w-16 bg-slate-700 rounded-t-lg relative" style="height: ${(pendente / maxStatus) * 150}px; min-height: 20px;">
-        <div class="absolute inset-0 bg-gradient-to-t from-red-500 to-rose-400 rounded-t-lg"></div>
-      </div>
-      <p class="text-xl font-bold mt-2 text-red-400">${pendente}</p>
-      <p class="text-xs text-slate-400">Pendente</p>
-    </div>
-  `;
-
-  const regionCounts = {};
-  allFiscalizacoes.forEach(f => {
-    if (f.regiao_administrativa) regionCounts[f.regiao_administrativa] = (regionCounts[f.regiao_administrativa] || 0) + 1;
-  });
-
-  const sortedRegions = Object.entries(regionCounts).sort((a, b) => b[1] - a[1]);
-  const maxRegion = sortedRegions.length > 0 ? sortedRegions[0][1] : 1;
-
-  document.getElementById('chart-regiao').innerHTML = sortedRegions.length > 0
-    ? sortedRegions.map(([region, count]) => `
-      <div class="flex items-center gap-3">
-        <span class="text-xs text-slate-400 w-32 truncate">${region}</span>
-        <div class="flex-1 h-5 bg-slate-700 rounded-full overflow-hidden">
-          <div class="h-full bg-gradient-to-r from-blue-600 to-blue-400 rounded-full transition-all duration-500"
-               style="width: ${(count / maxRegion) * 100}%"></div>
-        </div>
-        <span class="text-sm font-semibold text-blue-400 min-w-[30px] text-right">${count}</span>
-      </div>
-    `).join('')
-    : '<p class="text-center text-slate-500 py-8">Nenhuma região cadastrada</p>';
-}
 
 function setDashboardMeta(config) {
   const panel = document.getElementById('dashboard-panel');
@@ -1840,6 +3075,20 @@ function updateDashboard() {
     document.getElementById('metric-conformidade').textContent = `${avgExecucao}%`;
     document.getElementById('metric-ai').textContent = formatCurrency(valorTotal);
     document.getElementById('metric-tn').textContent = formatCurrency(valorExecutado);
+    document.getElementById('metric-critical-pending').textContent = allObras.filter((obra) => {
+      const progress = getObraProgressValue(obra);
+      const status = normalizePlainText(obra.situacao_contrato);
+      return (Number.isFinite(progress) && progress < 40) || status.includes('paralis') || status.includes('atras');
+    }).length;
+    document.getElementById('metric-no-coords').textContent = semCoordenadas;
+    document.getElementById('metric-session-saves').textContent = sessionMetrics.saves;
+    document.getElementById('metric-session-imports').textContent = sessionMetrics.imports;
+    const duplicateSummary = document.getElementById('duplicate-summary-text');
+    if (duplicateSummary) {
+      duplicateSummary.textContent = 'Duplicidade (ID + Processo SEI): aplicavel apenas a fiscalizacoes';
+    }
+    const dedupeButton = document.getElementById('dedupe-fiscalizacoes-btn');
+    if (dedupeButton) dedupeButton.disabled = true;
 
     const maxStatus = Math.max(emExecucao, emRecebimento, outrasSituacoes, 1);
     document.getElementById('chart-situacao').innerHTML = [
@@ -1880,15 +3129,15 @@ function updateDashboard() {
     quaternaryLabel: 'Conformidade Media',
     quinaryLabel: 'Pendentes',
     senaryLabel: 'Total Autos de Infracao',
-    septenaryLabel: 'Total Termos de Notificacao',
+    septenaryLabel: 'Total de Termos de Notificacao',
     statusChartTitle: 'Distribuicao por Situacao',
     regionChartTitle: 'Por Regiao Administrativa'
   });
 
   const total = allFiscalizacoes.length;
-  const andamento = allFiscalizacoes.filter((f) => isSituacaoAndamento(f.situacao)).length;
-  const concluida = allFiscalizacoes.filter((f) => isSituacaoConcluida(f.situacao)).length;
-  const pendente = allFiscalizacoes.filter((f) => isSituacaoPendente(f.situacao)).length;
+  const andamento = allFiscalizacoes.filter(f => f.situacao === 'Em Andamento').length;
+  const concluida = allFiscalizacoes.filter(f => f.situacao === 'Concluida').length;
+  const pendente = allFiscalizacoes.filter(f => f.situacao === 'Pendente').length;
 
   const conformidades = allFiscalizacoes
     .map((f) => Number(f.indice_conformidade))
@@ -1907,6 +3156,24 @@ function updateDashboard() {
   document.getElementById('metric-conformidade').textContent = `${avgConformidade}%`;
   document.getElementById('metric-ai').textContent = totalAI;
   document.getElementById('metric-tn').textContent = totalTN;
+  document.getElementById('metric-critical-pending').textContent = allFiscalizacoes.filter((f) => {
+    const pendenteOuAndamento = normalizePlainText(f.situacao).includes('pend') || normalizePlainText(f.situacao).includes('andamento');
+    const conformidade = toSafeNumber(f.indice_conformidade);
+    const naoConformes = toSafeNumber(f.constatacoes_nao_conformes) || 0;
+    return pendenteOuAndamento && ((Number.isFinite(conformidade) && conformidade < 60) || naoConformes > 0);
+  }).length;
+  document.getElementById('metric-no-coords').textContent = allFiscalizacoes.filter((f) => {
+    return !(Number.isFinite(Number(f.latitude)) && Number.isFinite(Number(f.longitude)));
+  }).length;
+  document.getElementById('metric-session-saves').textContent = sessionMetrics.saves;
+  document.getElementById('metric-session-imports').textContent = sessionMetrics.imports;
+  const dedupeButton = document.getElementById('dedupe-fiscalizacoes-btn');
+  if (dedupeButton) dedupeButton.disabled = false;
+  const duplicateSummary = document.getElementById('duplicate-summary-text');
+  if (duplicateSummary) {
+    const duplicateReport = buildDuplicateReport(allFiscalizacoes);
+    duplicateSummary.textContent = `Duplicidades por ID + Processo SEI: ${duplicateReport.duplicateRecords}`;
+  }
 
   const maxStatus = Math.max(andamento, concluida, pendente, 1);
   document.getElementById('chart-situacao').innerHTML = [
@@ -1934,7 +3201,7 @@ function updateDashboard() {
         <span class="text-sm font-semibold text-blue-400 min-w-[30px] text-right">${count}</span>
       </div>
     `).join('')
-    : '<p class="text-center text-slate-500 py-8">Nenhuma regiÃ£o cadastrada</p>';
+    : '<p class="text-center text-slate-500 py-8">Nenhuma regiao cadastrada</p>';
 }
 
 // ======== Obras Upload ========
@@ -1970,10 +3237,10 @@ function renderObrasUploadPreview(records = [], meta = null) {
   previewBody.innerHTML = records.length > 0
     ? records.slice(0, 5).map((obra) => `
       <tr class="border-t border-slate-600">
-        <td class="px-2 py-2 text-slate-300">${obra.item || '-'}</td>
-        <td class="px-2 py-2 text-slate-300">${obra.local || '-'}</td>
-        <td class="px-2 py-2 text-slate-300">${obra.situacao_contrato || '-'}</td>
-        <td class="px-2 py-2 text-slate-300">${formatPercent(getObraProgressValue(obra))}</td>
+        <td class="px-2 py-2 text-slate-300">${escapeHtml(obra.item || '-')}</td>
+        <td class="px-2 py-2 text-slate-300">${escapeHtml(obra.local || '-')}</td>
+        <td class="px-2 py-2 text-slate-300">${escapeHtml(obra.situacao_contrato || '-')}</td>
+        <td class="px-2 py-2 text-slate-300">${escapeHtml(formatPercent(getObraProgressValue(obra)))}</td>
       </tr>
     `).join('')
     : `
@@ -2088,6 +3355,7 @@ async function executeObrasUpload() {
     return;
   }
 
+  setOperationStatus('Salvando obras...', 'syncing');
   showLoading('Salvando obras...');
 
   const result = await persistObrasData(pendingObrasUpload.map((obra) => ({ ...obra })));
@@ -2095,6 +3363,7 @@ async function executeObrasUpload() {
   hideLoading();
 
   if (!result.isOk) {
+    setOperationStatus('Falha de conexao ao salvar obras', 'error');
     showToast('Erro ao salvar obras.', 'error');
     return;
   }
@@ -2114,6 +3383,8 @@ async function executeObrasUpload() {
   }
 
   updateDashboard();
+  bumpSessionMetric('imports');
+  setOperationStatus('Obras atualizadas com sucesso', 'success');
 
   const mappedWithCoordinates = allObras.filter((obra) => hasObraCoordinates(obra)).length;
   if (result.fallbackReason === 'api_unavailable') {
@@ -2134,6 +3405,7 @@ async function clearObrasData() {
     return;
   }
 
+  setOperationStatus('Removendo obras...', 'syncing');
   showLoading('Removendo obras...');
 
   const result = await deleteObrasData();
@@ -2141,6 +3413,7 @@ async function clearObrasData() {
   hideLoading();
 
   if (!result.isOk) {
+    setOperationStatus('Falha ao remover obras', 'error');
     showToast('Erro ao remover obras.', 'error');
     return;
   }
@@ -2160,6 +3433,7 @@ async function clearObrasData() {
   }
 
   updateDashboard();
+  setOperationStatus('Obras removidas', 'success');
 
   if (result.fallbackReason === 'api_unavailable') {
     showToast('Obras removidas localmente (API indisponivel).', 'warning');
@@ -2264,7 +3538,7 @@ function showToast(message, type = 'info') {
   toast.className = `${colors[type]} px-4 py-3 rounded-xl shadow-lg flex items-center gap-3 fade-in`;
   toast.innerHTML = `
     <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">${icons[type]}</svg>
-    <span class="text-sm font-medium text-white">${message}</span>
+    <span class="text-sm font-medium text-white">${escapeHtml(message)}</span>
   `;
 
   container.appendChild(toast);
@@ -2288,17 +3562,162 @@ function hideLoading() {
 // ======== Import ========
 function openImportModal() {
   document.getElementById('import-modal').classList.remove('hidden');
-  document.getElementById('import-textarea').value = '';
-  document.getElementById('import-preview').classList.add('hidden');
+  resetFiscalizacoesImportState();
 }
 window.openImportModal = openImportModal;
 
 function closeImportModal() {
   document.getElementById('import-modal').classList.add('hidden');
-  document.getElementById('import-textarea').value = '';
-  document.getElementById('import-preview').classList.add('hidden');
+  resetFiscalizacoesImportState();
 }
 window.closeImportModal = closeImportModal;
+
+function resetFiscalizacoesImportState() {
+  pendingFiscalizacoesUpload = [];
+  pendingFiscalizacoesMeta = null;
+  importSimulation = null;
+
+  const input = document.getElementById('fiscalizacoes-file-input');
+  if (input) input.value = '';
+
+  const preview = document.getElementById('import-preview');
+  const summary = document.getElementById('import-simulation-summary');
+  const uploadSummary = document.getElementById('fiscalizacoes-upload-summary');
+  const previewBody = document.getElementById('preview-body');
+  const importBtn = document.getElementById('import-btn');
+  if (preview) preview.classList.add('hidden');
+  if (summary) summary.classList.add('hidden');
+  if (uploadSummary) uploadSummary.classList.add('hidden');
+  if (previewBody) previewBody.innerHTML = '';
+  if (importBtn) importBtn.disabled = true;
+}
+
+function selectFiscalizacoesSheetName(sheetNames) {
+  if (!Array.isArray(sheetNames) || sheetNames.length === 0) return null;
+  return sheetNames.find((name) => normalizePlainText(name).includes('fiscaliza')) ||
+    sheetNames.find((name) => normalizePlainText(name).includes('direta')) ||
+    sheetNames.find((name) => normalizePlainText(name).includes('dados')) ||
+    sheetNames[0];
+}
+
+function findFiscalizacoesHeaderRow(rows) {
+  if (!Array.isArray(rows)) return -1;
+  for (let index = 0; index < Math.min(rows.length, 50); index += 1) {
+    const row = Array.isArray(rows[index]) ? rows[index] : [];
+    const cells = row.map(normalizeHeaderText);
+    const hasId = cells.includes('id');
+    const hasProcessoSei = cells.some((cell) => cell.includes('processo sei'));
+    const hasDiretaIndireta = cells.some((cell) => cell.includes('direta ou indireta'));
+    if (hasId && hasProcessoSei && hasDiretaIndireta) {
+      return index;
+    }
+  }
+  return -1;
+}
+
+function renderFiscalizacoesUploadSummary(rows = [], meta = null) {
+  const summary = document.getElementById('fiscalizacoes-upload-summary');
+  const fileLabel = document.getElementById('fiscalizacoes-summary-file');
+  const sheetLabel = document.getElementById('fiscalizacoes-summary-sheet');
+  const countLabel = document.getElementById('fiscalizacoes-summary-count');
+  if (!summary || !fileLabel || !sheetLabel || !countLabel) return;
+
+  if (!meta) {
+    summary.classList.add('hidden');
+    fileLabel.textContent = '-';
+    sheetLabel.textContent = '-';
+    countLabel.textContent = '0';
+    return;
+  }
+
+  fileLabel.textContent = meta.fileName || '-';
+  sheetLabel.textContent = meta.sheetName || '-';
+  countLabel.textContent = String(rows.length);
+  summary.classList.remove('hidden');
+}
+
+async function handleFiscalizacoesFileSelected(event) {
+  const input = event?.target;
+  const file = input?.files?.[0];
+
+  if (!file) {
+    resetFiscalizacoesImportState();
+    return;
+  }
+
+  if (typeof XLSX === 'undefined') {
+    showToast('Leitor de planilha indisponivel no navegador.', 'error');
+    return;
+  }
+
+  showLoading('Lendo arquivo de fiscalizacoes...');
+  setOperationStatus('Lendo arquivo para importacao...', 'syncing');
+
+  try {
+    let dataRows = [];
+    let sheetName = 'CSV';
+    let headerRowIndex = -1;
+
+    const isCsv = /\.csv$/i.test(file.name || '') || String(file.type || '').toLowerCase().includes('csv');
+    if (isCsv) {
+      const text = await file.text();
+      const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+      const delimiter = detectImportDelimiter(lines);
+      headerRowIndex = findImportHeaderIndex(lines, delimiter);
+      if (headerRowIndex < 0) {
+        throw new Error('Nao foi possivel localizar o cabecalho no CSV de fiscalizacoes.');
+      }
+      dataRows = lines
+        .slice(headerRowIndex + 1)
+        .map((line) => line.split(delimiter).map((cell) => String(cell || '').trim()))
+        .filter((cells) => cells.some((cell) => cell !== ''));
+    } else {
+      const workbook = XLSX.read(await file.arrayBuffer(), { type: 'array', cellDates: false });
+      sheetName = selectFiscalizacoesSheetName(workbook.SheetNames);
+      const sheet = sheetName ? workbook.Sheets[sheetName] : null;
+      if (!sheetName || !sheet) {
+        throw new Error('Nao foi possivel localizar aba valida de fiscalizacoes.');
+      }
+      const rawRows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, defval: '' });
+      headerRowIndex = findFiscalizacoesHeaderRow(rawRows);
+      if (headerRowIndex < 0) {
+        throw new Error('Nao foi possivel localizar cabecalho de fiscalizacoes na planilha.');
+      }
+      dataRows = rawRows
+        .slice(headerRowIndex + 1)
+        .map((row) => (Array.isArray(row) ? row.map((cell) => String(cell || '').trim()) : []))
+        .filter((cells) => cells.some((cell) => cell !== ''));
+    }
+
+    pendingFiscalizacoesUpload = dataRows;
+    pendingFiscalizacoesMeta = {
+      fileName: file.name,
+      sheetName,
+      headerRowIndex,
+      fileKey: `${file.name}-${file.size}-${file.lastModified}`
+    };
+    renderFiscalizacoesUploadSummary(dataRows, pendingFiscalizacoesMeta);
+    setOperationStatus('Arquivo carregado. Execute a simulacao.', 'success');
+
+    if (dataRows.length === 0) {
+      showToast('Arquivo lido, mas nenhuma linha de fiscalizacao foi encontrada.', 'warning');
+      return;
+    }
+
+    showToast(`Arquivo carregado com ${dataRows.length} linhas para simulacao.`, 'success');
+    previewImport();
+  } catch (error) {
+    pendingFiscalizacoesUpload = [];
+    pendingFiscalizacoesMeta = null;
+    renderFiscalizacoesUploadSummary();
+    setOperationStatus('Falha ao ler arquivo de importacao', 'error');
+    showToast(error?.message || 'Erro ao ler arquivo de fiscalizacoes.', 'error');
+  } finally {
+    hideLoading();
+    if (input) input.value = '';
+  }
+}
+window.handleFiscalizacoesFileSelected = handleFiscalizacoesFileSelected;
 
 function detectImportDelimiter(lines) {
   const sample = lines.slice(0, 5).join('\n');
@@ -2344,222 +3763,360 @@ function findImportHeaderIndex(lines, delimiter) {
   return -1;
 }
 
+function parseImportRecordFromCells(cells) {
+  const rowResult = {
+    status: 'ok',
+    notes: [],
+    record: null,
+    id: '',
+    regiao: '',
+    situacao: '',
+    conformidade: ''
+  };
+
+  if (!Array.isArray(cells) || cells.length < 19) {
+    rowResult.status = 'error';
+    rowResult.notes.push('Linha incompleta: esperado minimo de 19 colunas.');
+    return rowResult;
+  }
+
+  const norm = (value) => String(value ?? '').trim();
+  const normalizeType = (value) => normalizePlainText(norm(value));
+  const parseNumber = (value) => {
+    const cleaned = norm(value).replace('%', '');
+    const parsed = parseLocalizedNumber(cleaned);
+    return Number.isFinite(parsed) ? parsed : null;
+  };
+  const parseIntSafe = (value) => {
+    const parsed = parseNumber(value);
+    return parsed == null ? null : Math.trunc(parsed);
+  };
+
+  let regiaoRaw = norm(cells[4]);
+  let regiao = regiaoRaw;
+  if (/^distrito\s*federal$/i.test(regiaoRaw)) {
+    regiao = 'Plano Piloto';
+  }
+
+  const tipoFiscalizacao = norm(cells[7]);
+  if (normalizeType(tipoFiscalizacao) !== 'direta') {
+    rowResult.status = 'warning';
+    rowResult.notes.push('Ignorada: somente fiscalizacoes Direta sao importadas.');
+    rowResult.id = norm(cells[0]);
+    rowResult.regiao = regiao;
+    rowResult.situacao = norm(cells[5]);
+    rowResult.conformidade = norm(cells[18]);
+    return rowResult;
+  }
+
+  const id = norm(cells[0]);
+  if (!id) {
+    rowResult.status = 'error';
+    rowResult.notes.push('ID vazio.');
+  }
+
+  const processo = norm(cells[1]);
+  if (!processo) {
+    rowResult.status = 'error';
+    rowResult.notes.push('Processo SEI vazio.');
+  }
+
+  let ano = parseIntSafe(cells[2]);
+  if (!Number.isFinite(ano)) {
+    rowResult.status = 'warning';
+    rowResult.notes.push('Ano ausente ou invalido; sera mantido vazio.');
+    ano = null;
+  }
+
+  const conformidade = parseNumber(cells[18]);
+  if (norm(cells[18]) && conformidade == null) {
+    rowResult.status = rowResult.status === 'error' ? 'error' : 'warning';
+    rowResult.notes.push('Conformidade invalida; valor ignorado.');
+  }
+
+  let lat = null;
+  let lng = null;
+  if (regiao && regionCoordinates[regiao]) {
+    const [baseLat, baseLng] = regionCoordinates[regiao];
+    lat = baseLat + (Math.random() - 0.5) * 0.02;
+    lng = baseLng + (Math.random() - 0.5) * 0.02;
+  } else {
+    rowResult.status = rowResult.status === 'error' ? 'error' : 'warning';
+    rowResult.notes.push('Regiao sem coordenada base; mapa pode ficar sem foco local.');
+  }
+
+  rowResult.id = id;
+  rowResult.regiao = regiao;
+  rowResult.situacao = norm(cells[5]);
+  rowResult.conformidade = norm(cells[18]);
+  rowResult.record = {
+    id,
+    processo_sei: processo,
+    ano,
+    objetivo: norm(cells[3]),
+    regiao_administrativa: regiao || null,
+    situacao: norm(cells[5]),
+    tipo_documento: norm(cells[6]),
+    destinatario: '',
+    direta_indireta: 'Direta',
+    programada: norm(cells[8]),
+    sei_documento: norm(cells[9]),
+    data: toIsoDate(norm(cells[10])),
+    constatacoes: norm(cells[11]),
+    constatacoes_nao_conformes: parseIntSafe(cells[12]),
+    recomendacoes: norm(cells[13]),
+    determinacoes: norm(cells[14]),
+    termos_notificacao: parseIntSafe(cells[15]),
+    autos_infracao: parseIntSafe(cells[16]),
+    termos_ajuste: parseIntSafe(cells[17]),
+    indice_conformidade: conformidade,
+    latitude: lat,
+    longitude: lng
+  };
+
+  return rowResult;
+}
+
+function renderImportSimulation(simulation) {
+  const preview = document.getElementById('import-preview');
+  const previewBody = document.getElementById('preview-body');
+  const summary = document.getElementById('import-simulation-summary');
+  const totalLabel = document.getElementById('sim-total-lines');
+  const validLabel = document.getElementById('sim-valid-lines');
+  const warningLabel = document.getElementById('sim-warning-lines');
+  const errorLabel = document.getElementById('sim-error-lines');
+  const note = document.getElementById('sim-summary-note');
+  const importBtn = document.getElementById('import-btn');
+  if (!preview || !previewBody || !summary || !totalLabel || !validLabel || !warningLabel || !errorLabel || !note || !importBtn) return;
+
+  previewBody.innerHTML = simulation.rows.slice(0, 80).map((row) => {
+    const toneClass = row.status === 'error'
+      ? 'text-red-300'
+      : row.status === 'warning'
+        ? 'text-amber-300'
+        : 'text-emerald-300';
+    const statusText = row.status === 'error' ? 'Erro' : (row.status === 'warning' ? 'Aviso' : 'OK');
+    return `
+      <tr class="border-t border-slate-600">
+        <td class="px-2 py-2 ${toneClass}">${statusText}</td>
+        <td class="px-2 py-2 text-slate-300">${escapeHtml(row.id || '-')}</td>
+        <td class="px-2 py-2 text-slate-300">${escapeHtml(row.regiao || '-')}</td>
+        <td class="px-2 py-2 text-slate-300">${escapeHtml(row.situacao || '-')}</td>
+        <td class="px-2 py-2 text-slate-300">${escapeHtml(row.conformidade || '-')}</td>
+        <td class="px-2 py-2 text-slate-400">${escapeHtml((row.notes || []).join(' | ') || '-')}</td>
+      </tr>
+    `;
+  }).join('');
+
+  totalLabel.textContent = simulation.total;
+  validLabel.textContent = simulation.validCount;
+  warningLabel.textContent = simulation.warningCount;
+  errorLabel.textContent = simulation.errorCount;
+  note.textContent = simulation.errorCount > 0
+    ? 'Corrija as linhas com erro para habilitar a importacao.'
+    : 'Simulacao pronta. Linhas com aviso serao importadas, mas revise os alertas.';
+
+  preview.classList.remove('hidden');
+  summary.classList.remove('hidden');
+  importBtn.disabled = simulation.errorCount > 0 || simulation.importableRecords.length === 0;
+}
+
+function buildImportSimulationFromRows(dataRows) {
+  const rows = (dataRows || []).map((cells, index) => {
+    const parsed = parseImportRecordFromCells(cells);
+    parsed.lineNumber = index + 1;
+    return parsed;
+  });
+
+  const existingIdentityMap = new Map();
+  allFiscalizacoes.forEach((record) => {
+    const identity = buildFiscalizacaoIdentity(record);
+    if (!identity) return;
+    if (!existingIdentityMap.has(identity)) {
+      existingIdentityMap.set(identity, record);
+    }
+  });
+
+  const seenImportIdentity = new Set();
+  rows.forEach((row) => {
+    if (!row.record) return;
+    const identity = buildFiscalizacaoIdentity(row.record);
+    if (!identity) return;
+
+    if (existingIdentityMap.has(identity)) {
+      row.status = row.status === 'error' ? 'error' : 'warning';
+      row.skipImport = true;
+      row.notes.push('Registro ja existe no sistema e sera ignorado para evitar duplicidade.');
+      return;
+    }
+
+    if (seenImportIdentity.has(identity)) {
+      row.status = row.status === 'error' ? 'error' : 'warning';
+      row.skipImport = true;
+      row.notes.push('Registro repetido no proprio arquivo; apenas a primeira ocorrencia sera considerada.');
+      return;
+    }
+
+    seenImportIdentity.add(identity);
+  });
+
+  const importableRecords = rows
+    .filter((row) => row.record && row.status !== 'error' && !row.skipImport)
+    .map((row) => row.record);
+
+  const errorCount = rows.filter((row) => row.status === 'error').length;
+  const warningCount = rows.filter((row) => row.status === 'warning').length;
+  const validCount = rows.filter((row) => row.status === 'ok').length;
+
+  return {
+    sourceKey: pendingFiscalizacoesMeta?.fileKey || '',
+    total: rows.length,
+    rows,
+    importableRecords,
+    errorCount,
+    warningCount,
+    validCount
+  };
+}
+
+function buildImportSimulation() {
+  if (!pendingFiscalizacoesUpload.length) return null;
+  return buildImportSimulationFromRows(pendingFiscalizacoesUpload);
+}
+
 function previewImport() {
-  const text = document.getElementById('import-textarea').value.trim();
-  if (!text) {
-    showToast('Cole os dados primeiro', 'warning');
+  const simulation = buildImportSimulation();
+  if (!simulation) {
+    showToast('Selecione um arquivo de fiscalizacoes antes de simular.', 'warning');
     return;
   }
 
-  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
-  const delim = detectImportDelimiter(lines);
-
-  const previewBody = document.getElementById('preview-body');
-  previewBody.innerHTML = '';
-
-  const headerIndex = findImportHeaderIndex(lines, delim);
-  const startIndex = headerIndex >= 0 ? headerIndex + 1 : 0;
-
-  for (let i = startIndex; i < Math.min(startIndex + 5, lines.length); i++) {
-    const cells = lines[i].split(delim);
-    const row = document.createElement('tr');
-    row.className = 'border-t border-slate-600';
-    row.innerHTML = `
-      <td class="px-2 py-2 text-slate-300">${cells[0] || '-'}</td>
-      <td class="px-2 py-2 text-slate-300">${cells[4] || '-'}</td>
-      <td class="px-2 py-2 text-slate-300">${cells[5] || '-'}</td>
-      <td class="px-2 py-2 text-slate-300">${cells[7] || '-'}</td>
-    `;
-    previewBody.appendChild(row);
+  if (simulation.total === 0) {
+    showToast('Nao foram encontradas linhas para importar.', 'warning');
+    return;
   }
 
-  document.getElementById('import-preview').classList.remove('hidden');
+  importSimulation = simulation;
+  renderImportSimulation(simulation);
+  setOperationStatus('Simulacao de importacao concluida', simulation.errorCount > 0 ? 'warning' : 'success');
+
+  if (simulation.importableRecords.length === 0) {
+    showToast('Nenhuma linha valida para importacao.', 'warning');
+    return;
+  }
+
+  if (simulation.errorCount > 0) {
+    showToast('Simulacao concluida com erros. Revise as linhas destacadas.', 'warning');
+    return;
+  }
+
+  if (simulation.warningCount > 0) {
+    showToast('Simulacao concluida com avisos.', 'info');
+    return;
+  }
+
+  showToast('Simulacao concluida sem erros.', 'success');
 }
 window.previewImport = previewImport;
 
 async function executeImport() {
-  const text = document.getElementById('import-textarea').value.trim();
-  if (!text) {
-    showToast('Cole os dados primeiro', 'warning');
+  if (!pendingFiscalizacoesUpload.length) {
+    showToast('Selecione um arquivo de fiscalizacoes primeiro.', 'warning');
     return;
   }
 
-  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
-  if (lines.length < 1) {
-    showToast('Dados inválidos', 'error');
+  if (!importSimulation || importSimulation.sourceKey !== (pendingFiscalizacoesMeta?.fileKey || '')) {
+    previewImport();
+  }
+
+  if (!importSimulation) return;
+  if (importSimulation.errorCount > 0) {
+    showToast('Nao e possivel importar com erros na simulacao.', 'error');
     return;
   }
 
-  const delim = detectImportDelimiter(lines);
-
-  const norm = (v) => (v ?? '').toString().trim();
-  const normalizeTipoFiscalizacao = (v) => norm(v)
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase();
-
-  const parseNumber = (v) => {
-    const s = norm(v);
-    if (!s || s === '#ERROR!') return null;
-    const cleaned = s.replace('%', '').replace(/\./g, '').replace(',', '.').trim();
-    const n = Number(cleaned);
-    return Number.isFinite(n) ? n : null;
-  };
-
-  const parseIntSafe = (v) => {
-    const n = parseNumber(v);
-    return n === null ? null : Math.trunc(n);
-  };
-
-  const parseDateToISO = (v) => {
-    const s = norm(v);
-    if (!s || s === '#ERROR!') return '';
-    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-
-    if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(s)) {
-      const [a, b, c] = s.split('/').map(x => parseInt(x, 10));
-      let day, month;
-      if (a > 12) { day = a; month = b; } else { month = a; day = b; }
-      const yyyy = c;
-      const mm = String(month).padStart(2, '0');
-      const dd = String(day).padStart(2, '0');
-      return `${yyyy}-${mm}-${dd}`;
-    }
-    return '';
-  };
-
-  const headerIndex = findImportHeaderIndex(lines, delim);
-  const startIndex = headerIndex >= 0 ? headerIndex + 1 : 0;
-  const dataLines = lines.slice(startIndex);
-
-  if (dataLines.length < 1) {
-    showToast('Dados inválidos', 'error');
+  const recordsToImport = importSimulation.importableRecords;
+  if (recordsToImport.length === 0) {
+    showToast('Nao ha registros importaveis.', 'warning');
     return;
   }
 
-  const diretaCandidates = dataLines.reduce((count, line) => {
-    const cells = line.split(delim);
-    if (cells.length < 19) return count;
-    return normalizeTipoFiscalizacao(cells[7]) === 'direta' ? count + 1 : count;
-  }, 0);
-
-  if (diretaCandidates === 0) {
-    showToast('Nenhuma fiscalizacao "Direta" encontrada para importar.', 'warning');
+  if (allFiscalizacoes.length + recordsToImport.length > 999) {
+    showToast(`Voce tem ${allFiscalizacoes.length} registros. Maximo permitido e 999.`, 'error');
     return;
   }
 
-  if (allFiscalizacoes.length + diretaCandidates > 999) {
-    showToast(`Você tem ${allFiscalizacoes.length} registros. Máximo é 999.`, 'error');
-    return;
-  }
-
-  showLoading(`Importando ${diretaCandidates} fiscalizacoes Direta...`);
+  setOperationStatus(`Importando ${recordsToImport.length} registros...`, 'syncing');
+  showLoading(`Importando ${recordsToImport.length} fiscalizacoes...`);
   const btn = document.getElementById('import-btn');
-  btn.disabled = true;
+  if (btn) btn.disabled = true;
 
   let imported = 0;
   let failed = 0;
-  let skippedNonDireta = 0;
 
-  for (let i = 0; i < dataLines.length; i++) {
-    const line = dataLines[i];
-    const cells = line.split(delim);
-
-    if (cells.length < 19) { failed++; continue; }
-
-    let regiaoRaw = norm(cells[4]);
-    let regiao = regiaoRaw;
-
-    const brasiliaCenter = { lat: -15.7942, lng: -47.8822 };
-
-    if (/^distrito\s*federal$/i.test(regiaoRaw)) {
-      regiao = 'Plano Piloto';
+  for (let index = 0; index < recordsToImport.length; index += 1) {
+    const payload = recordsToImport[index];
+    const result = await window.dataSdk.create(payload);
+    if (result?.isOk) {
+      imported += 1;
+    } else {
+      failed += 1;
     }
 
-    const tipoFiscalizacao = norm(cells[7]);
-    if (normalizeTipoFiscalizacao(tipoFiscalizacao) !== 'direta') {
-      skippedNonDireta++;
-      continue;
+    const progress = Math.round(((index + 1) / recordsToImport.length) * 100);
+    const loadingText = document.getElementById('loading-text');
+    if (loadingText) {
+      loadingText.textContent = `Importando... ${progress}% (${imported}/${recordsToImport.length})`;
     }
-
-    let lat = null;
-    let lng = null;
-
-    if ((!lat || !lng)) {
-      if (regiao && regionCoordinates[regiao]) {
-        const [baseLat, baseLng] = regionCoordinates[regiao];
-        lat = baseLat + (Math.random() - 0.5) * 0.02;
-        lng = baseLng + (Math.random() - 0.5) * 0.02;
-      } else if (/^distrito\s*federal$/i.test(regiaoRaw)) {
-        lat = brasiliaCenter.lat + (Math.random() - 0.5) * 0.02;
-        lng = brasiliaCenter.lng + (Math.random() - 0.5) * 0.02;
-      }
-    }
-
-    const fiscData = {
-      id: norm(cells[0]),
-      processo_sei: norm(cells[1]),
-      ano: parseIntSafe(cells[2]),
-      objetivo: norm(cells[3]),
-      regiao_administrativa: regiao || null,
-      situacao: norm(cells[5]),
-      tipo_documento: norm(cells[6]),
-      destinatario: '',
-      direta_indireta: 'Direta',
-      programada: norm(cells[8]),
-      sei_documento: norm(cells[9]),
-      data: parseDateToISO(cells[10]),
-      constatacoes: norm(cells[11]),
-      constatacoes_nao_conformes: parseIntSafe(cells[12]),
-      recomendacoes: norm(cells[13]),
-      determinacoes: norm(cells[14]),
-      termos_notificacao: parseIntSafe(cells[15]),
-      autos_infracao: parseIntSafe(cells[16]),
-      termos_ajuste: parseIntSafe(cells[17]),
-      indice_conformidade: parseNumber(cells[18]),
-      latitude: lat || null,
-      longitude: lng || null
-    };
-
-    const result = await window.dataSdk.create(fiscData);
-    if (result && result.isOk) imported++;
-    else failed++;
-
-    const progress = Math.round(((i + 1) / dataLines.length) * 100);
-    document.getElementById('loading-text').textContent =
-      `Importando... ${progress}% (${imported}/${diretaCandidates})`;
   }
 
   hideLoading();
-  btn.disabled = false;
+  if (btn) btn.disabled = false;
 
   if (imported > 0) {
-    showToast(`✅ ${imported} fiscalizacoes Direta importadas!`, 'success');
+    await recordAuditEvent('import_batch', null, null, {
+      imported,
+      warnings: importSimulation.warningCount
+    });
+    bumpSessionMetric('imports');
+    setOperationStatus(`${imported} registros importados com sucesso`, 'success');
+    showToast(`${imported} fiscalizacoes importadas!`, 'success');
     closeImportModal();
+    updateDashboard();
   }
-  if (skippedNonDireta > 0) {
-    showToast(`⚠️ ${skippedNonDireta} registros ignorados (nao sao Direta)`, 'warning');
-  }
+
   if (failed > 0) {
-    showToast(`⚠️ ${failed} registros falharam`, 'warning');
+    setOperationStatus(`Importacao com falhas (${failed})`, 'warning');
+    showToast(`${failed} registros falharam na importacao.`, 'warning');
   }
 }
 window.executeImport = executeImport;
 
 // ======== Init ========
 async function init() {
-  // títulos
+  // titulos
   const t = document.getElementById('app-title');
   const s = document.getElementById('app-subtitle');
   if (t) t.textContent = defaultConfig.app_title;
   if (s) s.textContent = defaultConfig.subtitle;
 
+  loadSessionMetrics();
+  loadListState();
+  loadMapLayerState();
   initStorageModeSelector();
+  initEnhancedControls();
+  initFormRealtimeValidation();
   updateDataViewUI();
   initMap();
   await initDataSDK();
   updateFiltersOptions();
+  restoreFilterState();
   applyFilters();
+  renderSavedFilterButtons();
   updateObrasUploadActions();
+  setDraftStatus('Sem alteracoes pendentes', 'idle');
+  setOperationStatus('Sistema pronto', 'success');
 }
 init();
+
+
