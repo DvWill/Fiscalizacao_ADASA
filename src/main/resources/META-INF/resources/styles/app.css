@@ -468,6 +468,40 @@ body:is(.app-page, .public-page, .auth-page) .metric-card .text-slate-500 {
   color: var(--text-muted) !important;
 }
 
+body:is(.app-page, .public-page, .auth-page) [class*="bg-slate-800/90"],
+body:is(.app-page, .public-page, .auth-page) [class*="bg-slate-700/70"],
+body:is(.app-page, .public-page, .auth-page) [class*="bg-slate-900/60"] {
+  color: #f8fafc !important;
+}
+
+body:is(.app-page, .public-page, .auth-page) [class*="bg-slate-800/90"] .text-slate-300,
+body:is(.app-page, .public-page, .auth-page) [class*="bg-slate-700/70"] .text-slate-300,
+body:is(.app-page, .public-page, .auth-page) [class*="bg-slate-900/60"] .text-slate-300 {
+  color: #e2e8f0 !important;
+}
+
+body:is(.app-page, .public-page, .auth-page) [class*="bg-slate-800/90"] .text-slate-400,
+body:is(.app-page, .public-page, .auth-page) [class*="bg-slate-700/70"] .text-slate-400,
+body:is(.app-page, .public-page, .auth-page) [class*="bg-slate-900/60"] .text-slate-400 {
+  color: #cbd5e1 !important;
+}
+
+body:is(.app-page, .public-page, .auth-page) [class*="bg-slate-800/90"] .text-slate-500,
+body:is(.app-page, .public-page, .auth-page) [class*="bg-slate-700/70"] .text-slate-500,
+body:is(.app-page, .public-page, .auth-page) [class*="bg-slate-900/60"] .text-slate-500 {
+  color: #94a3b8 !important;
+}
+
+body:is(.app-page, .public-page, .auth-page) [class*="bg-slate-800/90"] .text-blue-400,
+body:is(.app-page, .public-page, .auth-page) [class*="bg-slate-900/60"] .text-blue-400 {
+  color: #7dd3fc !important;
+}
+
+body:is(.app-page, .public-page, .auth-page) [class*="bg-slate-800/90"] .text-red-400,
+body:is(.app-page, .public-page, .auth-page) [class*="bg-slate-900/60"] .text-red-400 {
+  color: #fda4af !important;
+}
+
 body:is(.app-page, .public-page, .auth-page) .text-blue-400,
 body:is(.app-page, .public-page, .auth-page) .text-cyan-400,
 body:is(.app-page, .public-page, .auth-page) .text-purple-400,
