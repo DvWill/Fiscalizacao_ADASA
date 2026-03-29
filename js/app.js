@@ -108,8 +108,8 @@ const OBRAS_STORAGE_KEY = 'obras_storage_v1';
 const VIEW_MODE_KEY = 'fiscalizacoes_data_view';
 
 const defaultConfig = {
-  app_title: 'Sistema de Fiscalizacoes',
-  subtitle: 'Monitoramento em Tempo Real'
+  app_title: 'Painel de Fiscalizacoes',
+  subtitle: 'Monitoramento territorial e conformidade em tempo real'
 };
 
 const regionCoordinates = {
@@ -933,8 +933,9 @@ async function loadObrasData() {
   });
 
   if (!payload || !Array.isArray(payload.records)) {
-    allObras = localRecords;
-    return { isOk: true, source: 'local', fallbackReason: 'api_unavailable' };
+    allObras = [];
+    filteredObras = [];
+    return { isOk: false, source: 'api', fallbackReason: 'api_unavailable' };
   }
 
   allObras = payload.records.map((record, index) => normalizeObraRecord(record, index));
@@ -954,9 +955,7 @@ async function persistObrasData(records) {
   const savedRecords = await replaceObrasApiRecords(normalizedRecords);
 
   if (!savedRecords) {
-    allObras = normalizedRecords;
-    saveStoredObras(allObras);
-    return { isOk: true, source: 'local', fallbackReason: 'api_unavailable' };
+    return { isOk: false, source: 'api', fallbackReason: 'api_unavailable' };
   }
 
   allObras = savedRecords;
@@ -974,10 +973,7 @@ async function deleteObrasData() {
 
   const savedRecords = await replaceObrasApiRecords([]);
   if (!savedRecords) {
-    allObras = [];
-    filteredObras = [];
-    clearStoredObras();
-    return { isOk: true, source: 'local', fallbackReason: 'api_unavailable' };
+    return { isOk: false, source: 'api', fallbackReason: 'api_unavailable' };
   }
 
   allObras = [];
@@ -1004,7 +1000,7 @@ async function initDataSDK() {
   const obrasResult = await loadObrasData();
   if (!result.isOk) showToast('Erro ao inicializar sistema de dados', 'error');
   if (obrasResult.fallbackReason === 'api_unavailable') {
-    showToast('API de obras indisponivel no momento. Usando armazenamento local.', 'warning');
+    showToast('API de obras indisponivel no momento. Nao foi possivel ler dados do banco.', 'warning');
   }
   if (result.syncedLocalToApi || obrasResult.syncedLocalToApi) {
     showToast('Dados locais sincronizados com o banco de dados.', 'success');
@@ -1576,9 +1572,10 @@ window.switchDataView = switchDataView;
 function initMap() {
   map = L.map('map').setView([-15.7942, -47.8822], 11);
 
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-    maxZoom: 19
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; OpenStreetMap &copy; CARTO',
+    maxZoom: 20,
+    subdomains: 'abcd'
   }).addTo(map);
 
   markerClusterGroup = L.markerClusterGroup({
@@ -1787,7 +1784,7 @@ function createPopupContent(fisc) {
     : '';
 
   return `
-    <div style="padding: 16px; font-family: 'Plus Jakarta Sans', sans-serif;">
+    <div style="padding: 16px; font-family: 'Manrope', sans-serif;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
         <span style="font-weight:700;font-size:16px;color:#1e293b;">${idLabel}</span>
         <span class="${statusClass}" style="font-size:11px;padding:3px 8px;">${statusLabel}</span>
@@ -1824,7 +1821,7 @@ function createObraPopupContent(obra) {
   const objetoContratoLabel = escapeHtml(obra.objeto_contrato || '');
 
   return `
-    <div style="padding: 16px; font-family: 'Plus Jakarta Sans', sans-serif;">
+    <div style="padding: 16px; font-family: 'Manrope', sans-serif;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:8px;">
         <span style="font-weight:700;font-size:15px;color:#1e293b;">${itemLabel}</span>
         <span style="font-size:11px;padding:4px 8px;border-radius:999px;background:${color};color:white;">${progressLabel}</span>
@@ -2193,7 +2190,7 @@ function renderFiscalizacoesList() {
       : null;
 
     return `
-      <div class="p-3 rounded-lg bg-slate-800/50 hover:bg-slate-700/50 cursor-pointer transition-colors border border-slate-700/50 focus-visible:ring-2 focus-visible:ring-blue-500"
+      <div class="list-card p-3 rounded-lg bg-slate-800/50 hover:bg-slate-700/50 cursor-pointer transition-colors border border-slate-700/50 focus-visible:ring-2 focus-visible:ring-blue-500"
            role="button"
            tabindex="0"
            onkeydown="if(event.key==='Enter' || event.key===' '){event.preventDefault(); focusFiscalizacao('${fisc.__backendId}');}"
@@ -2258,7 +2255,7 @@ function renderObrasList() {
     const chipLabel = progress != null ? formatPercent(progress) : (hasObraCoordinates(obra) ? 'Sem %' : 'Sem coord.');
 
     return `
-      <div class="p-3 rounded-lg bg-slate-800/50 hover:bg-slate-700/50 cursor-pointer transition-colors border border-slate-700/50 focus-visible:ring-2 focus-visible:ring-emerald-500"
+      <div class="list-card p-3 rounded-lg bg-slate-800/50 hover:bg-slate-700/50 cursor-pointer transition-colors border border-slate-700/50 focus-visible:ring-2 focus-visible:ring-emerald-500"
            role="button"
            tabindex="0"
            onkeydown="if(event.key==='Enter' || event.key===' '){event.preventDefault(); focusObra('${obra.__obraId}');}"
@@ -2310,9 +2307,9 @@ window.focusObra = focusObra;
 // ======== Detail Panel ========
 function createDetailField(label, value) {
   return `
-    <div class="bg-slate-800/50 rounded-lg p-3">
-      <p class="text-xs text-slate-500 mb-1">${label}</p>
-      <p class="text-sm font-medium text-slate-200">${value || '-'}</p>
+    <div class="detail-field">
+      <p class="detail-field-label">${label}</p>
+      <p class="detail-field-value">${value || '-'}</p>
     </div>
   `;
 }
@@ -2370,7 +2367,7 @@ function showDetailPanel(fisc) {
         ${fisc.objetivo ? `
           <div class="mt-3">
             <p class="text-xs text-slate-500 mb-1">Objetivo</p>
-            <p class="text-sm text-slate-300 bg-slate-800/50 rounded-lg p-3">${fisc.objetivo}</p>
+            <p class="detail-rich-text">${fisc.objetivo}</p>
           </div>
         ` : ''}
       </div>
@@ -2453,7 +2450,7 @@ function showObraDetailPanel(obra) {
         ${obra.objeto_contrato ? `
           <div class="mt-3">
             <p class="text-xs text-slate-500 mb-1">Objeto do Contrato</p>
-            <p class="text-sm text-slate-300 bg-slate-800/50 rounded-lg p-3">${obra.objeto_contrato}</p>
+            <p class="detail-rich-text">${obra.objeto_contrato}</p>
           </div>
         ` : ''}
       </div>
@@ -3109,23 +3106,6 @@ function buildDashboardBar(value, maxValue, colorClass, valueClass, label) {
   `;
 }
 
-function isSituacaoAndamento(value) {
-  return normalizePlainText(value).includes('andamento');
-}
-
-function isSituacaoConcluida(value) {
-  return normalizePlainText(value).includes('conclu');
-}
-
-function isSituacaoPendente(value) {
-  return normalizePlainText(value).includes('pend');
-}
-
-function toFiniteNumber(value) {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : 0;
-}
-
 function updateDashboard() {
   if (currentView === 'obras') {
     const total = allObras.length;
@@ -3229,15 +3209,13 @@ function updateDashboard() {
   const concluida = allFiscalizacoes.filter(f => f.situacao === 'Concluida').length;
   const pendente = allFiscalizacoes.filter(f => f.situacao === 'Pendente').length;
 
-  const conformidades = allFiscalizacoes
-    .map((f) => Number(f.indice_conformidade))
-    .filter((value) => Number.isFinite(value));
+  const conformidades = allFiscalizacoes.filter(f => f.indice_conformidade).map(f => f.indice_conformidade);
   const avgConformidade = conformidades.length > 0
     ? Math.round(conformidades.reduce((a, b) => a + b, 0) / conformidades.length)
     : 0;
 
-  const totalAI = allFiscalizacoes.reduce((sum, f) => sum + toFiniteNumber(f.autos_infracao), 0);
-  const totalTN = allFiscalizacoes.reduce((sum, f) => sum + toFiniteNumber(f.termos_notificacao), 0);
+  const totalAI = allFiscalizacoes.reduce((sum, f) => sum + (f.autos_infracao || 0), 0);
+  const totalTN = allFiscalizacoes.reduce((sum, f) => sum + (f.termos_notificacao || 0), 0);
 
   document.getElementById('metric-total').textContent = total;
   document.getElementById('metric-andamento').textContent = andamento;
@@ -3611,13 +3589,6 @@ function showToast(message, type = 'info') {
 
   const toast = document.createElement('div');
 
-  const colors = {
-    success: 'bg-emerald-600',
-    error: 'bg-red-600',
-    warning: 'bg-amber-600',
-    info: 'bg-blue-600'
-  };
-
   const icons = {
     success: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>',
     error: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>',
@@ -3625,10 +3596,10 @@ function showToast(message, type = 'info') {
     info: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>'
   };
 
-  toast.className = `${colors[type]} px-4 py-3 rounded-xl shadow-lg flex items-center gap-3 fade-in`;
+  toast.className = `app-toast app-toast--${type} fade-in`;
   toast.innerHTML = `
-    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">${icons[type]}</svg>
-    <span class="text-sm font-medium text-white">${escapeHtml(message)}</span>
+    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">${icons[type]}</svg>
+    <span class="text-sm font-medium text-slate-900">${escapeHtml(message)}</span>
   `;
 
   container.appendChild(toast);

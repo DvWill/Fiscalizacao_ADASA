@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Sistema de Fiscalizacoes</title>
+  <title>Painel de Fiscalizacoes</title>
 
   <!-- Tailwind CDN -->
   <script src="https://cdn.tailwindcss.com/3.4.17"></script>
@@ -18,7 +18,7 @@
   <script src="https://unpkg.com/leaflet.markercluster@1.4.1/dist/leaflet.markercluster.js"></script>
 
   <!-- Font -->
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
   <!-- Seu CSS -->
   <link rel="stylesheet" href="./styles/app.css" />
@@ -26,27 +26,28 @@
   <link rel="shortcut icon" href="./favicon.svg" />
 </head>
 
-<body class="h-full bg-slate-900 text-slate-100 overflow-hidden">
-  <div id="app" class="w-full flex flex-col">
+<body class="app-page h-full overflow-hidden">
+  <div id="app" class="app-shell w-full flex flex-col">
 
     <!-- Header (RESPONSIVO) -->
-    <header class="glass-card border-b border-slate-700 px-4 sm:px-6 py-3 sm:py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 z-50">
-      <div class="flex items-center gap-4">
-        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
+    <header class="app-header glass-card border-b border-slate-700 px-4 sm:px-6 py-3 sm:py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 z-50">
+      <div class="app-brand flex items-center gap-4">
+        <div class="app-brand-mark w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
           <svg class="icon-min w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path d="M12 21s-6-5.2-6-10a6 6 0 1112 0c0 4.8-6 10-6 10z" />
             <circle cx="12" cy="11" r="2.5" />
           </svg>
         </div>
         <div class="min-w-0">
-          <h1 id="app-title" class="text-lg sm:text-xl font-bold text-white truncate">Sistema de Fiscalizacoes</h1>
-          <p id="app-subtitle" class="text-xs sm:text-sm text-slate-400 truncate">Monitoramento em Tempo Real</p>
+          <p class="app-kicker">Painel Executivo</p>
+          <h1 id="app-title" class="text-lg sm:text-xl font-bold text-white truncate">Painel de Fiscalizacoes</h1>
+          <p id="app-subtitle" class="text-xs sm:text-sm text-slate-400 truncate">Monitoramento territorial e conformidade em tempo real</p>
         </div>
       </div>
 
       <!-- Botoes (rolagem horizontal no mobile) -->
-      <div class="flex items-center gap-2 sm:gap-3 w-full sm:w-auto overflow-x-auto sm:overflow-visible pb-1 sm:pb-0">
-        <div class="shrink-0 flex items-center gap-1 rounded-lg bg-slate-800/80 border border-slate-700 p-1">
+      <div class="app-toolbar flex items-center gap-2 sm:gap-3 w-full sm:w-auto overflow-x-auto sm:overflow-visible pb-1 sm:pb-0">
+        <div class="view-switch shrink-0 flex items-center gap-1 rounded-lg bg-slate-800/80 border border-slate-700 p-1">
           <button id="view-fiscalizacoes-btn" onclick="switchDataView('fiscalizacoes')"
             class="px-3 py-1.5 rounded-md bg-blue-600 text-white text-xs sm:text-sm font-medium transition-colors">
             Fiscalizacoes
@@ -162,19 +163,19 @@
     </header>
 
     <!-- Main Content -->
-    <div class="flex-1 relative overflow-hidden">
+    <div class="app-stage flex-1 relative overflow-hidden">
 
       <!-- Drawer Overlay -->
       <div
         id="filters-overlay"
-        class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-[1200]"
+        class="app-overlay hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-[1200]"
         onclick="toggleFiltersPanel(false)">
       </div>
 
       <!-- Filters Drawer (FULL no mobile) -->
       <aside
         id="filters-drawer"
-        class="fixed top-0 sm:top-[72px] left-0 h-full sm:h-[calc(100%-72px)] w-full sm:w-80 glass-card border-r border-slate-700 p-5 overflow-y-auto custom-scrollbar z-[1300]
+        class="app-panel app-filters-drawer fixed top-0 sm:top-[72px] left-0 h-full sm:h-[calc(100%-72px)] w-full sm:w-80 glass-card border-r border-slate-700 p-5 overflow-y-auto custom-scrollbar z-[1300]
               -translate-x-full transition-transform duration-300 ease-out">
 
         <div class="flex items-center justify-between mb-4">
@@ -331,7 +332,7 @@
         <div id="map" class="w-full h-full"></div>
 
         <!-- Map Legend (melhor no mobile) -->
-        <div class="absolute bottom-4 left-4 sm:bottom-6 sm:left-6 glass-card rounded-xl p-3 sm:p-4 z-[1000] max-w-[85vw] sm:max-w-none">
+        <div class="map-legend-card absolute bottom-4 left-4 sm:bottom-6 sm:left-6 glass-card rounded-xl p-3 sm:p-4 z-[1000] max-w-[85vw] sm:max-w-none">
           <div class="flex items-center justify-between gap-3">
             <h4 id="map-legend-title" class="text-sm font-semibold text-slate-300">Legenda</h4>
             <button
@@ -381,7 +382,7 @@
         </div>
 
         <div id="map-hint"
-          class="hidden absolute top-6 left-1/2 -translate-x-1/2 glass-card rounded-xl px-4 py-2 z-[1000] fade-in">
+          class="map-hint-card hidden absolute top-6 left-1/2 -translate-x-1/2 glass-card rounded-xl px-4 py-2 z-[1000] fade-in">
           <p class="text-sm text-blue-400 flex items-center gap-2">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -396,8 +397,8 @@
     </div>
 
     <!-- Dashboard Panel (responsivo) -->
-    <div id="dashboard-panel" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-[2000] flex items-center justify-center p-3 sm:p-6">
-      <div class="glass-card rounded-2xl w-full max-w-5xl h-[90vh] sm:h-auto sm:max-h-[90%] overflow-y-auto custom-scrollbar slide-in">
+    <div id="dashboard-panel" class="app-modal-overlay hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-[2000] flex items-center justify-center p-3 sm:p-6">
+      <div class="app-modal-shell glass-card rounded-2xl w-full max-w-5xl h-[90vh] sm:h-auto sm:max-h-[90%] overflow-y-auto custom-scrollbar slide-in">
         <div class="p-4 sm:p-6 border-b border-slate-700 flex items-center justify-between sticky top-0 bg-slate-800/90 backdrop-blur-sm z-10">
           <h2 class="text-lg sm:text-xl font-bold flex items-center gap-3">
             <svg class="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -557,8 +558,8 @@
     </div>
 
     <!-- Add/Edit Modal (full no mobile) -->
-    <div id="form-modal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-[2000] flex items-center justify-center p-3 sm:p-4">
-      <div class="glass-card rounded-2xl w-full max-w-4xl h-[95vh] sm:h-auto sm:max-h-[95%] overflow-y-auto custom-scrollbar slide-in">
+    <div id="form-modal" class="app-modal-overlay hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-[2000] flex items-center justify-center p-3 sm:p-4">
+      <div class="app-modal-shell glass-card rounded-2xl w-full max-w-4xl h-[95vh] sm:h-auto sm:max-h-[95%] overflow-y-auto custom-scrollbar slide-in">
         <div class="p-4 sm:p-6 border-b border-slate-700 flex items-center justify-between sticky top-0 bg-slate-800/90 backdrop-blur-sm z-10">
           <h2 id="modal-title" class="text-lg sm:text-xl font-bold flex items-center gap-3">
             <svg class="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -911,7 +912,7 @@
     </div>
 
     <!-- Detail Panel -->
-    <div id="detail-panel" class="hidden fixed top-0 right-0 h-full w-full md:w-[500px] glass-card border-l border-slate-700 z-[1500] overflow-y-auto custom-scrollbar slide-in">
+    <div id="detail-panel" class="detail-shell hidden fixed top-0 right-0 h-full w-full md:w-[500px] glass-card border-l border-slate-700 z-[1500] overflow-y-auto custom-scrollbar slide-in">
       <div class="p-4 sm:p-6 border-b border-slate-700 flex items-center justify-between sticky top-0 bg-slate-800/90 backdrop-blur-sm z-10">
         <h2 id="detail-title" class="text-lg sm:text-xl font-bold">Detalhes da Fiscalizacao</h2>
         <div class="flex items-center gap-2">
@@ -940,8 +941,8 @@
     </div>
 
     <!-- Delete Confirmation -->
-    <div id="delete-confirm" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-[3000] flex items-center justify-center p-4">
-      <div class="glass-card rounded-2xl p-6 w-full max-w-md fade-in">
+    <div id="delete-confirm" class="app-modal-overlay hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-[3000] flex items-center justify-center p-4">
+      <div class="app-modal-shell glass-card rounded-2xl p-6 w-full max-w-md fade-in">
         <div class="text-center">
           <div class="w-16 h-16 rounded-full bg-red-500/20 flex items-center justify-center mx-auto mb-4">
             <svg class="w-8 h-8 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -964,8 +965,8 @@
     </div>
 
     <!-- Import Modal (responsivo) -->
-    <div id="import-modal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-[2000] flex items-center justify-center p-3 sm:p-4">
-      <div class="glass-card rounded-2xl w-full max-w-2xl h-[90vh] sm:h-auto sm:max-h-[90%] overflow-y-auto custom-scrollbar slide-in">
+    <div id="import-modal" class="app-modal-overlay hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-[2000] flex items-center justify-center p-3 sm:p-4">
+      <div class="app-modal-shell glass-card rounded-2xl w-full max-w-2xl h-[90vh] sm:h-auto sm:max-h-[90%] overflow-y-auto custom-scrollbar slide-in">
         <div class="p-4 sm:p-6 border-b border-slate-700 flex items-center justify-between sticky top-0 bg-slate-800/90 backdrop-blur-sm z-10">
           <h2 class="text-lg sm:text-xl font-bold flex items-center gap-3">
             <svg class="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1062,8 +1063,8 @@
       </div>
     </div>
 
-    <div id="obras-upload-modal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-[2000] flex items-center justify-center p-3 sm:p-4">
-      <div class="glass-card rounded-2xl w-full max-w-3xl h-[90vh] sm:h-auto sm:max-h-[90%] overflow-y-auto custom-scrollbar slide-in">
+    <div id="obras-upload-modal" class="app-modal-overlay hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-[2000] flex items-center justify-center p-3 sm:p-4">
+      <div class="app-modal-shell glass-card rounded-2xl w-full max-w-3xl h-[90vh] sm:h-auto sm:max-h-[90%] overflow-y-auto custom-scrollbar slide-in">
         <div class="p-4 sm:p-6 border-b border-slate-700 flex items-center justify-between sticky top-0 bg-slate-800/90 backdrop-blur-sm z-10">
           <h2 class="text-lg sm:text-xl font-bold flex items-center gap-3">
             <svg class="w-6 h-6 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1136,8 +1137,8 @@
     </div>
 
     <!-- Loading Overlay -->
-    <div id="loading-overlay" class="hidden fixed inset-0 bg-black/40 backdrop-blur-sm z-[5000] flex items-center justify-center">
-      <div class="glass-card rounded-2xl p-8 flex flex-col items-center">
+    <div id="loading-overlay" class="app-modal-overlay hidden fixed inset-0 bg-black/40 backdrop-blur-sm z-[5000] flex items-center justify-center">
+      <div class="app-modal-shell glass-card rounded-2xl p-8 flex flex-col items-center">
         <div class="w-12 h-12 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin mb-4"></div>
         <p id="loading-text" class="text-slate-300">Carregando...</p>
       </div>

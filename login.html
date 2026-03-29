@@ -3,72 +3,106 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Login | Sistema de Fiscalizacoes</title>
+  <title>Login | Fiscalizacoes</title>
 
   <script src="https://cdn.tailwindcss.com/3.4.17"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="./styles/app.css" />
   <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
   <link rel="shortcut icon" href="./favicon.svg" />
 </head>
-<body class="h-full bg-slate-900 text-slate-100">
-  <main class="min-h-full flex items-center justify-center px-4 py-8">
-    <section class="glass-card w-full max-w-md rounded-2xl border border-slate-700 p-6 sm:p-8">
-      <div class="flex items-center gap-3 mb-6">
-        <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
-          <svg class="icon-min w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+<body class="auth-page h-full">
+  <main class="auth-layout min-h-full px-4 py-6 sm:px-6 sm:py-8">
+    <section class="auth-showcase">
+      <p class="auth-kicker">Painel executivo</p>
+      <h1 class="auth-headline">Fiscalizacao com presenca institucional.</h1>
+      <p class="auth-copy">
+        Uma interface clara, elegante e robusta para acompanhar fiscalizacoes, obras, importacoes e conformidade em um unico painel.
+      </p>
+
+      <div class="auth-points">
+        <article class="auth-point">
+          <p class="auth-point-label">Mapa vivo</p>
+          <p class="auth-point-text">Leitura territorial imediata para equipes que precisam decidir rapido.</p>
+        </article>
+        <article class="auth-point">
+          <p class="auth-point-label">Operacao premium</p>
+          <p class="auth-point-text">Fluxos refinados para cadastrar, revisar e importar com menos atrito.</p>
+        </article>
+        <article class="auth-point">
+          <p class="auth-point-label">Visao executiva</p>
+          <p class="auth-point-text">Dashboard, filtros e detalhes com linguagem mais institucional e sofisticada.</p>
+        </article>
+        <article class="auth-point">
+          <p class="auth-point-label">Transparencia</p>
+          <p class="auth-point-text">Versao publica pronta para apresentar informacoes sem expor dados sensiveis.</p>
+        </article>
+      </div>
+
+      <div class="auth-meta">
+        <span class="auth-meta-pill">Monitoramento territorial</span>
+        <span class="auth-meta-pill">Conformidade em tempo real</span>
+        <span class="auth-meta-pill">Experiencia executiva</span>
+      </div>
+    </section>
+
+    <section class="glass-card auth-card w-full max-w-md justify-self-end rounded-[2rem] border border-slate-200 p-6 sm:p-8">
+      <div class="auth-card-header">
+        <div class="auth-card-mark">
+          <svg class="icon-min h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path d="M12 21s-6-5.2-6-10a6 6 0 1112 0c0 4.8-6 10-6 10z"></path>
             <circle cx="12" cy="11" r="2.5"></circle>
           </svg>
         </div>
         <div>
-          <h1 class="text-xl font-bold text-white">Acesso ao Sistema</h1>
-          <p class="text-sm text-slate-400">Entre com login e senha</p>
+          <p class="auth-card-kicker">Acesso seguro</p>
+          <h2 class="text-2xl font-bold text-white">Entrar no sistema</h2>
+          <p class="text-sm text-slate-400">Use suas credenciais para acessar o painel completo.</p>
         </div>
       </div>
 
       <form id="login-form" class="space-y-4">
         <div>
-          <label for="login" class="block text-sm font-medium text-slate-300 mb-2">Login</label>
+          <label for="login" class="mb-2 block text-sm font-medium text-slate-300">Login</label>
           <input
             id="login"
             name="login"
             type="text"
             autocomplete="username"
             required
-            class="input-field w-full px-4 py-2.5 rounded-lg bg-slate-800 border border-slate-600 text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
+            class="input-field w-full px-4 py-3 text-sm"
             placeholder="Seu login"
           />
         </div>
 
         <div>
-          <label for="senha" class="block text-sm font-medium text-slate-300 mb-2">Senha</label>
+          <label for="senha" class="mb-2 block text-sm font-medium text-slate-300">Senha</label>
           <input
             id="senha"
             name="senha"
             type="password"
             autocomplete="current-password"
             required
-            class="input-field w-full px-4 py-2.5 rounded-lg bg-slate-800 border border-slate-600 text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
+            class="input-field w-full px-4 py-3 text-sm"
             placeholder="Sua senha"
           />
         </div>
 
-        <p id="login-error" class="hidden text-sm text-red-300"></p>
+        <p id="login-error" class="hidden rounded-2xl border border-red-300/40 bg-red-50/70 px-4 py-3 text-sm text-red-500"></p>
 
         <button
           id="login-submit"
           type="submit"
-          class="w-full btn-primary rounded-lg px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60 disabled:cursor-not-allowed"
+          class="btn-primary w-full px-4 py-3 text-sm font-semibold"
         >
           Entrar
         </button>
 
         <a
           href="/publico.html"
-          class="block w-full text-center rounded-lg px-4 py-2.5 text-sm font-medium border border-slate-600 text-slate-200 hover:bg-slate-800 transition-colors"
+          class="block w-full border border-slate-600 px-4 py-3 text-center text-sm font-medium text-slate-200 transition-colors"
         >
-          Ver mapa publico (sem login)
+          Ver mapa publico
         </a>
       </form>
     </section>
