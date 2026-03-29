@@ -554,6 +554,13 @@ body.app-page #upload-obras-btn {
   color: #ffffff !important;
 }
 
+body:is(.app-page, .public-page, .auth-page) .glass-card .btn-primary,
+body:is(.app-page, .public-page, .auth-page) .glass-card .btn-primary *,
+body:is(.app-page, .public-page, .auth-page) .app-header .btn-primary,
+body:is(.app-page, .public-page, .auth-page) .app-header .btn-primary * {
+  color: #ffffff !important;
+}
+
 body.app-page .view-switch {
   background: rgba(247, 248, 250, 0.88) !important;
   border: 1px solid var(--border-soft) !important;
