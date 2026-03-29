@@ -13,6 +13,51 @@ function normalizeText(value) {
     .trim();
 }
 
+const DISPLAY_TEXT_OVERRIDES = new Map([
+  ["Fiscalizacao", "Fiscalização"],
+  ["Fiscalizacoes", "Fiscalizações"],
+  ["Regiao", "Região"],
+  ["Regioes", "Regiões"],
+  ["Concluida", "Concluída"],
+  ["Concluidas", "Concluídas"],
+  ["Execucao", "Execução"],
+  ["Atualizacao", "Atualização"],
+  ["Nao informada", "Não informada"],
+  ["Nao informado", "Não informado"],
+  ["Em execucao", "Em execução"],
+  ["Aguas Claras", "Águas Claras"],
+  ["Brazlandia", "Brazlândia"],
+  ["Paranoa", "Paranoá"],
+  ["Nucleo Bandeirante", "Núcleo Bandeirante"],
+  ["Ceilandia", "Ceilândia"],
+  ["Guara", "Guará"],
+  ["Sao Sebastiao", "São Sebastião"],
+  ["Candangolandia", "Candangolândia"],
+  ["Varjao", "Varjão"],
+  ["Jardim Botanico", "Jardim Botânico"],
+  ["Itapoa", "Itapoã"]
+]);
+
+function formatDisplayText(value) {
+  const raw = String(value == null ? "" : value).trim();
+  if (!raw) return "";
+
+  const exact = DISPLAY_TEXT_OVERRIDES.get(raw);
+  if (exact) return exact;
+
+  return raw
+    .replace(/\bFiscalizacoes\b/g, "Fiscalizações")
+    .replace(/\bFiscalizacao\b/g, "Fiscalização")
+    .replace(/\bConcluidas\b/g, "Concluídas")
+    .replace(/\bConcluida\b/g, "Concluída")
+    .replace(/\bRegioes\b/g, "Regiões")
+    .replace(/\bRegiao\b/g, "Região")
+    .replace(/\bExecucao\b/g, "Execução")
+    .replace(/\bAtualizacao\b/g, "Atualização")
+    .replace(/\bNao\b/g, "Não")
+    .replace(/\bMedia\b/g, "Média");
+}
+
 function escapeHtml(value) {
   return String(value == null ? "" : value)
     .replace(/&/g, "&amp;")
@@ -51,19 +96,19 @@ function createMarkerIcon(kind) {
 }
 
 function buildPopupContent(point) {
-  const title = point.kind === "obra" ? "Obra" : "Fiscalizacao";
-  const areaLabel = point.kind === "obra" ? "Local" : "Regiao";
+  const title = point.kind === "obra" ? "Obra" : "Fiscalização";
+  const areaLabel = point.kind === "obra" ? "Local" : "Região";
 
   let extraLine = "";
   if (point.kind === "obra" && Number.isFinite(point.execucao)) {
-    extraLine = `<p class="text-xs text-slate-500 mt-1">Execucao: ${escapeHtml(point.execucao)}%</p>`;
+    extraLine = `<p class="text-xs text-slate-500 mt-1">Execução: ${escapeHtml(point.execucao)}%</p>`;
   }
   if (point.kind === "fiscalizacao" && Number.isFinite(point.conformidade)) {
     extraLine = `<p class="text-xs text-slate-500 mt-1">Conformidade: ${escapeHtml(point.conformidade)}%</p>`;
   }
 
-  const status = escapeHtml(point.status || "Nao informada");
-  const area = escapeHtml(point.area || "Nao informado");
+  const status = escapeHtml(formatDisplayText(point.status || "Nao informada"));
+  const area = escapeHtml(formatDisplayText(point.area || "Nao informado"));
   const year = Number.isFinite(point.ano) ? `<p class="text-xs text-slate-500 mt-1">Ano: ${point.ano}</p>` : "";
 
   return `
@@ -100,7 +145,7 @@ function renderMarkers(points, fitBounds = false) {
   points.forEach((point) => {
     const marker = L.marker([point.latitude, point.longitude], {
       icon: createMarkerIcon(point.kind),
-      title: point.kind === "obra" ? "Obra" : "Fiscalizacao"
+      title: point.kind === "obra" ? "Obra" : "Fiscalização"
     });
     marker.bindPopup(buildPopupContent(point));
     publicCluster.addLayer(marker);
@@ -135,7 +180,7 @@ function updateViewLabel() {
   if (!label) return;
 
   if (selectedKindFilter === "fiscalizacao") {
-    label.textContent = "Exibindo apenas Fiscalizacoes no mapa.";
+    label.textContent = "Exibindo apenas Fiscalizações no mapa.";
     return;
   }
 
@@ -170,7 +215,7 @@ function populateStatusOptions() {
   )].sort((a, b) => a.localeCompare(b, "pt-BR"));
 
   statusSelect.innerHTML = `<option value="">Todos os status</option>${statuses.map((status) =>
-    `<option value="${escapeHtml(status)}">${escapeHtml(status)}</option>`).join("")}`;
+    `<option value="${escapeHtml(status)}">${escapeHtml(formatDisplayText(status))}</option>`).join("")}`;
 
   if (statuses.includes(previous)) {
     statusSelect.value = previous;
@@ -243,7 +288,7 @@ function renderTopAreas(containerId, points, emptyText, barClass) {
 
   const counts = {};
   points.forEach((point) => {
-    const area = String(point.area || "Nao informado").trim() || "Nao informado";
+    const area = formatDisplayText(String(point.area || "Nao informado").trim() || "Nao informado");
     counts[area] = (counts[area] || 0) + 1;
   });
 
@@ -302,16 +347,16 @@ function updateDetailedDashboard(points) {
     "dash-fisc-status-bars",
     [
       { label: "Andamento", count: fisAndamento, barClass: "bg-gradient-to-r from-amber-500 to-yellow-400" },
-      { label: "Concluidas", count: fisConcluidas, barClass: "bg-gradient-to-r from-emerald-600 to-emerald-400" },
+      { label: "Concluídas", count: fisConcluidas, barClass: "bg-gradient-to-r from-emerald-600 to-emerald-400" },
       { label: "Pendentes", count: fisPendentes, barClass: "bg-gradient-to-r from-rose-600 to-rose-400" }
     ],
-    "Nenhuma fiscalizacao encontrada nos filtros."
+    "Nenhuma fiscalização encontrada nos filtros."
   );
 
   renderDistributionBars(
     "dash-obras-status-bars",
     [
-      { label: "Em execucao", count: obrasExecucao, barClass: "bg-gradient-to-r from-amber-500 to-yellow-400" },
+      { label: "Em execução", count: obrasExecucao, barClass: "bg-gradient-to-r from-amber-500 to-yellow-400" },
       { label: "Recebimento", count: obrasRecebimento, barClass: "bg-gradient-to-r from-emerald-600 to-emerald-400" },
       { label: "Outras", count: obrasOutras, barClass: "bg-gradient-to-r from-sky-600 to-sky-400" }
     ],
@@ -413,7 +458,7 @@ function initPublicMap() {
 function setUpdatedAt(timestamp) {
   const node = document.getElementById("public-updated-at");
   if (!node) return;
-  node.textContent = `Atualizacao: ${formatDateTime(timestamp)}`;
+  node.textContent = `Atualização: ${formatDateTime(timestamp)}`;
 }
 
 async function loadPublicPoints() {
@@ -423,7 +468,7 @@ async function loadPublicPoints() {
   });
 
   if (!response.ok) {
-    throw new Error("Falha ao carregar dados publicos.");
+    throw new Error("Falha ao carregar dados públicos.");
   }
 
   const payload = await response.json();
@@ -465,7 +510,7 @@ async function initPublicPage() {
     updateDetailedDashboard([]);
     renderMarkers([], false);
     const node = document.getElementById("public-updated-at");
-    if (node) node.textContent = "Nao foi possivel carregar os pontos agora.";
+    if (node) node.textContent = "Não foi possível carregar os pontos agora.";
   }
 
   if (publicMap && hasInitialFit) {

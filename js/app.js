@@ -86,10 +86,10 @@ const fieldLabels = {
   'form-id': 'ID',
   'form-processo-sei': 'Processo SEI',
   'form-ano': 'Ano',
-  'form-regiao': 'Regiao',
-  'form-situacao': 'Situacao',
+  'form-regiao': 'Região',
+  'form-situacao': 'Situação',
   'form-direta': 'Tipo (Direta/Indireta)',
-  'form-conformidade': 'Indice de conformidade',
+  'form-conformidade': 'Índice de conformidade',
   'form-data': 'Data'
 };
 
@@ -108,7 +108,7 @@ const OBRAS_STORAGE_KEY = 'obras_storage_v1';
 const VIEW_MODE_KEY = 'fiscalizacoes_data_view';
 
 const defaultConfig = {
-  app_title: 'Painel de Fiscalizacoes',
+  app_title: 'Painel de Fiscalizações',
   subtitle: 'Monitoramento territorial e conformidade em tempo real'
 };
 
@@ -148,6 +148,59 @@ const regionCoordinates = {
   'Arniqueira': [-15.8500, -48.0333]
 };
 
+const DISPLAY_TEXT_OVERRIDES = new Map([
+  ['Aguas Claras', 'Águas Claras'],
+  ['Brazlandia', 'Brazlândia'],
+  ['Paranoa', 'Paranoá'],
+  ['Nucleo Bandeirante', 'Núcleo Bandeirante'],
+  ['Ceilandia', 'Ceilândia'],
+  ['Guara', 'Guará'],
+  ['Sao Sebastiao', 'São Sebastião'],
+  ['Candangolandia', 'Candangolândia'],
+  ['Varjao', 'Varjão'],
+  ['Jardim Botanico', 'Jardim Botânico'],
+  ['Itapoa', 'Itapoã'],
+  ['Nao Programada', 'Não Programada'],
+  ['Sem regiao', 'Sem região'],
+  ['Sem situacao', 'Sem situação'],
+  ['Regiao Administrativa', 'Região Administrativa'],
+  ['Situacao do Contrato', 'Situação do Contrato'],
+  ['No Processo SEI', 'Nº Processo SEI'],
+  ['No SEI', 'Nº SEI'],
+  ['Destinatario', 'Destinatário'],
+  ['Programacao', 'Programação'],
+  ['Localizacao', 'Localização'],
+  ['Informacoes Basicas', 'Informações Básicas'],
+  ['Identificacao', 'Identificação'],
+  ['Observacoes', 'Observações'],
+  ['Acao', 'Ação'],
+  ['Acoes', 'Ações'],
+  ['Em operacao', 'Em operação'],
+  ['Numero do Contrato', 'Número do Contrato'],
+  ['Plano de Exploracao', 'Plano de Exploração'],
+  ['Inicio', 'Início'],
+  ['Termino', 'Término'],
+  ['Concluida', 'Concluída'],
+  ['Concluidas', 'Concluídas'],
+  ['Situacao', 'Situação'],
+  ['Situacoes', 'Situações'],
+  ['Regiao', 'Região'],
+  ['Regioes', 'Regiões'],
+  ['Execucao', 'Execução'],
+  ['Conformidade Media', 'Conformidade Média'],
+  ['Indice de conformidade', 'Índice de conformidade'],
+  ['Total de Fiscalizacoes', 'Total de Fiscalizações'],
+  ['Total Autos de Infracao', 'Total de Autos de Infração'],
+  ['Total de Termos de Notificacao', 'Total de Termos de Notificação'],
+  ['Distribuicao por Situacao', 'Distribuição por Situação'],
+  ['Distribuicao por Situacao do Contrato', 'Distribuição por Situação do Contrato'],
+  ['Por Regiao Administrativa', 'Por Região Administrativa'],
+  ['Dashboard de Metricas', 'Dashboard de Métricas'],
+  ['Em Execucao', 'Em Execução'],
+  ['Execucao Media', 'Execução Média'],
+  ['Pendencias criticas', 'Pendências críticas']
+]);
+
 function normalizePlainText(value) {
   return (value || '')
     .toString()
@@ -155,6 +208,34 @@ function normalizePlainText(value) {
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
     .trim();
+}
+
+function formatDisplayText(value) {
+  const raw = String(value ?? '').trim();
+  if (!raw) return '';
+
+  const exact = DISPLAY_TEXT_OVERRIDES.get(raw);
+  if (exact) return exact;
+
+  return raw
+    .replace(/\bFiscalizacoes\b/g, 'Fiscalizações')
+    .replace(/\bFiscalizacao\b/g, 'Fiscalização')
+    .replace(/\bConcluidas\b/g, 'Concluídas')
+    .replace(/\bConcluida\b/g, 'Concluída')
+    .replace(/\bSituacoes\b/g, 'Situações')
+    .replace(/\bSituacao\b/g, 'Situação')
+    .replace(/\bRegioes\b/g, 'Regiões')
+    .replace(/\bRegiao\b/g, 'Região')
+    .replace(/\bExecucao\b/g, 'Execução')
+    .replace(/\bLocalizacao\b/g, 'Localização')
+    .replace(/\bInformacoes\b/g, 'Informações')
+    .replace(/\bIdentificacao\b/g, 'Identificação')
+    .replace(/\bNotificacao\b/g, 'Notificação')
+    .replace(/\bInfracao\b/g, 'Infração')
+    .replace(/\bIndice\b/g, 'Índice')
+    .replace(/\bNao\b/g, 'Não')
+    .replace(/\bnao\b/g, 'não')
+    .replace(/\bMedia\b/g, 'Média');
 }
 
 function normalizeHeaderKey(value) {
@@ -429,17 +510,17 @@ function getListSortOptions() {
     return [
       { value: 'item', label: 'Item' },
       { value: 'local', label: 'Local' },
-      { value: 'situacao', label: 'Situacao' },
-      { value: 'progress', label: 'Execucao' }
+      { value: 'situacao', label: 'Situação' },
+      { value: 'progress', label: 'Execução' }
     ];
   }
 
   return [
     { value: 'id', label: 'ID' },
     { value: 'ano', label: 'Ano' },
-    { value: 'situacao', label: 'Situacao' },
+    { value: 'situacao', label: 'Situação' },
     { value: 'conformidade', label: 'Conformidade' },
-    { value: 'regiao', label: 'Regiao' }
+    { value: 'regiao', label: 'Região' }
   ];
 }
 
@@ -736,12 +817,12 @@ function renderQuickFilterButtons() {
   const buttons = currentView === 'obras'
     ? [
       { key: 'obras_sem_coord', label: 'Sem coord.' },
-      { key: 'obras_execucao_baixa', label: 'Execucao < 40%' },
+      { key: 'obras_execucao_baixa', label: 'Execução < 40%' },
       { key: 'obras_em_execucao', label: 'Em execucao' }
     ]
     : [
       { key: 'fisc_pendente', label: 'Pendentes' },
-      { key: 'fisc_concluida', label: 'Concluidas' },
+      { key: 'fisc_concluida', label: 'Concluídas' },
       { key: 'fisc_sem_coord', label: 'Sem coord.' }
     ];
 
@@ -1000,7 +1081,7 @@ async function initDataSDK() {
   const obrasResult = await loadObrasData();
   if (!result.isOk) showToast('Erro ao inicializar sistema de dados', 'error');
   if (obrasResult.fallbackReason === 'api_unavailable') {
-    showToast('API de obras indisponivel no momento. Nao foi possivel ler dados do banco.', 'warning');
+    showToast('API de obras indisponível no momento. Não foi possível ler dados do banco.', 'warning');
   }
   if (result.syncedLocalToApi || obrasResult.syncedLocalToApi) {
     showToast('Dados locais sincronizados com o banco de dados.', 'success');
@@ -1092,13 +1173,13 @@ async function replaceFiscalizacoesData(records) {
 async function deduplicateFiscalizacoes() {
   const report = buildDuplicateReport(allFiscalizacoes);
   if (report.duplicateRecords === 0) {
-    showToast('Nao ha duplicados para remover.', 'info');
+    showToast('Não há duplicados para remover.', 'info');
     return;
   }
 
   const confirmed = window.confirm(
     `Foram encontrados ${report.duplicateRecords} registros duplicados em ${report.duplicateGroups} grupos.\n` +
-    'Deseja remover duplicados mantendo apenas a primeira ocorrencia de cada ID + Processo SEI?'
+    'Deseja remover duplicados mantendo apenas a primeira ocorrência de cada ID + Processo SEI?'
   );
   if (!confirmed) return;
 
@@ -1110,7 +1191,7 @@ async function deduplicateFiscalizacoes() {
 
   if (!result.isOk) {
     setOperationStatus('Falha ao deduplicar registros', 'error');
-    showToast(result.error || 'Nao foi possivel remover duplicados.', 'error');
+    showToast(result.error || 'Não foi possível remover duplicados.', 'error');
     return;
   }
 
@@ -1142,7 +1223,7 @@ function updateStorageModeStatus() {
   }
 
   if (lastSource !== 'api') {
-    status.textContent = 'Banco indisponivel';
+    status.textContent = 'Banco indisponível';
     return;
   }
 
@@ -1154,7 +1235,7 @@ async function handleStorageModeChange(event) {
     window.dataSdk.setStorageMode('api');
     event.target.value = 'api';
     updateStorageModeStatus();
-    showToast('Esta instalacao salva diretamente no banco de dados.', 'info');
+    showToast('Esta instalação salva diretamente no banco de dados.', 'info');
     return;
   }
 
@@ -1182,8 +1263,8 @@ async function handleStorageModeChange(event) {
   }
 
   if (nextMode === 'api' && result.source !== 'api') {
-    setOperationStatus('Banco indisponivel, usando dados locais', 'warning');
-    showToast('API indisponivel. Dados locais carregados.', 'warning');
+    setOperationStatus('Banco indisponível, usando dados locais', 'warning');
+    showToast('API indisponível. Dados locais carregados.', 'warning');
     return;
   }
 
@@ -1226,7 +1307,7 @@ function getApiBaseUrl() {
 }
 
 async function logoutSession() {
-  setOperationStatus('Encerrando sessao...', 'syncing');
+  setOperationStatus('Encerrando sessão...', 'syncing');
   showLoading('Saindo...');
 
   try {
@@ -1248,7 +1329,7 @@ function initAuthSessionUI() {
   const authBadge = document.getElementById('auth-user-badge');
 
   const login = String(window.APP_AUTH_USER || '').trim();
-  if (userLabel) userLabel.textContent = login || 'Usuario';
+  if (userLabel) userLabel.textContent = login || 'Usuário';
   if (authBadge) authBadge.classList.remove('hidden');
 
   if (logoutBtn && !logoutBtn.dataset.bound) {
@@ -1350,14 +1431,14 @@ function renderMapLayerControls() {
 
   const controls = currentView === 'obras'
     ? [
-      { key: 'obra_alta', label: 'Execucao >= 80%' },
-      { key: 'obra_media', label: 'Execucao 40%-79%' },
-      { key: 'obra_baixa', label: 'Execucao < 40%' },
+      { key: 'obra_alta', label: 'Execução >= 80%' },
+      { key: 'obra_media', label: 'Execução 40%-79%' },
+      { key: 'obra_baixa', label: 'Execução < 40%' },
       { key: 'obra_sem_pct', label: 'Sem percentual' }
     ]
     : [
       { key: 'em_andamento', label: 'Em Andamento' },
-      { key: 'concluida', label: 'Concluida' },
+      { key: 'concluida', label: 'Concluída' },
       { key: 'pendente', label: 'Pendente' }
     ];
 
@@ -1444,15 +1525,15 @@ function updateMapLegend() {
     items.innerHTML = `
       <div class="flex items-center gap-2">
         <div class="w-4 h-4 rounded-full bg-gradient-to-br from-emerald-400 to-green-500"></div>
-        <span class="text-xs text-slate-400">Execucao >= 80%</span>
+        <span class="text-xs text-slate-400">Execução >= 80%</span>
       </div>
       <div class="flex items-center gap-2">
         <div class="w-4 h-4 rounded-full bg-gradient-to-br from-yellow-400 to-amber-500"></div>
-        <span class="text-xs text-slate-400">Execucao entre 40% e 79%</span>
+        <span class="text-xs text-slate-400">Execução entre 40% e 79%</span>
       </div>
       <div class="flex items-center gap-2">
         <div class="w-4 h-4 rounded-full bg-gradient-to-br from-red-400 to-rose-500"></div>
-        <span class="text-xs text-slate-400">Execucao abaixo de 40%</span>
+        <span class="text-xs text-slate-400">Execução abaixo de 40%</span>
       </div>
       <div class="flex items-center gap-2">
         <div class="w-4 h-4 rounded-full bg-gradient-to-br from-sky-400 to-blue-500"></div>
@@ -1472,7 +1553,7 @@ function updateMapLegend() {
     </div>
     <div class="flex items-center gap-2">
       <div class="w-4 h-4 rounded-full bg-gradient-to-br from-emerald-400 to-green-500"></div>
-      <span class="text-xs text-slate-400">Concluida</span>
+      <span class="text-xs text-slate-400">Concluída</span>
     </div>
     <div class="flex items-center gap-2">
       <div class="w-4 h-4 rounded-full bg-gradient-to-br from-red-400 to-rose-500"></div>
@@ -1516,10 +1597,10 @@ function updateDataViewUI() {
   }
 
   if (filterRegiao?.previousElementSibling) {
-    filterRegiao.previousElementSibling.textContent = isObras ? 'Local' : 'Regiao Administrativa';
+    filterRegiao.previousElementSibling.textContent = isObras ? 'Local' : 'Região Administrativa';
   }
   if (filterSituacao?.previousElementSibling) {
-    filterSituacao.previousElementSibling.textContent = isObras ? 'Situacao do Contrato' : 'Situacao';
+    filterSituacao.previousElementSibling.textContent = isObras ? 'Situação do Contrato' : 'Situação';
   }
   if (filterAno?.previousElementSibling) {
     filterAno.previousElementSibling.textContent = isObras ? 'Sistema' : 'Ano';
@@ -1529,12 +1610,12 @@ function updateDataViewUI() {
   if (conformidadeGroup) conformidadeGroup.classList.toggle('hidden', isObras);
 
   if (countBadge?.parentElement?.firstElementChild) {
-    countBadge.parentElement.firstElementChild.textContent = isObras ? 'Obras' : 'Fiscalizacoes';
+    countBadge.parentElement.firstElementChild.textContent = isObras ? 'Obras' : 'Fiscalizações';
   }
   if (searchInput) {
     searchInput.placeholder = isObras
-      ? 'Item, local, acao, fornecedor...'
-      : 'ID, Processo, Destinatario...';
+      ? 'Item, local, ação, fornecedor...'
+      : 'ID, Processo, Destinatário...';
   }
   if (subtitle) {
     subtitle.textContent = isObras ? 'Mapa de Obras em Andamento' : defaultConfig.subtitle;
@@ -1769,8 +1850,8 @@ function createPopupContent(fisc) {
   const statusClass = fisc.situacao === 'Em Andamento' ? 'status-andamento' :
                       fisc.situacao === 'Concluida' ? 'status-concluida' : 'status-pendente';
   const idLabel = escapeHtml(fisc.id || '-');
-  const statusLabel = escapeHtml(fisc.situacao || '-');
-  const regiaoLabel = escapeHtml(fisc.regiao_administrativa || '-');
+  const statusLabel = escapeHtml(formatDisplayText(fisc.situacao || '-'));
+  const regiaoLabel = escapeHtml(formatDisplayText(fisc.regiao_administrativa || '-'));
   const processoLabel = escapeHtml(fisc.processo_sei || '-');
   const conformidade = parseLocalizedNumber(fisc.indice_conformidade);
   const hasConformidade = Number.isFinite(conformidade);
@@ -1786,7 +1867,7 @@ function createPopupContent(fisc) {
         <span class="${statusClass}" style="font-size:11px;padding:3px 8px;">${statusLabel}</span>
       </div>
       <div style="color:#64748b;font-size:13px;margin-bottom:8px;">
-        <strong>Regiao:</strong> ${regiaoLabel}
+        <strong>Região:</strong> ${regiaoLabel}
       </div>
       <div style="color:#64748b;font-size:13px;margin-bottom:8px;">
         <strong>Processo:</strong> ${processoLabel}
@@ -1811,9 +1892,9 @@ function createObraPopupContent(obra) {
   const progresso = getObraProgressValue(obra);
   const itemLabel = escapeHtml(obra.item || 'Obra');
   const progressLabel = escapeHtml(progresso != null ? formatPercent(progresso) : 'Obra');
-  const localLabel = escapeHtml(obra.local || '-');
-  const situacaoLabel = escapeHtml(obra.situacao_contrato || '-');
-  const acaoLabel = escapeHtml(obra.acao || '-');
+  const localLabel = escapeHtml(formatDisplayText(obra.local || '-'));
+  const situacaoLabel = escapeHtml(formatDisplayText(obra.situacao_contrato || '-'));
+  const acaoLabel = escapeHtml(formatDisplayText(obra.acao || '-'));
   const objetoContratoLabel = escapeHtml(obra.objeto_contrato || '');
 
   return `
@@ -1826,10 +1907,10 @@ function createObraPopupContent(obra) {
         <strong>Local:</strong> ${localLabel}
       </div>
       <div style="color:#64748b;font-size:13px;margin-bottom:8px;">
-        <strong>Situacao:</strong> ${situacaoLabel}
+        <strong>Situação:</strong> ${situacaoLabel}
       </div>
       <div style="color:#64748b;font-size:13px;margin-bottom:8px;">
-        <strong>Acao:</strong> ${acaoLabel}
+        <strong>Ação:</strong> ${acaoLabel}
       </div>
       ${obra.objeto_contrato ? `
         <div style="margin-top:12px;color:#475569;font-size:12px;line-height:1.4;">
@@ -1902,7 +1983,7 @@ function updateFiltersOptions() {
     locais.forEach((local) => {
       const option = document.createElement('option');
       option.value = local;
-      option.textContent = local;
+      option.textContent = formatDisplayText(local);
       if (local === currentLocal) option.selected = true;
       regiaoSelect.appendChild(option);
     });
@@ -1913,7 +1994,7 @@ function updateFiltersOptions() {
     situacoes.forEach((situacao) => {
       const option = document.createElement('option');
       option.value = situacao;
-      option.textContent = situacao;
+      option.textContent = formatDisplayText(situacao);
       if (situacao === currentSituacao) option.selected = true;
       situacaoSelect.appendChild(option);
     });
@@ -1941,7 +2022,7 @@ function updateFiltersOptions() {
     regioes.forEach((r) => {
       const option = document.createElement('option');
       option.value = r;
-      option.textContent = r;
+      option.textContent = formatDisplayText(r);
       if (r === currentRegiao) option.selected = true;
       regiaoSelect.appendChild(option);
     });
@@ -1991,11 +2072,11 @@ function populateMapFocusOptions(regioesOuLocais, situacoes) {
   const currentRegion = regionSelect.value;
   const currentStatus = statusSelect.value;
 
-  regionSelect.innerHTML = '<option value="">Todas as regioes/locais</option>';
+    regionSelect.innerHTML = '<option value="">Todas as regiões/locais</option>';
   regioesOuLocais.forEach((value) => {
     const option = document.createElement('option');
     option.value = value;
-    option.textContent = value;
+    option.textContent = formatDisplayText(value);
     if (value === currentRegion) option.selected = true;
     regionSelect.appendChild(option);
   });
@@ -2004,7 +2085,7 @@ function populateMapFocusOptions(regioesOuLocais, situacoes) {
   situacoes.forEach((value) => {
     const option = document.createElement('option');
     option.value = value;
-    option.textContent = value;
+    option.textContent = formatDisplayText(value);
     if (value === currentStatus) option.selected = true;
     statusSelect.appendChild(option);
   });
@@ -2164,7 +2245,7 @@ function renderFiscalizacoesList() {
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
             d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
         </svg>
-        <p class="text-sm">Nenhuma fiscalizacao encontrada</p>
+        <p class="text-sm">Nenhuma fiscalização encontrada</p>
         <p class="text-xs mt-1">Ajuste os filtros ou adicione uma nova</p>
       </div>
     `;
@@ -2179,8 +2260,8 @@ function renderFiscalizacoesList() {
     const statusClass = fisc.situacao === 'Em Andamento' ? 'status-andamento' :
                         fisc.situacao === 'Concluida' ? 'status-concluida' : 'status-pendente';
     const idLabel = escapeHtml(fisc.id || '-');
-    const statusLabel = escapeHtml(fisc.situacao || '-');
-    const regiaoLabel = escapeHtml(fisc.regiao_administrativa || 'Sem regiao');
+    const statusLabel = escapeHtml(formatDisplayText(fisc.situacao || '-'));
+    const regiaoLabel = escapeHtml(formatDisplayText(fisc.regiao_administrativa || 'Sem regiao'));
     const conformidade = Number.isFinite(Number(fisc.indice_conformidade))
       ? Number(fisc.indice_conformidade)
       : null;
@@ -2325,22 +2406,22 @@ function showDetailPanel(fisc) {
                       fisc.situacao === 'Concluida' ? 'status-concluida' : 'status-pendente';
 
   setDetailPanelActionsVisible(true);
-  document.getElementById('detail-title').textContent = fisc.id || 'Detalhes da Fiscalizacao';
+  document.getElementById('detail-title').textContent = fisc.id || 'Detalhes da Fiscalização';
   document.getElementById('delete-detail-btn').onclick = () => confirmDelete(fisc);
 
   content.innerHTML = `
     <div class="space-y-6">
       <div class="flex items-center justify-center">
-        <span class="${statusClass} text-base">${fisc.situacao}</span>
+        <span class="${statusClass} text-base">${formatDisplayText(fisc.situacao)}</span>
       </div>
 
       <div class="space-y-3">
-        <h3 class="text-sm font-semibold text-blue-400 uppercase tracking-wider">Informacoes Basicas</h3>
+        <h3 class="text-sm font-semibold text-blue-400 uppercase tracking-wider">Informações Básicas</h3>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          ${createDetailField('No Processo SEI', fisc.processo_sei)}
+          ${createDetailField('Nº Processo SEI', fisc.processo_sei)}
           ${createDetailField('Ano', fisc.ano)}
-          ${createDetailField('Regiao', fisc.regiao_administrativa)}
-          ${createDetailField('Destinatario', fisc.destinatario)}
+          ${createDetailField('Região', formatDisplayText(fisc.regiao_administrativa))}
+          ${createDetailField('Destinatário', fisc.destinatario)}
         </div>
       </div>
 
@@ -2348,7 +2429,7 @@ function showDetailPanel(fisc) {
         <h3 class="text-sm font-semibold text-blue-400 uppercase tracking-wider">Classificacao</h3>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           ${createDetailField('Tipo', fisc.direta_indireta)}
-          ${createDetailField('Programacao', fisc.programada)}
+          ${createDetailField('Programação', formatDisplayText(fisc.programada))}
         </div>
       </div>
 
@@ -2356,7 +2437,7 @@ function showDetailPanel(fisc) {
         <h3 class="text-sm font-semibold text-blue-400 uppercase tracking-wider">Documento</h3>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           ${createDetailField('Tipo', fisc.tipo_documento)}
-          ${createDetailField('No SEI', fisc.sei_documento)}
+          ${createDetailField('Nº SEI', fisc.sei_documento)}
           ${createDetailField('Data', fisc.data ? new Date(fisc.data).toLocaleDateString('pt-BR') : null)}
         </div>
 
@@ -2370,7 +2451,7 @@ function showDetailPanel(fisc) {
 
       ${(fisc.latitude && fisc.longitude) ? `
         <div class="space-y-3">
-          <h3 class="text-sm font-semibold text-blue-400 uppercase tracking-wider">Localizacao</h3>
+          <h3 class="text-sm font-semibold text-blue-400 uppercase tracking-wider">Localização</h3>
           <div class="bg-slate-800/50 rounded-lg p-3">
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
@@ -2390,7 +2471,7 @@ function showDetailPanel(fisc) {
         <div class="space-y-3">
           <h3 class="text-sm font-semibold text-blue-400 uppercase tracking-wider">Imagem</h3>
           <div class="rounded-xl overflow-hidden border border-slate-700 bg-slate-900/80">
-            <img src="${fisc.imagem}" alt="Imagem da fiscalizacao" class="w-full object-cover max-h-96">
+            <img src="${fisc.imagem}" alt="Imagem da fiscalização" class="w-full object-cover max-h-96">
           </div>
         </div>
       ` : ''}
@@ -2417,31 +2498,31 @@ function showObraDetailPanel(obra) {
     <div class="space-y-6">
       <div class="flex items-center justify-center">
         <span style="padding:6px 14px;border-radius:999px;background:${color};color:white;font-size:14px;font-weight:600;">
-          ${progress != null ? `Execucao ${formatPercent(progress)}` : (obra.situacao_contrato || 'Obra em mapa')}
+          ${progress != null ? `Execução ${formatPercent(progress)}` : formatDisplayText(obra.situacao_contrato || 'Obra no mapa')}
         </span>
       </div>
 
       <div class="space-y-3">
-        <h3 class="text-sm font-semibold text-emerald-400 uppercase tracking-wider">Identificacao</h3>
+        <h3 class="text-sm font-semibold text-emerald-400 uppercase tracking-wider">Identificação</h3>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           ${createDetailField('Item', obra.item)}
-          ${createDetailField('Local', obra.local)}
+          ${createDetailField('Local', formatDisplayText(obra.local))}
           ${createDetailField('Sistema', obra.sistema)}
           ${createDetailField('Tipo', obra.tipo)}
           ${createDetailField('Programa', obra.programa)}
-          ${createDetailField('Acao', obra.acao)}
+          ${createDetailField('Ação', formatDisplayText(obra.acao))}
         </div>
       </div>
 
       <div class="space-y-3">
         <h3 class="text-sm font-semibold text-emerald-400 uppercase tracking-wider">Contrato</h3>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          ${createDetailField('Numero do Contrato', obra.numero_contrato)}
-          ${createDetailField('Situacao', obra.situacao_contrato)}
+          ${createDetailField('Número do Contrato', obra.numero_contrato)}
+          ${createDetailField('Situação', formatDisplayText(obra.situacao_contrato))}
           ${createDetailField('Fornecedor', obra.fornecedor)}
           ${createDetailField('Sigla UO', obra.sigla_uo)}
           ${createDetailField('Processo SEI', obra.numero_processo_sei)}
-          ${createDetailField('Em operacao', obra.em_operacao)}
+          ${createDetailField('Em operação', formatDisplayText(obra.em_operacao))}
         </div>
         ${obra.objeto_contrato ? `
           <div class="mt-3">
@@ -2452,16 +2533,16 @@ function showObraDetailPanel(obra) {
       </div>
 
       <div class="space-y-3">
-        <h3 class="text-sm font-semibold text-emerald-400 uppercase tracking-wider">Execucao</h3>
+        <h3 class="text-sm font-semibold text-emerald-400 uppercase tracking-wider">Execução</h3>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           ${createDetailField('Valor Total da Obra', formatCurrency(obra.valor_total_obra))}
           ${createDetailField('Valor Executado 2025', formatCurrency(obra.valor_executado_2025))}
           ${createDetailField('Executado Jan-Jun', formatCurrency(obra.valor_executado_jan_jun))}
           ${createDetailField('Executado Jul-Dez', formatCurrency(obra.valor_executado_jul_dez))}
-          ${createDetailField('Execucao Financeira', formatPercent(obra.execucao_financeira_pct))}
-          ${createDetailField('Execucao Fisica', formatPercent(obra.execucao_fisica_pct))}
-          ${createDetailField('Inicio', normalizeDateDisplay(obra.execucao_inicio))}
-          ${createDetailField('Termino', normalizeDateDisplay(obra.execucao_termino))}
+          ${createDetailField('Execução Financeira', formatPercent(obra.execucao_financeira_pct))}
+          ${createDetailField('Execução Física', formatPercent(obra.execucao_fisica_pct))}
+          ${createDetailField('Início', normalizeDateDisplay(obra.execucao_inicio))}
+          ${createDetailField('Término', normalizeDateDisplay(obra.execucao_termino))}
         </div>
       </div>
 
@@ -2471,13 +2552,13 @@ function showObraDetailPanel(obra) {
           ${createDetailField('Tipo de Recurso', obra.tipo_recurso)}
           ${createDetailField('Fonte do Recurso', obra.fonte_recurso)}
           ${createDetailField('Item GPLAN', obra.item_gplan)}
-          ${createDetailField('Plano de Exploracao', obra.codigo_plano_exploracao)}
+          ${createDetailField('Plano de Exploração', obra.codigo_plano_exploracao)}
         </div>
       </div>
 
       ${(hasObraCoordinates(obra)) ? `
         <div class="space-y-3">
-          <h3 class="text-sm font-semibold text-emerald-400 uppercase tracking-wider">Localizacao</h3>
+          <h3 class="text-sm font-semibold text-emerald-400 uppercase tracking-wider">Localização</h3>
           <div class="bg-slate-800/50 rounded-lg p-3">
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
@@ -2495,7 +2576,7 @@ function showObraDetailPanel(obra) {
 
       ${obra.observacoes ? `
         <div class="space-y-3">
-          <h3 class="text-sm font-semibold text-emerald-400 uppercase tracking-wider">Observacoes</h3>
+          <h3 class="text-sm font-semibold text-emerald-400 uppercase tracking-wider">Observações</h3>
           <p class="text-sm text-slate-300 bg-slate-800/50 rounded-lg p-3">${obra.observacoes}</p>
         </div>
       ` : ''}
@@ -2561,7 +2642,7 @@ function applyFormDraft(draft) {
 
 function clearFormDraft() {
   localStorage.removeItem(FORM_DRAFT_KEY);
-  setDraftStatus('Sem alteracoes pendentes', 'idle');
+  setDraftStatus('Sem alterações pendentes', 'idle');
 }
 
 function saveFormDraftNow() {
@@ -2586,18 +2667,18 @@ function scheduleDraftSave() {
 function maybeRestoreDraftOnCreate() {
   const draft = readStoredJson(FORM_DRAFT_KEY, null);
   if (!draft) {
-    setDraftStatus('Sem alteracoes pendentes', 'idle');
+    setDraftStatus('Sem alterações pendentes', 'idle');
     return;
   }
 
   if (String(draft.__editingId || '').trim()) {
-    setDraftStatus('Sem alteracoes pendentes', 'idle');
+    setDraftStatus('Sem alterações pendentes', 'idle');
     return;
   }
 
   const hasData = FISCALIZACAO_FORM_FIELDS.some((fieldId) => String(draft[fieldId] || '').trim() !== '');
   if (!hasData) {
-    setDraftStatus('Sem alteracoes pendentes', 'idle');
+    setDraftStatus('Sem alterações pendentes', 'idle');
     return;
   }
 
@@ -2646,22 +2727,22 @@ function buildFormValidationErrors() {
   const lngRaw = String(document.getElementById('form-lng')?.value || '').trim();
   const data = String(document.getElementById('form-data')?.value || '').trim();
 
-  if (!id) errors.push({ field: 'form-id', message: 'Informe o ID da fiscalizacao.' });
-  if (!processo) errors.push({ field: 'form-processo-sei', message: 'Informe o numero do processo SEI.' });
+  if (!id) errors.push({ field: 'form-id', message: 'Informe o ID da fiscalização.' });
+  if (!processo) errors.push({ field: 'form-processo-sei', message: 'Informe o número do processo SEI.' });
   if (!Number.isFinite(ano)) {
-    errors.push({ field: 'form-ano', message: 'Ano invalido.' });
+    errors.push({ field: 'form-ano', message: 'Ano inválido.' });
   } else if (ano < 2000 || ano > 2100) {
     errors.push({ field: 'form-ano', message: 'Ano deve estar entre 2000 e 2100.' });
   }
-  if (!regiao) errors.push({ field: 'form-regiao', message: 'Selecione uma regiao administrativa.' });
-  if (!situacao) errors.push({ field: 'form-situacao', message: 'Selecione a situacao.' });
-  if (!direta) errors.push({ field: 'form-direta', message: 'Selecione se e Direta ou Indireta.' });
+  if (!regiao) errors.push({ field: 'form-regiao', message: 'Selecione uma região administrativa.' });
+  if (!situacao) errors.push({ field: 'form-situacao', message: 'Selecione a situação.' });
+  if (!direta) errors.push({ field: 'form-direta', message: 'Selecione se é Direta ou Indireta.' });
 
   if (conformidade != null) {
     if (!Number.isFinite(conformidade)) {
-      errors.push({ field: 'form-conformidade', message: 'Indice de conformidade invalido.' });
+      errors.push({ field: 'form-conformidade', message: 'Índice de conformidade inválido.' });
     } else if (conformidade < 0 || conformidade > 100) {
-      errors.push({ field: 'form-conformidade', message: 'Indice de conformidade deve ficar entre 0 e 100.' });
+      errors.push({ field: 'form-conformidade', message: 'Índice de conformidade deve ficar entre 0 e 100.' });
     }
   }
 
@@ -2675,19 +2756,19 @@ function buildFormValidationErrors() {
   if (latRaw) {
     const lat = toSafeNumber(latRaw.replace(',', '.'));
     if (!Number.isFinite(lat) || lat < -90 || lat > 90) {
-      errors.push({ field: 'form-lat', message: 'Latitude invalida (use valor entre -90 e 90).' });
+      errors.push({ field: 'form-lat', message: 'Latitude inválida (use valor entre -90 e 90).' });
     }
   }
 
   if (lngRaw) {
     const lng = toSafeNumber(lngRaw.replace(',', '.'));
     if (!Number.isFinite(lng) || lng < -180 || lng > 180) {
-      errors.push({ field: 'form-lng', message: 'Longitude invalida (use valor entre -180 e 180).' });
+      errors.push({ field: 'form-lng', message: 'Longitude inválida (use valor entre -180 e 180).' });
     }
   }
 
   if (data && !toIsoDate(data)) {
-    errors.push({ field: 'form-data', message: 'Data invalida. Use AAAA-MM-DD ou DD/MM/AAAA.' });
+    errors.push({ field: 'form-data', message: 'Data inválida. Use AAAA-MM-DD ou DD/MM/AAAA.' });
   }
 
   return errors;
@@ -2771,9 +2852,9 @@ function openAddModal() {
     <svg class="w-6 h-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
     </svg>
-    Nova Fiscalizacao
+    Nova Fiscalização
   `;
-  document.getElementById('submit-text').textContent = 'Salvar Fiscalizacao';
+  document.getElementById('submit-text').textContent = 'Salvar Fiscalização';
   document.getElementById('fiscalizacao-form').reset();
   document.getElementById('form-backend-id').value = '';
   document.getElementById('form-ano').value = new Date().getFullYear();
@@ -2793,9 +2874,9 @@ function editCurrentFiscalizacao() {
       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
         d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
     </svg>
-    Editar Fiscalizacao
+    Editar Fiscalização
   `;
-  document.getElementById('submit-text').textContent = 'Atualizar Fiscalizacao';
+  document.getElementById('submit-text').textContent = 'Atualizar Fiscalização';
 
   document.getElementById('form-backend-id').value = currentFiscalizacao.__backendId;
   document.getElementById('form-id').value = currentFiscalizacao.id || '';
@@ -2876,7 +2957,7 @@ function handleImagemSelected(event) {
 
   const maxBytes = 2 * 1024 * 1024;
   if (file.size > maxBytes) {
-    showToast('Imagem deve ter no maximo 2MB.', 'warning');
+    showToast('Imagem deve ter no máximo 2MB.', 'warning');
     event.target.value = '';
     updateImagemPreview();
     return;
@@ -2885,7 +2966,7 @@ function handleImagemSelected(event) {
   const reader = new FileReader();
   reader.onload = () => updateImagemPreview({ data: reader.result, name: file.name });
   reader.onerror = () => {
-    showToast('Nao foi possivel ler a imagem.', 'error');
+    showToast('Não foi possível ler a imagem.', 'error');
     updateImagemPreview();
   };
   reader.readAsDataURL(file);
@@ -2911,7 +2992,7 @@ async function handleSubmit(event) {
   const isEditing = !!backendId;
 
   if (!isEditing && allFiscalizacoes.length >= 999) {
-    showToast('Limite de 999 fiscalizacoes atingido. Exclua algumas para continuar.', 'error');
+    showToast('Limite de 999 fiscalizações atingido. Exclua algumas para continuar.', 'error');
     return;
   }
 
@@ -2959,7 +3040,7 @@ async function handleSubmit(event) {
     });
     if (newIdentity && duplicate) {
       const duplicateId = duplicate.id || '(sem ID)';
-      showToast(`Ja existe fiscalizacao com mesmo ID/Processo (${duplicateId}).`, 'warning');
+      showToast(`Já existe fiscalização com mesmo ID/Processo (${duplicateId}).`, 'warning');
       setOperationStatus('Duplicidade detectada no cadastro', 'warning');
       return;
     }
@@ -2993,13 +3074,13 @@ async function handleSubmit(event) {
     });
     bumpSessionMetric('saves');
     clearFormDraft();
-    setOperationStatus('Ultima operacao concluida', 'success');
-    showToast(isEditing ? 'Fiscalizacao atualizada!' : 'Fiscalizacao criada!', 'success');
+    setOperationStatus('Última operação concluída', 'success');
+    showToast(isEditing ? 'Fiscalização atualizada!' : 'Fiscalização criada!', 'success');
     closeModal();
     updateDashboard();
   } else {
-    setOperationStatus('Falha de conexao ou permissao ao salvar', 'error');
-    showToast('Erro ao salvar fiscalizacao', 'error');
+    setOperationStatus('Falha de conexão ou permissão ao salvar', 'error');
+    showToast('Erro ao salvar fiscalização', 'error');
   }
 }
 window.handleSubmit = handleSubmit;
@@ -3033,12 +3114,12 @@ async function executeDelete() {
   if (result.isOk) {
     await recordAuditEvent('delete', beforeRecord, null, { view: currentView });
     setOperationStatus('Registro removido com sucesso', 'success');
-    showToast('Fiscalizacao excluida!', 'success');
+    showToast('Fiscalização excluída!', 'success');
     closeDetailPanel();
     updateDashboard();
   } else {
     setOperationStatus('Falha ao remover registro', 'error');
-    showToast('Erro ao excluir fiscalizacao', 'error');
+    showToast('Erro ao excluir fiscalização', 'error');
   }
 
   deleteTarget = null;
@@ -3124,13 +3205,13 @@ function updateDashboard() {
     setDashboardMeta({
       title: 'Dashboard de Obras',
       totalLabel: 'Total de Obras',
-      secondaryLabel: 'Em Execucao',
+      secondaryLabel: 'Em Execução',
       tertiaryLabel: 'Em Recebimento',
-      quaternaryLabel: 'Execucao Media',
+      quaternaryLabel: 'Execução Média',
       quinaryLabel: 'Sem Coordenadas',
       senaryLabel: 'Valor Total',
       septenaryLabel: 'Executado 2025',
-      statusChartTitle: 'Distribuicao por Situacao do Contrato',
+      statusChartTitle: 'Distribuição por Situação do Contrato',
       regionChartTitle: 'Por Local'
     });
 
@@ -3151,14 +3232,14 @@ function updateDashboard() {
     document.getElementById('metric-session-imports').textContent = sessionMetrics.imports;
     const duplicateSummary = document.getElementById('duplicate-summary-text');
     if (duplicateSummary) {
-      duplicateSummary.textContent = 'Duplicidade (ID + Processo SEI): aplicavel apenas a fiscalizacoes';
+      duplicateSummary.textContent = 'Duplicidade (ID + Processo SEI): aplicável apenas a fiscalizações';
     }
     const dedupeButton = document.getElementById('dedupe-fiscalizacoes-btn');
     if (dedupeButton) dedupeButton.disabled = true;
 
     const maxStatus = Math.max(emExecucao, emRecebimento, outrasSituacoes, 1);
     document.getElementById('chart-situacao').innerHTML = [
-      buildDashboardBar(emExecucao, maxStatus, 'bg-gradient-to-t from-amber-500 to-yellow-400', 'text-amber-400', 'Em Execucao'),
+      buildDashboardBar(emExecucao, maxStatus, 'bg-gradient-to-t from-amber-500 to-yellow-400', 'text-amber-400', 'Em Execução'),
       buildDashboardBar(emRecebimento, maxStatus, 'bg-gradient-to-t from-emerald-500 to-green-400', 'text-emerald-400', 'Em Recebimento'),
       buildDashboardBar(outrasSituacoes, maxStatus, 'bg-gradient-to-t from-sky-500 to-blue-400', 'text-sky-400', 'Outras')
     ].join('');
@@ -3188,16 +3269,16 @@ function updateDashboard() {
   }
 
   setDashboardMeta({
-    title: 'Dashboard de Metricas',
-    totalLabel: 'Total de Fiscalizacoes',
+    title: 'Dashboard de Métricas',
+    totalLabel: 'Total de Fiscalizações',
     secondaryLabel: 'Em Andamento',
-    tertiaryLabel: 'Concluidas',
-    quaternaryLabel: 'Conformidade Media',
+    tertiaryLabel: 'Concluídas',
+    quaternaryLabel: 'Conformidade Média',
     quinaryLabel: 'Pendentes',
-    senaryLabel: 'Total Autos de Infracao',
-    septenaryLabel: 'Total de Termos de Notificacao',
-    statusChartTitle: 'Distribuicao por Situacao',
-    regionChartTitle: 'Por Regiao Administrativa'
+    senaryLabel: 'Total de Autos de Infração',
+    septenaryLabel: 'Total de Termos de Notificação',
+    statusChartTitle: 'Distribuição por Situação',
+    regionChartTitle: 'Por Região Administrativa'
   });
 
   const total = allFiscalizacoes.length;
@@ -3242,7 +3323,7 @@ function updateDashboard() {
   const maxStatus = Math.max(andamento, concluida, pendente, 1);
   document.getElementById('chart-situacao').innerHTML = [
     buildDashboardBar(andamento, maxStatus, 'bg-gradient-to-t from-amber-500 to-yellow-400', 'text-amber-400', 'Andamento'),
-    buildDashboardBar(concluida, maxStatus, 'bg-gradient-to-t from-emerald-500 to-green-400', 'text-emerald-400', 'Concluida'),
+    buildDashboardBar(concluida, maxStatus, 'bg-gradient-to-t from-emerald-500 to-green-400', 'text-emerald-400', 'Concluída'),
     buildDashboardBar(pendente, maxStatus, 'bg-gradient-to-t from-red-500 to-rose-400', 'text-red-400', 'Pendente')
   ].join('');
 
@@ -3265,7 +3346,7 @@ function updateDashboard() {
         <span class="text-sm font-semibold text-blue-400 min-w-[30px] text-right">${count}</span>
       </div>
     `).join('')
-    : '<p class="text-center text-slate-500 py-8">Nenhuma regiao cadastrada</p>';
+    : '<p class="text-center text-slate-500 py-8">Nenhuma região cadastrada</p>';
 }
 
 // ======== Obras Upload ========
@@ -3344,7 +3425,7 @@ async function handleObrasFileSelected(event) {
   }
 
   if (typeof XLSX === 'undefined') {
-    showToast('Leitor de planilha indisponivel no navegador.', 'error');
+    showToast('Leitor de planilha indisponível no navegador.', 'error');
     input.value = '';
     return;
   }
@@ -3360,7 +3441,7 @@ async function handleObrasFileSelected(event) {
     const sheet = sheetName ? workbook.Sheets[sheetName] : null;
 
     if (!sheetName || !sheet) {
-      throw new Error('Nao foi possivel localizar a aba de obras na planilha.');
+      throw new Error('Não foi possível localizar a aba de obras na planilha.');
     }
 
     const rawRows = XLSX.utils.sheet_to_json(sheet, {
@@ -3371,7 +3452,7 @@ async function handleObrasFileSelected(event) {
     const headerRowIndex = findObrasHeaderRow(rawRows);
 
     if (headerRowIndex < 0) {
-      throw new Error('Nao encontrei o cabecalho da tabela de obras nessa planilha.');
+      throw new Error('Não encontrei o cabeçalho da tabela de obras nesta planilha.');
     }
 
     const rawRecords = XLSX.utils.sheet_to_json(sheet, {
@@ -3395,7 +3476,7 @@ async function handleObrasFileSelected(event) {
     updateObrasUploadActions();
 
     if (records.length === 0) {
-      showToast('Planilha lida, mas nenhuma obra valida foi encontrada.', 'warning');
+      showToast('Planilha lida, mas nenhuma obra válida foi encontrada.', 'warning');
     } else {
       const mappedWithCoordinates = records.filter((obra) => hasObraCoordinates(obra)).length;
       showToast(`${records.length} obras preparadas (${mappedWithCoordinates} com coordenadas).`, 'success');
@@ -3415,7 +3496,7 @@ window.handleObrasFileSelected = handleObrasFileSelected;
 
 async function executeObrasUpload() {
   if (pendingObrasUpload.length === 0) {
-    showToast('Selecione uma planilha valida antes de carregar as obras.', 'warning');
+    showToast('Selecione uma planilha válida antes de carregar as obras.', 'warning');
     return;
   }
 
@@ -3427,7 +3508,7 @@ async function executeObrasUpload() {
   hideLoading();
 
   if (!result.isOk) {
-    setOperationStatus('Falha de conexao ao salvar obras', 'error');
+    setOperationStatus('Falha de conexão ao salvar obras', 'error');
     showToast('Erro ao salvar obras.', 'error');
     return;
   }
@@ -3461,7 +3542,7 @@ window.executeObrasUpload = executeObrasUpload;
 
 async function clearObrasData() {
   if (!pendingObrasMeta && allObras.length === 0) {
-    showToast('Nao ha obras carregadas para limpar.', 'info');
+    showToast('Não há obras carregadas para limpar.', 'info');
     return;
   }
 
@@ -3500,7 +3581,7 @@ async function clearObrasData() {
   setOperationStatus('Obras removidas', 'success');
 
   if (result.fallbackReason === 'api_unavailable') {
-    showToast('Obras removidas localmente (API indisponivel).', 'warning');
+    showToast('Obras removidas localmente (API indisponível).', 'warning');
     return;
   }
   showToast('Dados de obras removidos.', 'success');
@@ -3520,11 +3601,11 @@ function exportToCSV() {
     }
 
     headers = [
-      'Item', 'Sistema', 'Tipo', 'Programa', 'Acao', 'Local',
-      'Numero Contrato', 'Objeto Contrato', 'Valor Total', 'Situacao',
+      'Item', 'Sistema', 'Tipo', 'Programa', 'Ação', 'Local',
+      'Número Contrato', 'Objeto Contrato', 'Valor Total', 'Situação',
       'Fornecedor', 'Processo SEI', 'Tipo Recurso', 'Fonte Recurso',
-      'Execucao Inicio', 'Execucao Termino', 'Executado 2025',
-      'Execucao Financeira', 'Execucao Fisica', 'Latitude', 'Longitude'
+      'Execução Início', 'Execução Término', 'Executado 2025',
+      'Execução Financeira', 'Execução Física', 'Latitude', 'Longitude'
     ];
 
     rows = allObras.map((obra) => [
@@ -3540,15 +3621,15 @@ function exportToCSV() {
     filename = `obras_${new Date().toISOString().split('T')[0]}.csv`;
   } else {
     if (allFiscalizacoes.length === 0) {
-      showToast('Nenhuma fiscalizacao para exportar', 'warning');
+      showToast('Nenhuma fiscalização para exportar', 'warning');
       return;
     }
 
     headers = [
-      'ID', 'Processo SEI', 'Ano', 'Objetivo', 'Regiao', 'Situacao',
-      'Tipo Documento', 'Destinatario', 'Direta/Indireta', 'Programada',
-      'SEI Documento', 'Data', 'Constatacoes', 'Nao Conformes',
-      'Recomendacoes', 'Determinacoes', 'TN', 'AI', 'TAC',
+      'ID', 'Processo SEI', 'Ano', 'Objetivo', 'Região', 'Situação',
+      'Tipo Documento', 'Destinatário', 'Direta/Indireta', 'Programada',
+      'SEI Documento', 'Data', 'Constatações', 'Não Conformes',
+      'Recomendações', 'Determinações', 'TN', 'AI', 'TAC',
       'Conformidade', 'Latitude', 'Longitude'
     ];
 
@@ -3703,12 +3784,12 @@ async function handleFiscalizacoesFileSelected(event) {
   }
 
   if (typeof XLSX === 'undefined') {
-    showToast('Leitor de planilha indisponivel no navegador.', 'error');
+    showToast('Leitor de planilha indisponível no navegador.', 'error');
     return;
   }
 
-  showLoading('Lendo arquivo de fiscalizacoes...');
-  setOperationStatus('Lendo arquivo para importacao...', 'syncing');
+  showLoading('Lendo arquivo de fiscalizações...');
+  setOperationStatus('Lendo arquivo para importação...', 'syncing');
 
   try {
     let dataRows = [];
@@ -3722,7 +3803,7 @@ async function handleFiscalizacoesFileSelected(event) {
       const delimiter = detectImportDelimiter(lines);
       headerRowIndex = findImportHeaderIndex(lines, delimiter);
       if (headerRowIndex < 0) {
-        throw new Error('Nao foi possivel localizar o cabecalho no CSV de fiscalizacoes.');
+        throw new Error('Não foi possível localizar o cabeçalho no CSV de fiscalizações.');
       }
       dataRows = lines
         .slice(headerRowIndex + 1)
@@ -3733,12 +3814,12 @@ async function handleFiscalizacoesFileSelected(event) {
       sheetName = selectFiscalizacoesSheetName(workbook.SheetNames);
       const sheet = sheetName ? workbook.Sheets[sheetName] : null;
       if (!sheetName || !sheet) {
-        throw new Error('Nao foi possivel localizar aba valida de fiscalizacoes.');
+        throw new Error('Não foi possível localizar uma aba válida de fiscalizações.');
       }
       const rawRows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, defval: '' });
       headerRowIndex = findFiscalizacoesHeaderRow(rawRows);
       if (headerRowIndex < 0) {
-        throw new Error('Nao foi possivel localizar cabecalho de fiscalizacoes na planilha.');
+        throw new Error('Não foi possível localizar o cabeçalho de fiscalizações na planilha.');
       }
       dataRows = rawRows
         .slice(headerRowIndex + 1)
@@ -3754,21 +3835,21 @@ async function handleFiscalizacoesFileSelected(event) {
       fileKey: `${file.name}-${file.size}-${file.lastModified}`
     };
     renderFiscalizacoesUploadSummary(dataRows, pendingFiscalizacoesMeta);
-    setOperationStatus('Arquivo carregado. Execute a simulacao.', 'success');
+    setOperationStatus('Arquivo carregado. Execute a simulação.', 'success');
 
     if (dataRows.length === 0) {
-      showToast('Arquivo lido, mas nenhuma linha de fiscalizacao foi encontrada.', 'warning');
+      showToast('Arquivo lido, mas nenhuma linha de fiscalização foi encontrada.', 'warning');
       return;
     }
 
-    showToast(`Arquivo carregado com ${dataRows.length} linhas para simulacao.`, 'success');
+    showToast(`Arquivo carregado com ${dataRows.length} linhas para simulação.`, 'success');
     previewImport();
   } catch (error) {
     pendingFiscalizacoesUpload = [];
     pendingFiscalizacoesMeta = null;
     renderFiscalizacoesUploadSummary();
-    setOperationStatus('Falha ao ler arquivo de importacao', 'error');
-    showToast(error?.message || 'Erro ao ler arquivo de fiscalizacoes.', 'error');
+    setOperationStatus('Falha ao ler arquivo de importação', 'error');
+    showToast(error?.message || 'Erro ao ler arquivo de fiscalizações.', 'error');
   } finally {
     hideLoading();
     if (input) input.value = '';
@@ -3833,7 +3914,7 @@ function parseImportRecordFromCells(cells) {
 
   if (!Array.isArray(cells) || cells.length < 19) {
     rowResult.status = 'error';
-    rowResult.notes.push('Linha incompleta: esperado minimo de 19 colunas.');
+    rowResult.notes.push('Linha incompleta: esperado mínimo de 19 colunas.');
     return rowResult;
   }
 
@@ -3858,7 +3939,7 @@ function parseImportRecordFromCells(cells) {
   const tipoFiscalizacao = norm(cells[7]);
   if (normalizeType(tipoFiscalizacao) !== 'direta') {
     rowResult.status = 'warning';
-    rowResult.notes.push('Ignorada: somente fiscalizacoes Direta sao importadas.');
+    rowResult.notes.push('Ignorada: somente fiscalizações Direta são importadas.');
     rowResult.id = norm(cells[0]);
     rowResult.regiao = regiao;
     rowResult.situacao = norm(cells[5]);
@@ -3881,14 +3962,14 @@ function parseImportRecordFromCells(cells) {
   let ano = parseIntSafe(cells[2]);
   if (!Number.isFinite(ano)) {
     rowResult.status = 'warning';
-    rowResult.notes.push('Ano ausente ou invalido; sera mantido vazio.');
+    rowResult.notes.push('Ano ausente ou inválido; será mantido vazio.');
     ano = null;
   }
 
   const conformidade = parseNumber(cells[18]);
   if (norm(cells[18]) && conformidade == null) {
     rowResult.status = rowResult.status === 'error' ? 'error' : 'warning';
-    rowResult.notes.push('Conformidade invalida; valor ignorado.');
+    rowResult.notes.push('Conformidade inválida; valor ignorado.');
   }
 
   let lat = null;
@@ -3899,7 +3980,7 @@ function parseImportRecordFromCells(cells) {
     lng = baseLng + (Math.random() - 0.5) * 0.02;
   } else {
     rowResult.status = rowResult.status === 'error' ? 'error' : 'warning';
-    rowResult.notes.push('Regiao sem coordenada base; mapa pode ficar sem foco local.');
+    rowResult.notes.push('Região sem coordenada base; o mapa pode ficar sem foco local.');
   }
 
   rowResult.id = id;
@@ -3957,8 +4038,8 @@ function renderImportSimulation(simulation) {
       <tr class="border-t border-slate-600">
         <td class="px-2 py-2 ${toneClass}">${statusText}</td>
         <td class="px-2 py-2 text-slate-300">${escapeHtml(row.id || '-')}</td>
-        <td class="px-2 py-2 text-slate-300">${escapeHtml(row.regiao || '-')}</td>
-        <td class="px-2 py-2 text-slate-300">${escapeHtml(row.situacao || '-')}</td>
+        <td class="px-2 py-2 text-slate-300">${escapeHtml(formatDisplayText(row.regiao || '-'))}</td>
+        <td class="px-2 py-2 text-slate-300">${escapeHtml(formatDisplayText(row.situacao || '-'))}</td>
         <td class="px-2 py-2 text-slate-300">${escapeHtml(row.conformidade || '-')}</td>
         <td class="px-2 py-2 text-slate-400">${escapeHtml((row.notes || []).join(' | ') || '-')}</td>
       </tr>
@@ -3970,8 +4051,8 @@ function renderImportSimulation(simulation) {
   warningLabel.textContent = simulation.warningCount;
   errorLabel.textContent = simulation.errorCount;
   note.textContent = simulation.errorCount > 0
-    ? 'Corrija as linhas com erro para habilitar a importacao.'
-    : 'Simulacao pronta. Linhas com aviso serao importadas, mas revise os alertas.';
+    ? 'Corrija as linhas com erro para habilitar a importação.'
+    : 'Simulação pronta. Linhas com aviso serão importadas, mas revise os alertas.';
 
   preview.classList.remove('hidden');
   summary.classList.remove('hidden');
@@ -4003,14 +4084,14 @@ function buildImportSimulationFromRows(dataRows) {
     if (existingIdentityMap.has(identity)) {
       row.status = row.status === 'error' ? 'error' : 'warning';
       row.skipImport = true;
-      row.notes.push('Registro ja existe no sistema e sera ignorado para evitar duplicidade.');
+      row.notes.push('Registro já existe no sistema e será ignorado para evitar duplicidade.');
       return;
     }
 
     if (seenImportIdentity.has(identity)) {
       row.status = row.status === 'error' ? 'error' : 'warning';
       row.skipImport = true;
-      row.notes.push('Registro repetido no proprio arquivo; apenas a primeira ocorrencia sera considerada.');
+      row.notes.push('Registro repetido no próprio arquivo; apenas a primeira ocorrência será considerada.');
       return;
     }
 
@@ -4044,41 +4125,41 @@ function buildImportSimulation() {
 function previewImport() {
   const simulation = buildImportSimulation();
   if (!simulation) {
-    showToast('Selecione um arquivo de fiscalizacoes antes de simular.', 'warning');
+    showToast('Selecione um arquivo de fiscalizações antes de simular.', 'warning');
     return;
   }
 
   if (simulation.total === 0) {
-    showToast('Nao foram encontradas linhas para importar.', 'warning');
+    showToast('Não foram encontradas linhas para importar.', 'warning');
     return;
   }
 
   importSimulation = simulation;
   renderImportSimulation(simulation);
-  setOperationStatus('Simulacao de importacao concluida', simulation.errorCount > 0 ? 'warning' : 'success');
+  setOperationStatus('Simulação de importação concluída', simulation.errorCount > 0 ? 'warning' : 'success');
 
   if (simulation.importableRecords.length === 0) {
-    showToast('Nenhuma linha valida para importacao.', 'warning');
+    showToast('Nenhuma linha válida para importação.', 'warning');
     return;
   }
 
   if (simulation.errorCount > 0) {
-    showToast('Simulacao concluida com erros. Revise as linhas destacadas.', 'warning');
+    showToast('Simulação concluída com erros. Revise as linhas destacadas.', 'warning');
     return;
   }
 
   if (simulation.warningCount > 0) {
-    showToast('Simulacao concluida com avisos.', 'info');
+    showToast('Simulação concluída com avisos.', 'info');
     return;
   }
 
-  showToast('Simulacao concluida sem erros.', 'success');
+  showToast('Simulação concluída sem erros.', 'success');
 }
 window.previewImport = previewImport;
 
 async function executeImport() {
   if (!pendingFiscalizacoesUpload.length) {
-    showToast('Selecione um arquivo de fiscalizacoes primeiro.', 'warning');
+    showToast('Selecione um arquivo de fiscalizações primeiro.', 'warning');
     return;
   }
 
@@ -4088,23 +4169,23 @@ async function executeImport() {
 
   if (!importSimulation) return;
   if (importSimulation.errorCount > 0) {
-    showToast('Nao e possivel importar com erros na simulacao.', 'error');
+    showToast('Não é possível importar com erros na simulação.', 'error');
     return;
   }
 
   const recordsToImport = importSimulation.importableRecords;
   if (recordsToImport.length === 0) {
-    showToast('Nao ha registros importaveis.', 'warning');
+    showToast('Não há registros importáveis.', 'warning');
     return;
   }
 
   if (allFiscalizacoes.length + recordsToImport.length > 999) {
-    showToast(`Voce tem ${allFiscalizacoes.length} registros. Maximo permitido e 999.`, 'error');
+    showToast(`Você tem ${allFiscalizacoes.length} registros. Máximo permitido é 999.`, 'error');
     return;
   }
 
   setOperationStatus(`Importando ${recordsToImport.length} registros...`, 'syncing');
-  showLoading(`Importando ${recordsToImport.length} fiscalizacoes...`);
+  showLoading(`Importando ${recordsToImport.length} fiscalizações...`);
   const btn = document.getElementById('import-btn');
   if (btn) btn.disabled = true;
 
@@ -4137,14 +4218,14 @@ async function executeImport() {
     });
     bumpSessionMetric('imports');
     setOperationStatus(`${imported} registros importados com sucesso`, 'success');
-    showToast(`${imported} fiscalizacoes importadas!`, 'success');
+    showToast(`${imported} fiscalizações importadas!`, 'success');
     closeImportModal();
     updateDashboard();
   }
 
   if (failed > 0) {
-    setOperationStatus(`Importacao com falhas (${failed})`, 'warning');
-    showToast(`${failed} registros falharam na importacao.`, 'warning');
+    setOperationStatus(`Importação com falhas (${failed})`, 'warning');
+    showToast(`${failed} registros falharam na importação.`, 'warning');
   }
 }
 window.executeImport = executeImport;
@@ -4174,7 +4255,7 @@ async function init() {
   applyFilters();
   renderSavedFilterButtons();
   updateObrasUploadActions();
-  setDraftStatus('Sem alteracoes pendentes', 'idle');
+  setDraftStatus('Sem alterações pendentes', 'idle');
   setOperationStatus('Sistema pronto', 'success');
 }
 init();

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Login | Fiscalizacoes</title>
+  <title>Login | Fiscalizações</title>
 
   <script src="https://cdn.tailwindcss.com/3.4.17"></script>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -73,7 +73,7 @@
           href="/publico.html"
           class="block w-full border border-slate-600 px-4 py-3 text-center text-sm font-medium text-slate-200 transition-colors"
         >
-          Ver mapa publico
+          Ver mapa público
         </a>
       </form>
     </section>
@@ -148,18 +148,18 @@
         }
 
         if (response.status === 401) {
-          setLoginError("Login ou senha invalidos.");
+          setLoginError("Login ou senha inválidos.");
           return;
         }
 
         if (response.status === 503) {
-          setLoginError("Login nao configurado no servidor.");
+          setLoginError("Login não configurado no servidor.");
           return;
         }
 
-        setLoginError(payload.error || "Nao foi possivel autenticar agora.");
+        setLoginError(payload.error || "Não foi possível autenticar agora.");
       } catch {
-        setLoginError("Falha de conexao. Tente novamente.");
+        setLoginError("Falha de conexão. Tente novamente.");
       } finally {
         submit.disabled = false;
         submit.textContent = "Entrar";

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Visualizacao Publica | Fiscalizacoes e Obras</title>
+  <title>Visualização Pública | Fiscalizações e Obras</title>
 
   <script src="https://cdn.tailwindcss.com/3.4.17"></script>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -27,16 +27,16 @@
     <header class="public-header sticky top-0 z-20 px-4 py-4 sm:px-6">
       <div class="public-header-bar flex flex-col gap-4 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
         <div>
-          <p class="public-kicker">Visualizacao institucional</p>
-          <h1 class="text-2xl font-bold text-white sm:text-3xl">Mapa publico de fiscalizacoes e obras</h1>
-          <p class="mt-2 text-sm text-slate-400 sm:text-base">Transparencia territorial com leitura clara, elegante e sem expor dados sensiveis.</p>
+          <p class="public-kicker">Visualização institucional</p>
+          <h1 class="text-2xl font-bold text-white sm:text-3xl">Mapa público de fiscalizações e obras</h1>
+          <p class="mt-2 text-sm text-slate-400 sm:text-base">Transparência territorial com leitura clara, elegante e sem expor dados sensíveis.</p>
         </div>
         <div class="public-header-actions">
-          <span class="public-status-pill">Atualizacao continua</span>
+          <span class="public-status-pill">Atualização contínua</span>
           <a
             href="/login.html"
             class="btn-primary whitespace-nowrap rounded-2xl px-4 py-3 text-sm font-semibold"
-            aria-label="Fazer login para acessar informacoes completas"
+            aria-label="Fazer login para acessar informações completas"
           >
             Acessar painel completo
           </a>
@@ -47,8 +47,8 @@
     <main class="mx-auto grid max-w-[1440px] grid-cols-1 gap-4 px-4 pb-4 sm:gap-6 sm:px-6 sm:pb-6 lg:grid-cols-[380px,1fr]">
       <section class="glass-card public-card public-sidebar border border-slate-200 p-4 sm:p-5 space-y-5">
         <div class="public-summary">
-          <p class="public-section-kicker">Visao executiva</p>
-          <h2 class="text-2xl font-semibold text-white">Acompanhamento publico com leitura imediata.</h2>
+          <p class="public-section-kicker">Visão executiva</p>
+          <h2 class="text-2xl font-semibold text-white">Acompanhamento público com leitura imediata.</h2>
           <p class="mt-2 text-sm text-slate-400">Navegue pelos pontos, filtre por status e acompanhe o panorama territorial de forma simples.</p>
         </div>
 
@@ -58,7 +58,7 @@
             <p id="stat-total" class="mt-2 text-2xl font-bold text-white">0</p>
           </div>
           <div class="metric-card rounded-2xl p-4 text-center">
-            <p class="text-[11px] uppercase tracking-[0.14em] text-slate-400">Fiscalizacoes</p>
+            <p class="text-[11px] uppercase tracking-[0.14em] text-slate-400">Fiscalizações</p>
             <p id="stat-fisc" class="mt-2 text-2xl font-bold text-amber-300">0</p>
           </div>
           <div class="metric-card rounded-2xl p-4 text-center">
@@ -68,10 +68,10 @@
         </div>
 
         <div class="rounded-[1.5rem] border border-slate-200 bg-slate-800/60 p-4 space-y-3">
-          <p class="text-xs uppercase tracking-[0.14em] text-slate-400">Visualizacao no mapa</p>
+          <p class="text-xs uppercase tracking-[0.14em] text-slate-400">Visualização no mapa</p>
           <div class="grid grid-cols-3 gap-2">
             <button id="view-all-btn" type="button" class="kind-toggle active rounded-xl px-3 py-2 text-xs font-semibold">Todos</button>
-            <button id="view-fisc-btn" type="button" class="kind-toggle rounded-xl px-3 py-2 text-xs font-semibold">Fiscalizacoes</button>
+            <button id="view-fisc-btn" type="button" class="kind-toggle rounded-xl px-3 py-2 text-xs font-semibold">Fiscalizações</button>
             <button id="view-obras-btn" type="button" class="kind-toggle rounded-xl px-3 py-2 text-xs font-semibold">Obras</button>
           </div>
           <p id="public-view-label" class="text-[11px] text-slate-400">Exibindo todos os pontos no mapa.</p>
@@ -86,7 +86,7 @@
           </div>
 
           <div>
-            <label for="filter-area" class="mb-2 block text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Regiao / Local</label>
+            <label for="filter-area" class="mb-2 block text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Região / Local</label>
             <input
               id="filter-area"
               type="text"
@@ -106,7 +106,7 @@
 
         <div class="rounded-[1.5rem] border border-amber-700/30 bg-amber-950/10 p-4 space-y-3">
           <div class="flex items-center justify-between gap-3">
-            <p class="text-sm font-semibold text-amber-100">Dashboard de Fiscalizacoes</p>
+            <p class="text-sm font-semibold text-amber-100">Dashboard de Fiscalizações</p>
             <span id="dash-fisc-share" class="text-xs text-amber-200">0% do mapa</span>
           </div>
 
@@ -116,7 +116,7 @@
               <p id="dash-fisc-total" class="mt-2 text-base font-semibold text-white">0</p>
             </div>
             <div class="metric-card rounded-2xl p-3">
-              <p class="text-[11px] uppercase tracking-[0.14em] text-slate-400">Conformidade media</p>
+              <p class="text-[11px] uppercase tracking-[0.14em] text-slate-400">Conformidade média</p>
               <p id="dash-fisc-avg" class="mt-2 text-base font-semibold text-amber-200">-</p>
             </div>
             <div class="metric-card rounded-2xl p-3">
@@ -124,7 +124,7 @@
               <p id="dash-fisc-andamento" class="mt-2 text-base font-semibold text-amber-300">0</p>
             </div>
             <div class="metric-card rounded-2xl p-3">
-              <p class="text-[11px] uppercase tracking-[0.14em] text-slate-400">Concluidas</p>
+              <p class="text-[11px] uppercase tracking-[0.14em] text-slate-400">Concluídas</p>
               <p id="dash-fisc-concluidas" class="mt-2 text-base font-semibold text-emerald-300">0</p>
             </div>
             <div class="metric-card col-span-2 rounded-2xl p-3">
@@ -139,7 +139,7 @@
           </div>
 
           <div class="space-y-2">
-            <p class="text-[11px] uppercase tracking-[0.14em] text-slate-400">Regioes com mais fiscalizacoes</p>
+            <p class="text-[11px] uppercase tracking-[0.14em] text-slate-400">Regiões com mais fiscalizações</p>
             <div id="dash-fisc-areas" class="space-y-2"></div>
           </div>
         </div>
@@ -156,11 +156,11 @@
               <p id="dash-obras-total" class="mt-2 text-base font-semibold text-white">0</p>
             </div>
             <div class="metric-card rounded-2xl p-3">
-              <p class="text-[11px] uppercase tracking-[0.14em] text-slate-400">Execucao media</p>
+              <p class="text-[11px] uppercase tracking-[0.14em] text-slate-400">Execução média</p>
               <p id="dash-obras-avg" class="mt-2 text-base font-semibold text-emerald-200">-</p>
             </div>
             <div class="metric-card rounded-2xl p-3">
-              <p class="text-[11px] uppercase tracking-[0.14em] text-slate-400">Em execucao</p>
+              <p class="text-[11px] uppercase tracking-[0.14em] text-slate-400">Em execução</p>
               <p id="dash-obras-execucao" class="mt-2 text-base font-semibold text-amber-300">0</p>
             </div>
             <div class="metric-card rounded-2xl p-3">
@@ -168,7 +168,7 @@
               <p id="dash-obras-recebimento" class="mt-2 text-base font-semibold text-emerald-300">0</p>
             </div>
             <div class="metric-card col-span-2 rounded-2xl p-3">
-              <p class="text-[11px] uppercase tracking-[0.14em] text-slate-400">Outras situacoes</p>
+              <p class="text-[11px] uppercase tracking-[0.14em] text-slate-400">Outras situações</p>
               <p id="dash-obras-outras" class="mt-2 text-base font-semibold text-sky-300">0</p>
             </div>
           </div>
@@ -188,7 +188,7 @@
           <p class="text-xs uppercase tracking-[0.14em] text-slate-400">Legenda</p>
           <div class="flex items-center gap-2 text-xs text-slate-300">
             <span class="public-marker dot-fisc" aria-hidden="true"></span>
-            <span>Fiscalizacao</span>
+            <span>Fiscalização</span>
           </div>
           <div class="flex items-center gap-2 text-xs text-slate-300">
             <span class="public-marker dot-obra" aria-hidden="true"></span>
@@ -196,11 +196,11 @@
           </div>
         </div>
 
-        <p id="public-updated-at" class="text-[11px] text-slate-500">Atualizacao: -</p>
+        <p id="public-updated-at" class="text-[11px] text-slate-500">Atualização: -</p>
       </section>
 
       <section class="glass-card public-card public-map-shell border border-slate-200 overflow-hidden">
-        <div id="public-map" role="region" aria-label="Mapa publico de pontos"></div>
+        <div id="public-map" role="region" aria-label="Mapa público de pontos"></div>
       </section>
     </main>
   </div>
