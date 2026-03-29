@@ -1491,7 +1491,6 @@ function updateDataViewUI() {
   const uploadBtn = document.getElementById('upload-obras-btn');
   const addBtn = document.getElementById('add-fiscalizacao-btn');
   const dashboardBtn = document.getElementById('dashboard-btn');
-  const storageMode = document.getElementById('storage-mode-wrapper');
   const filterRegiao = document.getElementById('filter-regiao');
   const filterSituacao = document.getElementById('filter-situacao');
   const filterAno = document.getElementById('filter-ano');
@@ -1512,8 +1511,6 @@ function updateDataViewUI() {
   importBtn?.classList.toggle('hidden', isObras);
   uploadBtn?.classList.toggle('hidden', !isObras);
   addBtn?.classList.toggle('hidden', isObras);
-  storageMode?.classList.toggle('hidden', isObras);
-
   if (dashboardBtn) {
     dashboardBtn.classList.remove('hidden');
   }
