@@ -19,15 +19,20 @@ function buildConnectionString() {
 let pool;
 let initPromise;
 
+function shouldRejectUnauthorized() {
+  const value = process.env.PG_SSL_REJECT_UNAUTHORIZED;
+  if (value == null || String(value).trim() === "") {
+    return false;
+  }
+
+  return ["1", "true", "yes", "on"].includes(String(value).trim().toLowerCase());
+}
+
 function getPool() {
   if (!pool) {
-    const rejectUnauthorized = String(process.env.PG_SSL_REJECT_UNAUTHORIZED || "true")
-      .trim()
-      .toLowerCase() !== "false";
-
     pool = new Pool({
       connectionString: buildConnectionString(),
-      ssl: { rejectUnauthorized }
+      ssl: { rejectUnauthorized: shouldRejectUnauthorized() }
     });
   }
   return pool;
@@ -74,6 +79,38 @@ async function ensureSchema() {
           metadata JSONB,
           created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )
+      `);
+      await db.query(`
+        ALTER TABLE public.fiscalizacoes_audit
+        ADD COLUMN IF NOT EXISTS audit_id VARCHAR(128)
+      `);
+      await db.query(`
+        ALTER TABLE public.fiscalizacoes_audit
+        ADD COLUMN IF NOT EXISTS backend_id VARCHAR(128)
+      `);
+      await db.query(`
+        ALTER TABLE public.fiscalizacoes_audit
+        ADD COLUMN IF NOT EXISTS action VARCHAR(64) NOT NULL DEFAULT 'event'
+      `);
+      await db.query(`
+        ALTER TABLE public.fiscalizacoes_audit
+        ADD COLUMN IF NOT EXISTS source VARCHAR(32)
+      `);
+      await db.query(`
+        ALTER TABLE public.fiscalizacoes_audit
+        ADD COLUMN IF NOT EXISTS payload_before JSONB
+      `);
+      await db.query(`
+        ALTER TABLE public.fiscalizacoes_audit
+        ADD COLUMN IF NOT EXISTS payload_after JSONB
+      `);
+      await db.query(`
+        ALTER TABLE public.fiscalizacoes_audit
+        ADD COLUMN IF NOT EXISTS metadata JSONB
+      `);
+      await db.query(`
+        ALTER TABLE public.fiscalizacoes_audit
+        ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       `);
       await db.query(`
         CREATE INDEX IF NOT EXISTS fiscalizacoes_audit_created_at_idx

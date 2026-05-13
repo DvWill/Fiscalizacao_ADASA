@@ -229,7 +229,21 @@ window.dataSdk = {
         }
       });
 
-      if (!response.ok) return null;
+      if (!response.ok) {
+        let body = "";
+        try {
+          body = await response.text();
+        } catch {
+          body = "";
+        }
+        console.error("API request failed", {
+          method: options.method || "GET",
+          url,
+          status: response.status,
+          body: body.slice(0, 500)
+        });
+        return null;
+      }
       if (response.status === 204) return {};
 
       return await response.json();

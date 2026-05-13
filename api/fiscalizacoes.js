@@ -86,6 +86,14 @@ async function writeAudit(db, { action, backendId = null, source = "api", before
   );
 }
 
+async function safeWriteAudit(db, entry) {
+  try {
+    await writeAudit(db, entry);
+  } catch (error) {
+    console.error("fiscalizacoes audit write failed", error);
+  }
+}
+
 async function findDuplicateByIdentity(db, record, excludingBackendId = "") {
   const identity = buildIdentity(record);
   if (!identity) return null;
@@ -161,7 +169,7 @@ async function replaceRecords(db, records) {
 
     await db.query("COMMIT");
     const nextRecords = await listRecords(db);
-    await writeAudit(db, {
+    await safeWriteAudit(db, {
       action: "replace_all",
       source: "api",
       metadata: {
@@ -233,7 +241,7 @@ module.exports = async function handler(req, res) {
           `,
           [record.__backendId, nextPos, JSON.stringify(record)]
         );
-        await writeAudit(db, {
+        await safeWriteAudit(db, {
           action: "create",
           backendId: record.__backendId,
           source: "api",
@@ -315,7 +323,7 @@ module.exports = async function handler(req, res) {
           `,
           [idParam, JSON.stringify(record)]
         );
-        await writeAudit(db, {
+        await safeWriteAudit(db, {
           action: "update",
           backendId: idParam,
           source: "api",
@@ -334,7 +342,7 @@ module.exports = async function handler(req, res) {
           const previousCountResult = await db.query("SELECT COUNT(1) AS total FROM public.fiscalizacoes");
           const previousCount = Number(previousCountResult.rows[0]?.total || 0);
           const deletedResult = await db.query("DELETE FROM public.fiscalizacoes");
-          await writeAudit(db, {
+          await safeWriteAudit(db, {
             action: "delete_all",
             source: "api",
             metadata: {
@@ -353,7 +361,7 @@ module.exports = async function handler(req, res) {
           res.status(404).json({ error: "Fiscalizacao nao encontrada." });
           return;
         }
-        await writeAudit(db, {
+        await safeWriteAudit(db, {
           action: "delete",
           backendId: idParam,
           source: "api",
