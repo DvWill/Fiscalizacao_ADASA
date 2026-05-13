@@ -41,6 +41,11 @@ public class ObraResource {
                     .entity(Map.of("error", "Campo records deve ser uma lista."))
                     .build();
             }
+            if (rawRecords.size() > 5000) {
+                return Response.status(Response.Status.BAD_REQUEST)
+                    .entity(Map.of("error", "Limite de 5000 obras excedido."))
+                    .build();
+            }
 
             @SuppressWarnings("unchecked")
             List<Map<String, Object>> records = (List<Map<String, Object>>) (List<?>) rawRecords;

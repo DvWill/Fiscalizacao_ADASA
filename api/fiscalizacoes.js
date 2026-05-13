@@ -1,5 +1,10 @@
 const { withDb } = require("./_db");
-const { applyCors, requireBearerAuth } = require("./_security");
+const { applyCors, requireBearerAuth, requireBulkConfirmation } = require("./_security");
+const {
+  buildRecordId,
+  sanitizeFiscalizacaoRecord,
+  sanitizeFiscalizacaoRecords
+} = require("./_validation");
 
 function readBody(body) {
   if (!body) return {};
@@ -13,7 +18,7 @@ function readBody(body) {
 }
 
 function buildId(value) {
-  const fallback = Date.now().toString(36) + Math.random().toString(36).slice(2);
+  const fallback = buildRecordId();
   const raw = value == null ? "" : String(value);
   return raw.trim() || fallback;
 }
@@ -142,7 +147,7 @@ async function replaceRecords(db, records) {
     for (let index = 0; index < records.length; index += 1) {
       const record = {
         ...(records[index] || {}),
-        __backendId: buildId(records[index]?.__backendId)
+        __backendId: records[index]?.__backendId || buildRecordId()
       };
 
       await db.query(
@@ -203,10 +208,12 @@ module.exports = async function handler(req, res) {
 
       if (method === "POST") {
         const incoming = readBody(req.body);
-        const record = {
-          ...incoming,
-          __backendId: buildId(incoming.__backendId)
-        };
+        const sanitized = sanitizeFiscalizacaoRecord(incoming, { requireCore: true });
+        if (sanitized.errors.length) {
+          res.status(400).json({ error: sanitized.errors.join(" ") });
+          return;
+        }
+        const record = sanitized.record;
 
         const duplicate = await findDuplicateByIdentity(db, record);
         if (duplicate) {
@@ -241,13 +248,21 @@ module.exports = async function handler(req, res) {
         const incoming = readBody(req.body);
 
         if (!idParam) {
+          if (!requireBulkConfirmation(req, res, "replace-all")) return;
+
           if (!Array.isArray(incoming.records)) {
             res.status(400).json({ error: "Campo records deve ser uma lista." });
             return;
           }
 
+          const sanitized = sanitizeFiscalizacaoRecords(incoming.records, { requireCore: true });
+          if (sanitized.errors.length) {
+            res.status(400).json({ error: sanitized.errors.join(" ") });
+            return;
+          }
+
           try {
-            const records = await replaceRecords(db, incoming.records);
+            const records = await replaceRecords(db, sanitized.records);
             res.status(200).json({ records });
             return;
           } catch (error) {
@@ -270,11 +285,21 @@ module.exports = async function handler(req, res) {
         }
 
         const currentRecord = parsePayload(found.rows[0].payload);
-        const record = {
+        const mergedRecord = {
           ...currentRecord,
           ...incoming,
           __backendId: idParam
         };
+        const sanitized = sanitizeFiscalizacaoRecord(mergedRecord, {
+          forcedId: idParam,
+          requireCore: true,
+          allowId: true
+        });
+        if (sanitized.errors.length) {
+          res.status(400).json({ error: sanitized.errors.join(" ") });
+          return;
+        }
+        const record = sanitized.record;
 
         const duplicate = await findDuplicateByIdentity(db, record, idParam);
         if (duplicate) {
@@ -304,6 +329,8 @@ module.exports = async function handler(req, res) {
 
       if (method === "DELETE") {
         if (!idParam) {
+          if (!requireBulkConfirmation(req, res, "delete-all")) return;
+
           const previousCountResult = await db.query("SELECT COUNT(1) AS total FROM public.fiscalizacoes");
           const previousCount = Number(previousCountResult.rows[0]?.total || 0);
           const deletedResult = await db.query("DELETE FROM public.fiscalizacoes");

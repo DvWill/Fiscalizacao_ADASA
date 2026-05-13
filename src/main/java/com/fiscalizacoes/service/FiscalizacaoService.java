@@ -26,6 +26,33 @@ import javax.sql.DataSource;
 @ApplicationScoped
 public class FiscalizacaoService {
 
+    private static final Set<String> ALLOWED_RECORD_FIELDS = Set.of(
+        "__backendId",
+        "id",
+        "processo_sei",
+        "ano",
+        "objetivo",
+        "regiao_administrativa",
+        "situacao",
+        "tipo_documento",
+        "destinatario",
+        "direta_indireta",
+        "programada",
+        "sei_documento",
+        "data",
+        "constatacoes",
+        "constatacoes_nao_conformes",
+        "recomendacoes",
+        "determinacoes",
+        "termos_notificacao",
+        "autos_infracao",
+        "termos_ajuste",
+        "indice_conformidade",
+        "latitude",
+        "longitude",
+        "imagem"
+    );
+
     private final ObjectMapper objectMapper;
     private final DataSource dataSource;
     @ConfigProperty(name = "app.mirror.enabled", defaultValue = "false")
@@ -68,6 +95,7 @@ public class FiscalizacaoService {
     public Map<String, Object> createRecord(Map<String, Object> record) {
         Map<String, Object> normalizedRecord = normalizeRecord(record);
         validateTipoFiscalizacao(normalizedRecord);
+        validateRequiredFields(normalizedRecord);
 
         try (Connection connection = dataSource.getConnection()) {
             ensureNoDuplicateIdentity(connection, normalizedRecord, null);
@@ -91,6 +119,7 @@ public class FiscalizacaoService {
         for (Map<String, Object> record : incomingRecords) {
             Map<String, Object> normalizedRecord = normalizeRecord(record);
             validateTipoFiscalizacao(normalizedRecord);
+            validateRequiredFields(normalizedRecord);
             normalizedRecords.add(normalizedRecord);
         }
         validateBatchIdentityUniqueness(normalizedRecords);
@@ -136,6 +165,7 @@ public class FiscalizacaoService {
             mergedRecord.put("__backendId", id);
             Map<String, Object> normalizedRecord = normalizeRecord(mergedRecord);
             validateTipoFiscalizacao(normalizedRecord);
+            validateRequiredFields(normalizedRecord);
             ensureNoDuplicateIdentity(connection, normalizedRecord, id);
 
             try (PreparedStatement updateStatement = connection.prepareStatement(updateSql)) {
@@ -222,7 +252,11 @@ public class FiscalizacaoService {
     private Map<String, Object> normalizeRecord(Map<String, Object> record) {
         Map<String, Object> normalized = new LinkedHashMap<>();
         if (record != null) {
-            normalized.putAll(record);
+            for (String field : ALLOWED_RECORD_FIELDS) {
+                if (record.containsKey(field)) {
+                    normalized.put(field, record.get(field));
+                }
+            }
         }
 
         Object backendId = normalized.get("__backendId");
@@ -237,6 +271,14 @@ public class FiscalizacaoService {
         String tipo = String.valueOf(record.getOrDefault("direta_indireta", "")).trim();
         if (!tipo.isEmpty() && !"direta".equalsIgnoreCase(tipo) && !"indireta".equalsIgnoreCase(tipo)) {
             throw new IllegalArgumentException("Campo direta_indireta deve ser \"Direta\" ou \"Indireta\".");
+        }
+    }
+
+    private void validateRequiredFields(Map<String, Object> record) {
+        String id = String.valueOf(record.getOrDefault("id", "")).trim();
+        String processo = String.valueOf(record.getOrDefault("processo_sei", "")).trim();
+        if (id.isBlank() || processo.isBlank()) {
+            throw new IllegalArgumentException("Campos id e processo_sei sao obrigatorios.");
         }
     }
 

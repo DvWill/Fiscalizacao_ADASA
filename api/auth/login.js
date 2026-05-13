@@ -2,7 +2,9 @@ const {
   applyCors,
   safeEquals,
   getLoginCredentials,
-  setAuthCookie
+  setAuthCookie,
+  checkRateLimit,
+  getClientIp
 } = require("../_security");
 
 function readBody(body) {
@@ -31,12 +33,27 @@ module.exports = async function handler(req, res) {
     return;
   }
 
+  const clientIp = getClientIp(req);
+  const ipLimit = checkRateLimit(`login:ip:${clientIp}`, { limit: 20, windowMs: 15 * 60 * 1000 });
+  if (!ipLimit.allowed) {
+    res.setHeader("Retry-After", String(ipLimit.retryAfterSeconds));
+    res.status(429).json({ error: "Muitas tentativas de login. Tente novamente mais tarde." });
+    return;
+  }
+
   const payload = readBody(req.body);
   const login = String(payload.login || payload.username || "").trim();
   const senha = String(payload.senha || payload.password || "");
 
   if (!login || !senha) {
     res.status(400).json({ error: "Informe login e senha." });
+    return;
+  }
+
+  const loginLimit = checkRateLimit(`login:user:${login.toLowerCase()}`, { limit: 10, windowMs: 15 * 60 * 1000 });
+  if (!loginLimit.allowed) {
+    res.setHeader("Retry-After", String(loginLimit.retryAfterSeconds));
+    res.status(429).json({ error: "Muitas tentativas de login. Tente novamente mais tarde." });
     return;
   }
 

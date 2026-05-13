@@ -1,5 +1,6 @@
 const { withDb } = require("./_db");
 const { applyCors, requireBearerAuth } = require("./_security");
+const { buildRecordId, sanitizeAuditEntry } = require("./_validation");
 
 function readBody(body) {
   if (!body) return {};
@@ -18,7 +19,7 @@ function queryParamToString(value) {
 }
 
 function buildId() {
-  return Date.now().toString(36) + Math.random().toString(36).slice(2);
+  return buildRecordId();
 }
 
 function sanitizeLimit(value) {
@@ -72,9 +73,12 @@ module.exports = async function handler(req, res) {
 
       if (method === "POST") {
         const incoming = readBody(req.body);
-        const action = String(incoming.action || "").trim() || "event";
-        const backendId = incoming.backendId == null ? null : String(incoming.backendId).trim() || null;
-        const source = String(incoming.source || "api").trim() || "api";
+        const sanitized = sanitizeAuditEntry(incoming);
+        if (sanitized.errors.length) {
+          res.status(400).json({ error: sanitized.errors.join(" ") });
+          return;
+        }
+        const { action, backendId, source, before, after, metadata, createdAt } = sanitized.entry;
 
         await db.query(
           `
@@ -95,10 +99,10 @@ module.exports = async function handler(req, res) {
             backendId,
             action,
             source,
-            incoming.before ? JSON.stringify(incoming.before) : null,
-            incoming.after ? JSON.stringify(incoming.after) : null,
-            incoming.metadata ? JSON.stringify(incoming.metadata) : null,
-            incoming.createdAt || null
+            before ? JSON.stringify(before) : null,
+            after ? JSON.stringify(after) : null,
+            metadata ? JSON.stringify(metadata) : null,
+            createdAt
           ]
         );
 

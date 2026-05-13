@@ -11,6 +11,10 @@ target/
 .redhat/
 .github/java-upgrade/
 data/*.mv.db
+data/*.json
+data/*.code-workspace
+*.log
+*.response.log
 tmp_obras_xlsx/
 tmp_obras_upload.zip
 tmp_test_write.txt

@@ -1,4 +1,4 @@
-const { applyCors, clearAuthCookie } = require("../_security");
+const { applyCors, clearAuthCookie, revokeSession } = require("../_security");
 
 module.exports = async function handler(req, res) {
   if (applyCors(req, res, ["POST", "OPTIONS"])) return;
@@ -9,6 +9,7 @@ module.exports = async function handler(req, res) {
     return;
   }
 
+  revokeSession(req);
   clearAuthCookie(req, res);
   res.status(200).json({ ok: true });
 };

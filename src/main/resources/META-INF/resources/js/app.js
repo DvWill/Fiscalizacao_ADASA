@@ -253,6 +253,30 @@ function escapeHtml(value) {
     .replace(/'/g, '&#39;');
 }
 
+function escapeJsString(value) {
+  return String(value ?? '')
+    .replace(/\\/g, '\\\\')
+    .replace(/'/g, "\\'")
+    .replace(/\r/g, '\\r')
+    .replace(/\n/g, '\\n')
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029')
+    .replace(/</g, '\\x3C');
+}
+
+function isSafeImageDataUrl(value) {
+  const raw = String(value ?? '').trim();
+  if (!raw) return false;
+  const match = raw.match(/^data:image\/(png|jpeg|webp);base64,([A-Za-z0-9+/=]+)$/);
+  if (!match) return false;
+  return Math.floor((match[2].length * 3) / 4) <= 2 * 1024 * 1024;
+}
+
+function getSafeImageSrc(value) {
+  const raw = String(value ?? '').trim();
+  return isSafeImageDataUrl(raw) ? raw : '';
+}
+
 function hasMeaningfulRecordData(record) {
   return Object.values(record || {}).some((value) => {
     if (value == null) return false;
@@ -992,6 +1016,9 @@ function hasObraCoordinates(obra) {
 async function replaceObrasApiRecords(records) {
   const payload = await window.dataSdk._fetchJson(window.dataSdk._buildUrl('/obras'), {
     method: 'PUT',
+    headers: {
+      'X-Confirm-Bulk-Operation': 'replace-all'
+    },
     body: JSON.stringify({ records })
   });
 
@@ -1157,6 +1184,9 @@ async function replaceFiscalizacoesData(records) {
 
   const payload = await window.dataSdk._fetchJson(window.dataSdk._buildUrl('/fiscalizacoes'), {
     method: 'PUT',
+    headers: {
+      'X-Confirm-Bulk-Operation': 'replace-all'
+    },
     body: JSON.stringify({ records })
   });
 
@@ -1313,7 +1343,10 @@ async function logoutSession() {
   try {
     await fetch(`${getApiBaseUrl()}/auth/logout`, {
       method: 'POST',
-      credentials: 'include'
+      credentials: 'include',
+      headers: {
+        'X-CSRF-Token': window.APP_CSRF_TOKEN || ''
+      }
     });
   } catch {
     // Mesmo com falha de rede, seguimos para limpar o acesso local.
@@ -2270,8 +2303,8 @@ function renderFiscalizacoesList() {
       <div class="list-card p-3 rounded-lg bg-slate-800/50 hover:bg-slate-700/50 cursor-pointer transition-colors border border-slate-700/50 focus-visible:ring-2 focus-visible:ring-blue-500"
            role="button"
            tabindex="0"
-           onkeydown="if(event.key==='Enter' || event.key===' '){event.preventDefault(); focusFiscalizacao('${fisc.__backendId}');}"
-           onclick="focusFiscalizacao('${fisc.__backendId}')">
+           onkeydown="if(event.key==='Enter' || event.key===' '){event.preventDefault(); focusFiscalizacao('${escapeJsString(fisc.__backendId)}');}"
+           onclick="focusFiscalizacao('${escapeJsString(fisc.__backendId)}')">
         <div class="flex items-center justify-between mb-2">
           <span class="font-semibold text-sm">${idLabel}</span>
           <span class="${statusClass}" style="font-size: 10px; padding: 2px 8px;">${statusLabel}</span>
@@ -2335,8 +2368,8 @@ function renderObrasList() {
       <div class="list-card p-3 rounded-lg bg-slate-800/50 hover:bg-slate-700/50 cursor-pointer transition-colors border border-slate-700/50 focus-visible:ring-2 focus-visible:ring-emerald-500"
            role="button"
            tabindex="0"
-           onkeydown="if(event.key==='Enter' || event.key===' '){event.preventDefault(); focusObra('${obra.__obraId}');}"
-           onclick="focusObra('${obra.__obraId}')">
+           onkeydown="if(event.key==='Enter' || event.key===' '){event.preventDefault(); focusObra('${escapeJsString(obra.__obraId)}');}"
+           onclick="focusObra('${escapeJsString(obra.__obraId)}')">
         <div class="flex items-start justify-between gap-3 mb-2">
           <span class="font-semibold text-sm leading-tight">${itemLabel}</span>
           <span style="font-size:10px;padding:2px 8px;border-radius:999px;background:${color};color:white;white-space:nowrap;">
@@ -2385,8 +2418,8 @@ window.focusObra = focusObra;
 function createDetailField(label, value) {
   return `
     <div class="detail-field">
-      <p class="detail-field-label">${label}</p>
-      <p class="detail-field-value">${value || '-'}</p>
+      <p class="detail-field-label">${escapeHtml(label)}</p>
+      <p class="detail-field-value">${escapeHtml(value || '-')}</p>
     </div>
   `;
 }
@@ -2404,6 +2437,7 @@ function showDetailPanel(fisc) {
 
   const statusClass = fisc.situacao === 'Em Andamento' ? 'status-andamento' :
                       fisc.situacao === 'Concluida' ? 'status-concluida' : 'status-pendente';
+  const safeImage = getSafeImageSrc(fisc.imagem);
 
   setDetailPanelActionsVisible(true);
   document.getElementById('detail-title').textContent = fisc.id || 'Detalhes da Fiscalização';
@@ -2444,7 +2478,7 @@ function showDetailPanel(fisc) {
         ${fisc.objetivo ? `
           <div class="mt-3">
             <p class="text-xs text-slate-500 mb-1">Objetivo</p>
-            <p class="detail-rich-text">${fisc.objetivo}</p>
+            <p class="detail-rich-text">${escapeHtml(fisc.objetivo)}</p>
           </div>
         ` : ''}
       </div>
@@ -2467,11 +2501,11 @@ function showDetailPanel(fisc) {
         </div>
       ` : ''}
 
-      ${fisc.imagem ? `
+      ${safeImage ? `
         <div class="space-y-3">
           <h3 class="text-sm font-semibold text-blue-400 uppercase tracking-wider">Imagem</h3>
           <div class="rounded-xl overflow-hidden border border-slate-700 bg-slate-900/80">
-            <img src="${fisc.imagem}" alt="Imagem da fiscalização" class="w-full object-cover max-h-96">
+            <img src="${escapeHtml(safeImage)}" alt="Imagem da fiscalização" class="w-full object-cover max-h-96">
           </div>
         </div>
       ` : ''}
@@ -2527,7 +2561,7 @@ function showObraDetailPanel(obra) {
         ${obra.objeto_contrato ? `
           <div class="mt-3">
             <p class="text-xs text-slate-500 mb-1">Objeto do Contrato</p>
-            <p class="detail-rich-text">${obra.objeto_contrato}</p>
+            <p class="detail-rich-text">${escapeHtml(obra.objeto_contrato)}</p>
           </div>
         ` : ''}
       </div>
@@ -2577,7 +2611,7 @@ function showObraDetailPanel(obra) {
       ${obra.observacoes ? `
         <div class="space-y-3">
           <h3 class="text-sm font-semibold text-emerald-400 uppercase tracking-wider">Observações</h3>
-          <p class="text-sm text-slate-300 bg-slate-800/50 rounded-lg p-3">${obra.observacoes}</p>
+          <p class="text-sm text-slate-300 bg-slate-800/50 rounded-lg p-3">${escapeHtml(obra.observacoes)}</p>
         </div>
       ` : ''}
     </div>
@@ -2934,9 +2968,10 @@ function updateImagemPreview({ data = '', name = '' } = {}) {
 
   if (!hidden || !preview || !img || !label) return;
 
-  if (data) {
-    hidden.value = data;
-    img.src = data;
+  const safeData = getSafeImageSrc(data);
+  if (safeData) {
+    hidden.value = safeData;
+    img.src = safeData;
     label.textContent = name || 'Imagem selecionada';
     preview.classList.remove('hidden');
   } else {
@@ -2956,6 +2991,14 @@ function handleImagemSelected(event) {
   }
 
   const maxBytes = 2 * 1024 * 1024;
+  const allowedTypes = new Set(['image/png', 'image/jpeg', 'image/webp']);
+  if (!allowedTypes.has(String(file.type || '').toLowerCase())) {
+    showToast('Use uma imagem PNG, JPEG ou WebP.', 'warning');
+    event.target.value = '';
+    updateImagemPreview();
+    return;
+  }
+
   if (file.size > maxBytes) {
     showToast('Imagem deve ter no máximo 2MB.', 'warning');
     event.target.value = '';
@@ -3937,14 +3980,19 @@ function parseImportRecordFromCells(cells) {
   }
 
   const tipoFiscalizacao = norm(cells[7]);
-  if (normalizeType(tipoFiscalizacao) !== 'direta') {
+  const tipoFiscalizacaoNormalizado = normalizeType(tipoFiscalizacao);
+  const diretaIndireta = tipoFiscalizacaoNormalizado === 'indireta'
+    ? 'Indireta'
+    : tipoFiscalizacaoNormalizado === 'direta'
+      ? 'Direta'
+      : '';
+
+  if (tipoFiscalizacao && !diretaIndireta) {
+    rowResult.status = 'error';
+    rowResult.notes.push('Tipo de fiscalização inválido; use Direta ou Indireta.');
+  } else if (!tipoFiscalizacao) {
     rowResult.status = 'warning';
-    rowResult.notes.push('Ignorada: somente fiscalizações Direta são importadas.');
-    rowResult.id = norm(cells[0]);
-    rowResult.regiao = regiao;
-    rowResult.situacao = norm(cells[5]);
-    rowResult.conformidade = norm(cells[18]);
-    return rowResult;
+    rowResult.notes.push('Tipo Direta/Indireta vazio; será mantido sem classificação.');
   }
 
   const id = norm(cells[0]);
@@ -3961,7 +4009,7 @@ function parseImportRecordFromCells(cells) {
 
   let ano = parseIntSafe(cells[2]);
   if (!Number.isFinite(ano)) {
-    rowResult.status = 'warning';
+    rowResult.status = rowResult.status === 'error' ? 'error' : 'warning';
     rowResult.notes.push('Ano ausente ou inválido; será mantido vazio.');
     ano = null;
   }
@@ -3996,7 +4044,7 @@ function parseImportRecordFromCells(cells) {
     situacao: norm(cells[5]),
     tipo_documento: norm(cells[6]),
     destinatario: '',
-    direta_indireta: 'Direta',
+    direta_indireta: diretaIndireta,
     programada: norm(cells[8]),
     sei_documento: norm(cells[9]),
     data: toIsoDate(norm(cells[10])),

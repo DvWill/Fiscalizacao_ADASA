@@ -26,7 +26,7 @@ class FiscalizacaoResourceTest {
     void shouldAcceptIndirectaRecords() {
         given()
             .contentType("application/json")
-            .body("{\"direta_indireta\":\"Indireta\"}")
+            .body("{\"id\":\"FISC-IND-1\",\"processo_sei\":\"00001/2026\",\"direta_indireta\":\"Indireta\"}")
             .when()
             .post("/api/fiscalizacoes")
             .then()
@@ -38,6 +38,7 @@ class FiscalizacaoResourceTest {
     @Test
     void shouldReplaceAllRecords() {
         given()
+            .header("X-Confirm-Bulk-Operation", "delete-all")
             .when()
             .delete("/api/fiscalizacoes")
             .then()
@@ -45,7 +46,8 @@ class FiscalizacaoResourceTest {
 
         given()
             .contentType("application/json")
-            .body("{\"records\":[{\"direta_indireta\":\"Direta\"},{\"direta_indireta\":\"Indireta\"}]}")
+            .header("X-Confirm-Bulk-Operation", "replace-all")
+            .body("{\"records\":[{\"id\":\"FISC-BULK-1\",\"processo_sei\":\"00002/2026\",\"direta_indireta\":\"Direta\"},{\"id\":\"FISC-BULK-2\",\"processo_sei\":\"00003/2026\",\"direta_indireta\":\"Indireta\"}]}")
             .when()
             .put("/api/fiscalizacoes")
             .then()
@@ -58,6 +60,7 @@ class FiscalizacaoResourceTest {
     @Test
     void shouldDeleteAllRecords() {
         given()
+            .header("X-Confirm-Bulk-Operation", "delete-all")
             .when()
             .delete("/api/fiscalizacoes")
             .then()
@@ -65,13 +68,14 @@ class FiscalizacaoResourceTest {
 
         given()
             .contentType("application/json")
-            .body("{\"direta_indireta\":\"Direta\"}")
+            .body("{\"id\":\"FISC-DEL-1\",\"processo_sei\":\"00004/2026\",\"direta_indireta\":\"Direta\"}")
             .when()
             .post("/api/fiscalizacoes")
             .then()
             .statusCode(201);
 
         given()
+            .header("X-Confirm-Bulk-Operation", "delete-all")
             .when()
             .delete("/api/fiscalizacoes")
             .then()

@@ -21,9 +21,13 @@ let initPromise;
 
 function getPool() {
   if (!pool) {
+    const rejectUnauthorized = String(process.env.PG_SSL_REJECT_UNAUTHORIZED || "true")
+      .trim()
+      .toLowerCase() !== "false";
+
     pool = new Pool({
       connectionString: buildConnectionString(),
-      ssl: { rejectUnauthorized: false }
+      ssl: { rejectUnauthorized }
     });
   }
   return pool;

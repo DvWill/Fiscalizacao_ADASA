@@ -18,11 +18,45 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import javax.sql.DataSource;
 
 @ApplicationScoped
 public class ObraService {
+
+    private static final Set<String> ALLOWED_RECORD_FIELDS = Set.of(
+        "__obraId",
+        "item",
+        "sistema",
+        "tipo",
+        "programa",
+        "acao",
+        "local",
+        "numero_contrato",
+        "objeto_contrato",
+        "situacao_contrato",
+        "fornecedor",
+        "numero_processo_sei",
+        "tipo_recurso",
+        "fonte_recurso",
+        "execucao_inicio",
+        "execucao_termino",
+        "valor_total_obra",
+        "valor_executado_2025",
+        "valor_executado_jan_jun",
+        "valor_executado_jul_dez",
+        "percentual_executado_obra",
+        "execucao_financeira_pct",
+        "execucao_fisica_pct",
+        "latitude",
+        "longitude",
+        "observacoes",
+        "sigla_uo",
+        "em_operacao",
+        "item_gplan",
+        "codigo_plano_exploracao"
+    );
 
     private final ObjectMapper objectMapper;
     private final DataSource dataSource;
@@ -100,7 +134,11 @@ public class ObraService {
     private Map<String, Object> normalizeRecord(Map<String, Object> record) {
         Map<String, Object> normalized = new LinkedHashMap<>();
         if (record != null) {
-            normalized.putAll(record);
+            for (String field : ALLOWED_RECORD_FIELDS) {
+                if (record.containsKey(field)) {
+                    normalized.put(field, record.get(field));
+                }
+            }
         }
 
         Object obraId = normalized.get("__obraId");

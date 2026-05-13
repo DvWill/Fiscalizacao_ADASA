@@ -211,6 +211,9 @@ window.dataSdk = {
     if (config.token) {
       headers.Authorization = `Bearer ${config.token}`;
     }
+    if (window.APP_CSRF_TOKEN) {
+      headers["X-CSRF-Token"] = window.APP_CSRF_TOKEN;
+    }
 
     return headers;
   },
@@ -219,6 +222,7 @@ window.dataSdk = {
     try {
       const response = await fetch(url, {
         ...options,
+        credentials: "include",
         headers: {
           ...this._getHeaders(),
           ...(options.headers || {})

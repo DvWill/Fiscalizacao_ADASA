@@ -44,7 +44,7 @@ public class FiscalizacaoResource {
             return Response.status(Response.Status.BAD_REQUEST)
                 .entity(Map.of("error", exception.getMessage()))
                 .build();
-        } catch (RuntimeException exception) {
+        } catch (RuntimeException excetion) {
             return internalError("Falha ao salvar fiscalizacao.");
         }
     }
@@ -56,6 +56,11 @@ public class FiscalizacaoResource {
             if (!(recordsValue instanceof List<?> rawRecords)) {
                 return Response.status(Response.Status.BAD_REQUEST)
                     .entity(Map.of("error", "Campo records deve ser uma lista."))
+                    .build();
+            }
+            if (rawRecords.size() > 999) {
+                return Response.status(Response.Status.BAD_REQUEST)
+                    .entity(Map.of("error", "Limite de 999 fiscalizacoes excedido."))
                     .build();
             }
 

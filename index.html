@@ -1178,6 +1178,7 @@
 
         const authPayload = await response.json().catch(() => ({}));
         window.APP_AUTH_USER = String(authPayload.login || "").trim();
+        window.APP_CSRF_TOKEN = String(authPayload.csrfToken || "").trim();
 
         await loadScript("./js/storage.js");
         await loadScript("./js/app.js");

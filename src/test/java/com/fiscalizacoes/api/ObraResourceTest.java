@@ -24,6 +24,7 @@ class ObraResourceTest {
     void shouldReplaceAllObras() {
         given()
             .contentType("application/json")
+            .header("X-Confirm-Bulk-Operation", "replace-all")
             .body("""
                 {
                   "records": [
@@ -61,6 +62,7 @@ class ObraResourceTest {
     void shouldReplaceObrasWithEmptyList() {
         given()
             .contentType("application/json")
+            .header("X-Confirm-Bulk-Operation", "replace-all")
             .body("""
                 {
                   "records": [
@@ -79,6 +81,7 @@ class ObraResourceTest {
 
         given()
             .contentType("application/json")
+            .header("X-Confirm-Bulk-Operation", "replace-all")
             .body("""
                 {
                   "records": []

@@ -9,7 +9,49 @@ const DATA_DIR = path.join(__dirname, "data");
 const DATA_FILE = path.join(DATA_DIR, "fiscalizacoes.json");
 
 app.use(express.json({ limit: "1mb" }));
-app.use(express.static(__dirname));
+app.use((req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  next();
+});
+app.use((req, res, next) => {
+  const blocked = /^\/(?:\.env|data\/|api\/|src\/|target\/|node_modules\/|.*\.log$)/i.test(req.path);
+  if (blocked) {
+    res.status(404).end();
+    return;
+  }
+  next();
+});
+app.use(express.static(__dirname, { dotfiles: "deny" }));
+
+function safeEquals(a, b) {
+  const left = Buffer.from(String(a));
+  const right = Buffer.from(String(b));
+  return left.length === right.length && crypto.timingSafeEqual(left, right);
+}
+
+function requireApiAuth(req, res, next) {
+  const expectedToken = String(process.env.API_TOKEN || process.env.APP_API_TOKEN || "").trim();
+  if (!expectedToken && String(process.env.NODE_ENV || "").toLowerCase() !== "production") {
+    next();
+    return;
+  }
+  if (!expectedToken) {
+    res.status(503).json({ error: "Autenticacao obrigatoria nao configurada no servidor." });
+    return;
+  }
+
+  const match = String(req.headers.authorization || "").match(/^Bearer\s+(.+)$/i);
+  if (!match || !safeEquals(match[1].trim(), expectedToken)) {
+    res.status(401).json({ error: "Nao autorizado." });
+    return;
+  }
+
+  next();
+}
+
+app.use("/api", requireApiAuth);
 
 async function ensureDataFile() {
   await fs.mkdir(DATA_DIR, { recursive: true });

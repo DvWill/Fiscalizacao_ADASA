@@ -2,6 +2,9 @@ const crypto = require("crypto");
 
 const SESSION_COOKIE_NAME = "fiscalizacoes_session";
 const DEFAULT_SESSION_TTL_SECONDS = 60 * 60 * 12;
+const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+const revokedSessions = new Map();
+const rateLimitBuckets = new Map();
 
 function toNormalizedOrigin(value) {
   return String(value || "").trim().replace(/\/+$/, "");
@@ -17,6 +20,13 @@ function getServerOrigin(req) {
     .toLowerCase();
   const protocol = forwardedProto || (host.includes("localhost") ? "http" : "https");
   return `${protocol}://${host}`;
+}
+
+function setBaseSecurityHeaders(res) {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=(self)");
 }
 
 function getAllowedOrigins() {
@@ -35,7 +45,10 @@ function isOriginAllowed(req, origin) {
   const allowAll = String(process.env.CORS_ALLOW_ALL || "")
     .trim()
     .toLowerCase() === "true";
-  if (allowAll) return true;
+  const allowAllInProduction = String(process.env.CORS_ALLOW_ALL_IN_PRODUCTION || "")
+    .trim()
+    .toLowerCase() === "true";
+  if (allowAll && (!isProductionLike() || allowAllInProduction)) return true;
 
   const serverOrigin = toNormalizedOrigin(getServerOrigin(req));
   if (serverOrigin && normalizedOrigin === serverOrigin) return true;
@@ -45,6 +58,7 @@ function isOriginAllowed(req, origin) {
 }
 
 function applyCors(req, res, methods) {
+  setBaseSecurityHeaders(res);
   const origin = String(req.headers.origin || "").trim();
 
   if (origin) {
@@ -58,7 +72,10 @@ function applyCors(req, res, methods) {
   }
 
   res.setHeader("Access-Control-Allow-Methods", methods.join(", "));
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.setHeader(
+    "Access-Control-Allow-Headers",
+    "Content-Type, Authorization, X-CSRF-Token, X-Confirm-Bulk-Operation"
+  );
 
   if (String(req.method || "").toUpperCase() === "OPTIONS") {
     res.status(204).end();
@@ -66,6 +83,36 @@ function applyCors(req, res, methods) {
   }
 
   return false;
+}
+
+function isProductionLike() {
+  const nodeEnv = String(process.env.NODE_ENV || "").trim().toLowerCase();
+  return nodeEnv === "production" || String(process.env.VERCEL || "") === "1";
+}
+
+function getClientIp(req) {
+  return String(req.headers["x-forwarded-for"] || req.socket?.remoteAddress || "")
+    .split(",")[0]
+    .trim() || "unknown";
+}
+
+function checkRateLimit(key, { limit = 20, windowMs = 60_000 } = {}) {
+  const now = Date.now();
+  const bucketKey = String(key || "default");
+  const bucket = rateLimitBuckets.get(bucketKey) || { count: 0, resetAt: now + windowMs };
+
+  if (bucket.resetAt <= now) {
+    bucket.count = 0;
+    bucket.resetAt = now + windowMs;
+  }
+
+  bucket.count += 1;
+  rateLimitBuckets.set(bucketKey, bucket);
+
+  return {
+    allowed: bucket.count <= limit,
+    retryAfterSeconds: Math.max(1, Math.ceil((bucket.resetAt - now) / 1000))
+  };
 }
 
 function parseBearerToken(headerValue) {
@@ -149,6 +196,11 @@ function parseCookies(req) {
   return cookies;
 }
 
+function getSessionTokenFromRequest(req) {
+  const cookies = parseCookies(req);
+  return String(cookies[SESSION_COOKIE_NAME] || "").trim();
+}
+
 function sign(value, secret) {
   return crypto
     .createHmac("sha256", secret)
@@ -170,9 +222,19 @@ function buildSessionToken(login) {
   return `${encodedPayload}.${signature}`;
 }
 
-function decodeSessionToken(token) {
+function cleanupRevokedSessions() {
+  const now = Date.now();
+  for (const [token, expiresAt] of revokedSessions.entries()) {
+    if (expiresAt <= now) revokedSessions.delete(token);
+  }
+}
+
+function decodeSessionToken(token, options = {}) {
   const raw = String(token || "").trim();
   if (!raw) return null;
+
+  cleanupRevokedSessions();
+  if (!options.ignoreRevocation && revokedSessions.has(raw)) return null;
 
   const [encodedPayload, signature] = raw.split(".");
   if (!encodedPayload || !signature) return null;
@@ -198,6 +260,15 @@ function decodeSessionToken(token) {
   } catch {
     return null;
   }
+}
+
+function revokeSession(req) {
+  const token = getSessionTokenFromRequest(req);
+  const session = decodeSessionToken(token, { ignoreRevocation: true });
+  if (!token || !session) return false;
+
+  revokedSessions.set(token, session.iat + getSessionTtlSeconds() * 1000);
+  return true;
 }
 
 function isSecureRequest(req) {
@@ -257,8 +328,24 @@ function clearAuthCookie(req, res) {
 }
 
 function readSession(req) {
-  const cookies = parseCookies(req);
-  return decodeSessionToken(cookies[SESSION_COOKIE_NAME]);
+  return decodeSessionToken(getSessionTokenFromRequest(req));
+}
+
+function buildCsrfToken(req) {
+  const sessionToken = getSessionTokenFromRequest(req);
+  const secret = getSessionSecret();
+  if (!sessionToken || !secret) return "";
+  return sign(`csrf:${sessionToken}`, secret);
+}
+
+function isCsrfValid(req, auth) {
+  const method = String(req.method || "GET").toUpperCase();
+  if (SAFE_METHODS.has(method)) return true;
+  if (auth?.mode !== "session") return true;
+
+  const expected = buildCsrfToken(req);
+  const provided = String(req.headers["x-csrf-token"] || "").trim();
+  return Boolean(expected && provided && safeEquals(provided, expected));
 }
 
 function resolveAuthorization(req) {
@@ -288,6 +375,15 @@ function resolveAuthorization(req) {
   const authRequired = Boolean(expectedToken || loginConfig.enabled);
 
   if (!authRequired) {
+    if (isProductionLike()) {
+      return {
+        authenticated: false,
+        authRequired: true,
+        mode: "unconfigured",
+        login: ""
+      };
+    }
+
     return {
       authenticated: true,
       authRequired: false,
@@ -307,20 +403,41 @@ function resolveAuthorization(req) {
 function requireBearerAuth(req, res) {
   const auth = resolveAuthorization(req);
   if (auth.authenticated) {
-    return true;
+    if (!isCsrfValid(req, auth)) {
+      res.status(403).json({ error: "Token CSRF ausente ou invalido." });
+      return false;
+    }
+    return auth;
   }
 
   res.setHeader("WWW-Authenticate", "Bearer");
-  res.status(401).json({ error: "Nao autorizado." });
+  const status = auth.mode === "unconfigured" ? 503 : 401;
+  const message = auth.mode === "unconfigured"
+    ? "Autenticacao obrigatoria nao configurada no servidor."
+    : "Nao autorizado.";
+  res.status(status).json({ error: message });
+  return false;
+}
+
+function requireBulkConfirmation(req, res, expectedValue) {
+  const provided = String(req.headers["x-confirm-bulk-operation"] || "").trim();
+  if (provided === expectedValue) return true;
+
+  res.status(400).json({ error: "Confirmacao de operacao em massa ausente." });
   return false;
 }
 
 module.exports = {
   applyCors,
   requireBearerAuth,
+  requireBulkConfirmation,
   safeEquals,
+  checkRateLimit,
+  getClientIp,
   getLoginCredentials,
   setAuthCookie,
   clearAuthCookie,
-  resolveAuthorization
+  revokeSession,
+  resolveAuthorization,
+  buildCsrfToken
 };

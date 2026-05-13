@@ -1,5 +1,6 @@
 const { withDb } = require("./_db");
-const { applyCors, requireBearerAuth } = require("./_security");
+const { applyCors, requireBearerAuth, requireBulkConfirmation } = require("./_security");
+const { buildRecordId, sanitizeObraRecords } = require("./_validation");
 
 function readBody(body) {
   if (!body) return {};
@@ -13,7 +14,7 @@ function readBody(body) {
 }
 
 function buildId(value) {
-  const fallback = Date.now().toString(36) + Math.random().toString(36).slice(2);
+  const fallback = buildRecordId();
   const raw = value == null ? "" : String(value);
   return raw.trim() || fallback;
 }
@@ -108,18 +109,28 @@ module.exports = async function handler(req, res) {
       }
 
       if (method === "PUT") {
+        if (!requireBulkConfirmation(req, res, "replace-all")) return;
+
         const incoming = readBody(req.body);
         if (!Array.isArray(incoming.records)) {
           res.status(400).json({ error: "Campo records deve ser uma lista." });
           return;
         }
 
-        const records = await replaceRecords(db, incoming.records);
+        const sanitized = sanitizeObraRecords(incoming.records);
+        if (sanitized.errors.length) {
+          res.status(400).json({ error: sanitized.errors.join(" ") });
+          return;
+        }
+
+        const records = await replaceRecords(db, sanitized.records);
         res.status(200).json({ records });
         return;
       }
 
       if (method === "DELETE") {
+        if (!requireBulkConfirmation(req, res, "delete-all")) return;
+
         const deletedResult = await db.query("DELETE FROM public.obras");
         res.status(200).json({ deleted: deletedResult.rowCount || 0 });
         return;

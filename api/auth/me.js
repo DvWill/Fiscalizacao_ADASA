@@ -1,4 +1,4 @@
-const { applyCors, resolveAuthorization } = require("../_security");
+const { applyCors, resolveAuthorization, buildCsrfToken } = require("../_security");
 
 module.exports = async function handler(req, res) {
   if (applyCors(req, res, ["GET", "OPTIONS"])) return;
@@ -22,6 +22,7 @@ module.exports = async function handler(req, res) {
     authenticated: true,
     authRequired: auth.authRequired,
     mode: auth.mode,
-    login: auth.login || ""
+    login: auth.login || "",
+    csrfToken: auth.mode === "session" ? buildCsrfToken(req) : ""
   });
 };
