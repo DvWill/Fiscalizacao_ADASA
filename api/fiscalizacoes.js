@@ -103,8 +103,8 @@ async function findDuplicateByIdentity(db, record, excludingBackendId = "") {
   let query = `
     SELECT backend_id, payload
     FROM public.fiscalizacoes
-    WHERE LOWER(REGEXP_REPLACE(COALESCE(payload->>'id', ''), '\\s+', '', 'g')) = $1
-      AND LOWER(REGEXP_REPLACE(COALESCE(payload->>'processo_sei', ''), '\\s+', '', 'g')) = $2
+    WHERE LOWER(REGEXP_REPLACE(COALESCE((payload::jsonb)->>'id', ''), '\\s+', '', 'g')) = $1
+      AND LOWER(REGEXP_REPLACE(COALESCE((payload::jsonb)->>'processo_sei', ''), '\\s+', '', 'g')) = $2
   `;
 
   if (excludingBackendId) {
@@ -161,7 +161,7 @@ async function replaceRecords(db, records) {
       await db.query(
         `
           INSERT INTO public.fiscalizacoes (backend_id, position, payload, created_at, updated_at)
-          VALUES ($1, $2, $3::jsonb, NOW(), NOW())
+          VALUES ($1, $2, $3, NOW(), NOW())
         `,
         [record.__backendId, index, JSON.stringify(record)]
       );
@@ -235,7 +235,7 @@ module.exports = async function handler(req, res) {
         await db.query(
           `
             INSERT INTO public.fiscalizacoes (backend_id, position, payload, created_at, updated_at)
-            VALUES ($1, $2, $3::jsonb, NOW(), NOW())
+            VALUES ($1, $2, $3, NOW(), NOW())
             ON CONFLICT (backend_id)
             DO UPDATE SET payload = EXCLUDED.payload, updated_at = NOW()
           `,
@@ -318,7 +318,7 @@ module.exports = async function handler(req, res) {
         await db.query(
           `
             UPDATE public.fiscalizacoes
-            SET payload = $2::jsonb, updated_at = NOW()
+            SET payload = $2, updated_at = NOW()
             WHERE backend_id = $1
           `,
           [idParam, JSON.stringify(record)]
@@ -376,6 +376,9 @@ module.exports = async function handler(req, res) {
     });
   } catch (error) {
     console.error("fiscalizacoes api error", error);
-    res.status(500).json({ error: "Erro ao acessar banco de dados." });
+    res.status(500).json({
+      error: "Erro ao acessar banco de dados.",
+      code: error?.code || "DB_ERROR"
+    });
   }
 };

@@ -92,7 +92,7 @@ module.exports = async function handler(req, res) {
               metadata,
               created_at
             )
-            VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb, $7::jsonb, COALESCE($8::timestamptz, NOW()))
+            VALUES ($1, $2, $3, $4, $5, $6, $7, COALESCE($8::timestamptz, NOW()))
           `,
           [
             buildId(),

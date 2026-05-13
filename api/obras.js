@@ -80,7 +80,7 @@ async function replaceRecords(db, records) {
       await db.query(
         `
           INSERT INTO public.obras (obra_id, position, payload, created_at, updated_at)
-          VALUES ($1, $2, $3::jsonb, NOW(), NOW())
+          VALUES ($1, $2, $3, NOW(), NOW())
         `,
         [record.__obraId, index, JSON.stringify(record)]
       );

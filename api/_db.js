@@ -56,6 +56,14 @@ async function ensureSchema() {
         ADD COLUMN IF NOT EXISTS position INTEGER NOT NULL DEFAULT 0
       `);
       await db.query(`
+        ALTER TABLE public.fiscalizacoes
+        ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      `);
+      await db.query(`
+        ALTER TABLE public.fiscalizacoes
+        ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      `);
+      await db.query(`
         CREATE TABLE IF NOT EXISTS public.obras (
           obra_id VARCHAR(128) PRIMARY KEY,
           position INTEGER NOT NULL DEFAULT 0,
@@ -67,6 +75,14 @@ async function ensureSchema() {
       await db.query(`
         ALTER TABLE public.obras
         ADD COLUMN IF NOT EXISTS position INTEGER NOT NULL DEFAULT 0
+      `);
+      await db.query(`
+        ALTER TABLE public.obras
+        ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      `);
+      await db.query(`
+        ALTER TABLE public.obras
+        ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       `);
       await db.query(`
         CREATE TABLE IF NOT EXISTS public.fiscalizacoes_audit (
