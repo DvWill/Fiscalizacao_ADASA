@@ -3851,7 +3851,7 @@ async function handleFiscalizacoesFileSelected(event) {
       dataRows = lines
         .slice(headerRowIndex + 1)
         .map((line) => line.split(delimiter).map((cell) => String(cell || '').trim()))
-        .filter((cells) => cells.some((cell) => cell !== ''));
+        .filter(isFiscalizacaoDataRow);
     } else {
       const workbook = XLSX.read(await file.arrayBuffer(), { type: 'array', cellDates: false });
       sheetName = selectFiscalizacoesSheetName(workbook.SheetNames);
@@ -3867,7 +3867,7 @@ async function handleFiscalizacoesFileSelected(event) {
       dataRows = rawRows
         .slice(headerRowIndex + 1)
         .map((row) => (Array.isArray(row) ? row.map((cell) => String(cell || '').trim()) : []))
-        .filter((cells) => cells.some((cell) => cell !== ''));
+        .filter(isFiscalizacaoDataRow);
     }
 
     pendingFiscalizacoesUpload = dataRows;
@@ -3942,6 +3942,24 @@ function findImportHeaderIndex(lines, delimiter) {
   }
 
   return -1;
+}
+
+function isFiscalizacaoDataRow(cells) {
+  if (!Array.isArray(cells)) return false;
+
+  const normalizedCells = cells.map((cell) => String(cell ?? '').trim());
+  const filledIndexes = normalizedCells
+    .map((cell, index) => (cell ? index : -1))
+    .filter((index) => index >= 0);
+
+  if (filledIndexes.length === 0) return false;
+
+  const hasDataBeyondId = filledIndexes.some((index) => index > 0);
+  if (!hasDataBeyondId && /^\d+$/.test(normalizedCells[0] || '')) {
+    return false;
+  }
+
+  return true;
 }
 
 function parseImportRecordFromCells(cells) {
