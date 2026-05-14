@@ -85,6 +85,75 @@ async function ensureSchema() {
         ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       `);
       await db.query(`
+        CREATE TABLE IF NOT EXISTS public.acoes_fiscalizatorias (
+          acao_uid VARCHAR(128) PRIMARY KEY,
+          position INTEGER NOT NULL DEFAULT 0,
+          source_id VARCHAR(64) NOT NULL,
+          processo_sei VARCHAR(128),
+          ano INTEGER,
+          objetivo TEXT,
+          regiao_administrativa VARCHAR(200),
+          situacao VARCHAR(80),
+          tipo_documento VARCHAR(160),
+          destinatario TEXT,
+          direta_indireta VARCHAR(20),
+          programada VARCHAR(80),
+          sei_documento VARCHAR(128),
+          data_acao DATE,
+          constatacoes INTEGER,
+          constatacoes_nao_conformes INTEGER,
+          recomendacoes_solicitacoes INTEGER,
+          termos_notificacao INTEGER,
+          autos_infracao INTEGER,
+          termos_ajustes_conduta INTEGER,
+          latitude DOUBLE PRECISION,
+          longitude DOUBLE PRECISION,
+          local_ra VARCHAR(200),
+          local_tipo VARCHAR(160),
+          local_motivo TEXT,
+          payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+      `);
+      await db.query(`
+        CREATE INDEX IF NOT EXISTS acoes_fiscalizatorias_ano_idx
+        ON public.acoes_fiscalizatorias (ano)
+      `);
+      await db.query(`
+        CREATE INDEX IF NOT EXISTS acoes_fiscalizatorias_situacao_idx
+        ON public.acoes_fiscalizatorias (situacao)
+      `);
+      await db.query(`
+        CREATE INDEX IF NOT EXISTS acoes_fiscalizatorias_regiao_idx
+        ON public.acoes_fiscalizatorias (regiao_administrativa)
+      `);
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS public.locais_fiscalizacoes (
+          local_uid VARCHAR(128) PRIMARY KEY,
+          position INTEGER NOT NULL DEFAULT 0,
+          source_id VARCHAR(64) NOT NULL,
+          ano INTEGER,
+          ra VARCHAR(200),
+          latitude DOUBLE PRECISION,
+          longitude DOUBLE PRECISION,
+          data_fiscalizacao DATE,
+          tipo VARCHAR(160),
+          motivo TEXT,
+          payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+      `);
+      await db.query(`
+        CREATE INDEX IF NOT EXISTS locais_fiscalizacoes_ano_idx
+        ON public.locais_fiscalizacoes (ano)
+      `);
+      await db.query(`
+        CREATE INDEX IF NOT EXISTS locais_fiscalizacoes_ra_idx
+        ON public.locais_fiscalizacoes (ra)
+      `);
+      await db.query(`
         CREATE TABLE IF NOT EXISTS public.fiscalizacoes_audit (
           audit_id VARCHAR(128) PRIMARY KEY,
           backend_id VARCHAR(128),

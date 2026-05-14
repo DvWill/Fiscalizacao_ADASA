@@ -56,9 +56,13 @@
             class="px-3 py-1.5 rounded-md text-slate-300 text-xs sm:text-sm font-medium transition-colors">
             Obras
           </button>
+          <button id="view-acoes-btn" onclick="switchDataView('acoes')"
+            class="px-3 py-1.5 rounded-md text-slate-300 text-xs sm:text-sm font-medium transition-colors">
+            A&ccedil;&otilde;es
+          </button>
         </div>
 
-        <button onclick="toggleFiltersPanel(true)"
+        <button id="filters-btn" onclick="toggleFiltersPanel(true)"
           class="shrink-0 px-3 sm:px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 transition-colors flex items-center gap-2 text-xs sm:text-sm font-medium">
           <svg class="icon-min w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path d="M4 6h16" />
@@ -103,7 +107,18 @@
           <span class="sm:hidden">Obras</span>
         </button>
 
-        <button onclick="exportToCSV()"
+        <button id="upload-acoes-btn" onclick="openAcoesUploadModal()"
+          class="hidden shrink-0 px-3 sm:px-4 py-2 rounded-lg bg-cyan-700 hover:bg-cyan-600 transition-colors flex items-center gap-2 text-xs sm:text-sm font-medium text-white">
+          <svg class="icon-min w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path d="M6 18h12" />
+            <path d="M12 6v9" />
+            <path d="M9 12l3 3 3-3" />
+          </svg>
+          <span class="hidden sm:inline">Upload A&ccedil;&otilde;es</span>
+          <span class="sm:hidden">A&ccedil;&otilde;es</span>
+        </button>
+
+        <button id="export-data-btn" onclick="exportToCSV()"
           class="shrink-0 px-3 sm:px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 transition-colors flex items-center gap-2 text-xs sm:text-sm font-medium">
           <svg class="icon-min w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path d="M12 6v9" />
@@ -316,7 +331,7 @@
       </aside>
 
       <!-- Map Container -->
-      <div class="absolute inset-0">
+      <div id="map-stage" class="absolute inset-0">
         <div id="map" class="w-full h-full"></div>
 
         <!-- Map Legend (melhor no mobile) -->
@@ -382,6 +397,9 @@
           </p>
         </div>
       </div>
+
+      <section id="acoes-dashboard-view" class="hidden absolute inset-0 overflow-y-auto custom-scrollbar bg-slate-950 p-4 sm:p-6">
+      </section>
     </div>
 
     <!-- Dashboard Panel (responsivo) -->
@@ -1118,6 +1136,85 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
               </svg>
               Carregar Obras no Mapa
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="acoes-upload-modal" class="app-modal-overlay hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-[2000] flex items-center justify-center p-3 sm:p-4">
+      <div class="app-modal-shell glass-card rounded-2xl w-full max-w-4xl h-[90vh] sm:h-auto sm:max-h-[90%] overflow-y-auto custom-scrollbar slide-in">
+        <div class="p-4 sm:p-6 border-b border-slate-700 flex items-center justify-between sticky top-0 bg-slate-800/90 backdrop-blur-sm z-10">
+          <h2 class="text-lg sm:text-xl font-bold flex items-center gap-3">
+            <svg class="w-6 h-6 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M4 7h16M4 12h16M4 17h10" />
+            </svg>
+            Alimentar Painel de A&ccedil;&otilde;es
+          </h2>
+          <button onclick="closeAcoesUploadModal()" class="p-2 rounded-lg hover:bg-slate-700 transition-colors">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <div class="p-4 sm:p-6">
+          <div class="mb-6">
+            <label class="block text-sm font-medium text-slate-300 mb-3">Selecione a planilha Dados A&ccedil;&otilde;es (.xlsx, .xls ou .xlsm)</label>
+            <input id="acoes-file-input" type="file" accept=".xlsx,.xls,.xlsm" onchange="handleAcoesFileSelected(event)"
+              class="w-full px-4 py-3 rounded-lg bg-slate-800 border border-slate-600 text-white focus:outline-none focus:border-cyan-500">
+            <p class="text-xs text-slate-500 mt-2">O importador usa as abas "A&ccedil;&otilde;es" e "Locais das Fiscaliza&ccedil;&otilde;es" do mesmo arquivo.</p>
+          </div>
+
+          <div id="acoes-upload-summary" class="hidden mb-6">
+            <div class="grid grid-cols-1 sm:grid-cols-4 gap-3 mb-4">
+              <div class="rounded-xl bg-slate-800/60 border border-slate-700 p-4">
+                <p class="text-xs uppercase tracking-wide text-slate-500 mb-1">Arquivo</p>
+                <p id="acoes-summary-file" class="text-sm text-slate-200 break-all">-</p>
+              </div>
+              <div class="rounded-xl bg-slate-800/60 border border-slate-700 p-4">
+                <p class="text-xs uppercase tracking-wide text-slate-500 mb-1">Aba A&ccedil;&otilde;es</p>
+                <p id="acoes-summary-sheet" class="text-sm text-slate-200">-</p>
+              </div>
+              <div class="rounded-xl bg-slate-800/60 border border-slate-700 p-4">
+                <p class="text-xs uppercase tracking-wide text-slate-500 mb-1">A&ccedil;&otilde;es</p>
+                <p id="acoes-summary-count" class="text-sm text-slate-200">0</p>
+              </div>
+              <div class="rounded-xl bg-slate-800/60 border border-slate-700 p-4">
+                <p class="text-xs uppercase tracking-wide text-slate-500 mb-1">Locais</p>
+                <p id="acoes-summary-locais-count" class="text-sm text-slate-200">0</p>
+              </div>
+            </div>
+
+            <div class="bg-slate-800/50 rounded-lg p-4 overflow-x-auto custom-scrollbar">
+              <h3 class="text-sm font-semibold text-slate-300 mb-3">Previa do painel</h3>
+              <table class="w-full min-w-[780px] text-xs">
+                <thead class="sticky top-0 bg-slate-700">
+                  <tr>
+                    <th class="text-left px-2 py-2 text-cyan-300">ID</th>
+                    <th class="text-left px-2 py-2 text-cyan-300">Ano</th>
+                    <th class="text-left px-2 py-2 text-cyan-300">Regi&atilde;o</th>
+                    <th class="text-left px-2 py-2 text-cyan-300">Situa&ccedil;&atilde;o</th>
+                    <th class="text-left px-2 py-2 text-cyan-300">Tipo</th>
+                    <th class="text-left px-2 py-2 text-cyan-300">Local</th>
+                  </tr>
+                </thead>
+                <tbody id="acoes-preview-body"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-3">
+            <button id="clear-acoes-btn" onclick="clearAcoesDashboardData()" class="hidden px-6 py-2.5 rounded-lg bg-slate-700 hover:bg-slate-600 transition-colors font-medium">
+              Limpar Painel
+            </button>
+            <button onclick="executeAcoesUpload()" id="acoes-upload-btn" disabled
+              class="btn-primary px-6 py-2.5 rounded-lg font-medium text-white flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:transform-none">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+              </svg>
+              Salvar no Banco e Atualizar Painel
             </button>
           </div>
         </div>

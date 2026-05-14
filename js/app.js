@@ -19,9 +19,15 @@ let deleteTarget = null;
 let allObras = [];
 let filteredObras = [];
 let currentObra = null;
+let allAcoes = [];
+let filteredAcoes = [];
+let allAcoesLocais = [];
 let currentView = 'fiscalizacoes';
 let pendingObrasUpload = [];
 let pendingObrasMeta = null;
+let pendingAcoesUpload = [];
+let pendingAcoesLocaisUpload = [];
+let pendingAcoesMeta = null;
 let pendingFiscalizacoesUpload = [];
 let pendingFiscalizacoesMeta = null;
 let importSimulation = null;
@@ -30,6 +36,13 @@ let listTotalPages = 1;
 let isDraftSyncing = false;
 let draftSaveTimer = null;
 let lastAppliedFilterFingerprint = '';
+let acoesFilterState = {
+  search: '',
+  ano: '',
+  situacao: '',
+  regiao: '',
+  tipo: ''
+};
 
 const LIST_DEFAULT_PAGE_SIZE = 12;
 const LIST_STATE_KEY = 'fiscalizacoes_list_state_v1';
@@ -105,6 +118,8 @@ let mapLayerVisibility = {
 let isMapLegendCollapsed = false;
 
 const OBRAS_STORAGE_KEY = 'obras_storage_v1';
+const ACOES_STORAGE_KEY = 'acoes_dashboard_storage_v1';
+const ACOES_LOCAIS_STORAGE_KEY = 'acoes_dashboard_locais_storage_v1';
 const VIEW_MODE_KEY = 'fiscalizacoes_data_view';
 
 const defaultConfig = {
@@ -346,13 +361,57 @@ function clearStoredObras() {
   localStorage.removeItem(OBRAS_STORAGE_KEY);
 }
 
+function loadStoredAcoes() {
+  try {
+    const raw = localStorage.getItem(ACOES_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed?.records) ? parsed.records : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveStoredAcoes(records) {
+  localStorage.setItem(ACOES_STORAGE_KEY, JSON.stringify({
+    updatedAt: new Date().toISOString(),
+    records
+  }));
+}
+
+function clearStoredAcoes() {
+  localStorage.removeItem(ACOES_STORAGE_KEY);
+}
+
+function loadStoredAcoesLocais() {
+  try {
+    const raw = localStorage.getItem(ACOES_LOCAIS_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed?.records) ? parsed.records : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveStoredAcoesLocais(records) {
+  localStorage.setItem(ACOES_LOCAIS_STORAGE_KEY, JSON.stringify({
+    updatedAt: new Date().toISOString(),
+    records
+  }));
+}
+
+function clearStoredAcoesLocais() {
+  localStorage.removeItem(ACOES_LOCAIS_STORAGE_KEY);
+}
+
 function loadStoredView() {
   const saved = localStorage.getItem(VIEW_MODE_KEY);
-  return saved === 'obras' ? 'obras' : 'fiscalizacoes';
+  return ['fiscalizacoes', 'obras', 'acoes'].includes(saved) ? saved : 'fiscalizacoes';
 }
 
 function saveStoredView(view) {
-  localStorage.setItem(VIEW_MODE_KEY, view === 'obras' ? 'obras' : 'fiscalizacoes');
+  localStorage.setItem(VIEW_MODE_KEY, ['fiscalizacoes', 'obras', 'acoes'].includes(view) ? view : 'fiscalizacoes');
 }
 
 function sanitizeCoordinate(value, axis) {
@@ -415,6 +474,56 @@ function normalizeObraRecord(record, index) {
   };
 }
 
+function buildAcoesId(prefix, parts, index) {
+  const base = normalizePlainText(parts.filter(Boolean).join('-') || `${prefix}-${index + 1}`)
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return `${prefix}-${index + 1}-${base || 'registro'}`.slice(0, 120);
+}
+
+function normalizeAcaoRecord(record, index = 0) {
+  return {
+    __acaoId: record?.__acaoId || buildAcoesId('acao', [record?.ano, record?.id, record?.processo_sei], index),
+    id: String(record?.id ?? '').trim(),
+    processo_sei: String(record?.processo_sei ?? '').trim(),
+    ano: Number.isFinite(Number(record?.ano)) ? Number(record.ano) : null,
+    objetivo: String(record?.objetivo ?? '').trim(),
+    regiao_administrativa: String(record?.regiao_administrativa ?? '').trim(),
+    situacao: String(record?.situacao ?? '').trim(),
+    tipo_documento: String(record?.tipo_documento ?? '').trim(),
+    destinatario: String(record?.destinatario ?? '').trim(),
+    direta_indireta: String(record?.direta_indireta ?? '').trim(),
+    programada: String(record?.programada ?? '').trim(),
+    sei_documento: String(record?.sei_documento ?? '').trim(),
+    data: toIsoDate(record?.data) || '',
+    constatacoes: parseLocalizedNumber(record?.constatacoes),
+    constatacoes_nao_conformes: parseLocalizedNumber(record?.constatacoes_nao_conformes),
+    recomendacoes_solicitacoes: parseLocalizedNumber(record?.recomendacoes_solicitacoes),
+    termos_notificacao: parseLocalizedNumber(record?.termos_notificacao),
+    autos_infracao: parseLocalizedNumber(record?.autos_infracao),
+    termos_ajustes_conduta: parseLocalizedNumber(record?.termos_ajustes_conduta),
+    latitude: sanitizeCoordinate(record?.latitude, 'lat'),
+    longitude: sanitizeCoordinate(record?.longitude, 'lng'),
+    local_ra: String(record?.local_ra ?? '').trim(),
+    local_tipo: String(record?.local_tipo ?? '').trim(),
+    local_motivo: String(record?.local_motivo ?? '').trim()
+  };
+}
+
+function normalizeAcaoLocalRecord(record, index = 0) {
+  return {
+    __localId: record?.__localId || buildAcoesId('local', [record?.ano, record?.id, record?.ra], index),
+    id: String(record?.id ?? '').trim(),
+    ano: Number.isFinite(Number(record?.ano)) ? Number(record.ano) : null,
+    ra: String(record?.ra ?? '').trim(),
+    latitude: sanitizeCoordinate(record?.latitude, 'lat'),
+    longitude: sanitizeCoordinate(record?.longitude, 'lng'),
+    data: toIsoDate(record?.data) || '',
+    tipo: String(record?.tipo ?? '').trim(),
+    motivo: String(record?.motivo ?? '').trim()
+  };
+}
+
 function formatCurrency(value) {
   if (value == null || !Number.isFinite(value)) return '-';
   return new Intl.NumberFormat('pt-BR', {
@@ -471,11 +580,27 @@ function toIsoDate(value) {
   const text = String(value || '').trim();
   if (!text) return '';
   if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
+  if (/^\d{4}-\d{2}-\d{2}T/.test(text)) return text.slice(0, 10);
+  if (/^\d+(?:\.\d+)?$/.test(text)) {
+    const serial = Number(text);
+    if (Number.isFinite(serial) && serial > 20000 && serial < 80000) {
+      const excelEpoch = Date.UTC(1899, 11, 30);
+      const date = new Date(excelEpoch + Math.round(serial) * 24 * 60 * 60 * 1000);
+      return date.toISOString().slice(0, 10);
+    }
+  }
   if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(text)) {
     const [dayRaw, monthRaw, yearRaw] = text.split('/').map((part) => parseInt(part, 10));
     const day = String(dayRaw).padStart(2, '0');
     const month = String(monthRaw).padStart(2, '0');
     return `${yearRaw}-${month}-${day}`;
+  }
+  if (/^\d{1,2}\/\d{1,2}\/\d{2}$/.test(text)) {
+    const [firstRaw, secondRaw, yearRaw] = text.split('/').map((part) => parseInt(part, 10));
+    const year = 2000 + yearRaw;
+    const day = firstRaw > 12 ? firstRaw : secondRaw;
+    const month = firstRaw > 12 ? secondRaw : firstRaw;
+    return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
   }
   return '';
 }
@@ -530,6 +655,16 @@ function setOperationStatus(text, type = 'idle') {
 }
 
 function getListSortOptions() {
+  if (currentView === 'acoes') {
+    return [
+      { value: 'id', label: 'ID' },
+      { value: 'ano', label: 'Ano' },
+      { value: 'situacao', label: 'Situacao' },
+      { value: 'regiao', label: 'Regiao' },
+      { value: 'autos', label: 'Autos de Infracao' }
+    ];
+  }
+
   if (currentView === 'obras') {
     return [
       { value: 'item', label: 'Item' },
@@ -549,6 +684,23 @@ function getListSortOptions() {
 }
 
 function getComparableValue(record, field) {
+  if (currentView === 'acoes') {
+    switch (field) {
+      case 'id':
+        return normalizePlainText(record.id);
+      case 'ano':
+        return Number(record.ano || 0);
+      case 'situacao':
+        return normalizePlainText(record.situacao);
+      case 'regiao':
+        return normalizePlainText(record.regiao_administrativa);
+      case 'autos':
+        return Number(record.autos_infracao || 0);
+      default:
+        return normalizePlainText(record.id);
+    }
+  }
+
   if (currentView === 'obras') {
     switch (field) {
       case 'item':
@@ -1090,7 +1242,113 @@ async function deleteObrasData() {
   return { isOk: true, source: 'api' };
 }
 
+async function replaceAcoesDashboardApiData(acoes, locais) {
+  const payload = await window.dataSdk._fetchJson(window.dataSdk._buildUrl('/acoes-dashboard'), {
+    method: 'PUT',
+    headers: {
+      'X-Confirm-Bulk-Operation': 'replace-all'
+    },
+    body: JSON.stringify({ acoes, locais })
+  });
+
+  if (!payload || !Array.isArray(payload.acoes) || !Array.isArray(payload.locais)) {
+    return null;
+  }
+
+  return {
+    acoes: payload.acoes.map((record, index) => normalizeAcaoRecord(record, index)),
+    locais: payload.locais.map((record, index) => normalizeAcaoLocalRecord(record, index))
+  };
+}
+
+async function loadAcoesDashboardData() {
+  const localAcoes = loadStoredAcoes().map((record, index) => normalizeAcaoRecord(record, index));
+  const localLocais = loadStoredAcoesLocais().map((record, index) => normalizeAcaoLocalRecord(record, index));
+  if (!window.dataSdk?.isApiConfigured?.()) {
+    allAcoes = localAcoes;
+    filteredAcoes = localAcoes;
+    allAcoesLocais = localLocais;
+    return { isOk: true, source: 'local' };
+  }
+
+  const payload = await window.dataSdk._fetchJson(window.dataSdk._buildUrl('/acoes-dashboard'), {
+    method: 'GET'
+  });
+
+  if (!payload || !Array.isArray(payload.acoes) || !Array.isArray(payload.locais)) {
+    allAcoes = localAcoes;
+    filteredAcoes = localAcoes;
+    allAcoesLocais = localLocais;
+    return { isOk: false, source: 'api', fallbackReason: 'api_unavailable' };
+  }
+
+  allAcoes = payload.acoes.map((record, index) => normalizeAcaoRecord(record, index));
+  filteredAcoes = allAcoes;
+  allAcoesLocais = payload.locais.map((record, index) => normalizeAcaoLocalRecord(record, index));
+  saveStoredAcoes(allAcoes);
+  saveStoredAcoesLocais(allAcoesLocais);
+  return { isOk: true, source: 'api' };
+}
+
+async function persistAcoesDashboardData(acoes, locais) {
+  const normalizedAcoes = (acoes || []).map((record, index) => normalizeAcaoRecord(record, index));
+  const normalizedLocais = (locais || []).map((record, index) => normalizeAcaoLocalRecord(record, index));
+
+  if (!window.dataSdk?.isApiConfigured?.()) {
+    allAcoes = normalizedAcoes;
+    filteredAcoes = allAcoes;
+    allAcoesLocais = normalizedLocais;
+    saveStoredAcoes(allAcoes);
+    saveStoredAcoesLocais(allAcoesLocais);
+    return { isOk: true, source: 'local' };
+  }
+
+  const saved = await replaceAcoesDashboardApiData(normalizedAcoes, normalizedLocais);
+  if (!saved) {
+    return { isOk: false, source: 'api', fallbackReason: 'api_unavailable' };
+  }
+
+  allAcoes = saved.acoes;
+  filteredAcoes = allAcoes;
+  allAcoesLocais = saved.locais;
+  saveStoredAcoes(allAcoes);
+  saveStoredAcoesLocais(allAcoesLocais);
+  return { isOk: true, source: 'api' };
+}
+
+async function deleteAcoesDashboardData() {
+  if (!window.dataSdk?.isApiConfigured?.()) {
+    allAcoes = [];
+    filteredAcoes = [];
+    allAcoesLocais = [];
+    clearStoredAcoes();
+    clearStoredAcoesLocais();
+    return { isOk: true, source: 'local' };
+  }
+
+  const payload = await window.dataSdk._fetchJson(window.dataSdk._buildUrl('/acoes-dashboard'), {
+    method: 'DELETE',
+    headers: {
+      'X-Confirm-Bulk-Operation': 'delete-all'
+    }
+  });
+
+  if (!payload) {
+    return { isOk: false, source: 'api', fallbackReason: 'api_unavailable' };
+  }
+
+  allAcoes = [];
+  filteredAcoes = [];
+  allAcoesLocais = [];
+  clearStoredAcoes();
+  clearStoredAcoesLocais();
+  return { isOk: true, source: 'api' };
+}
+
 allObras = loadStoredObras().map((record, index) => normalizeObraRecord(record, index));
+allAcoes = loadStoredAcoes().map((record, index) => normalizeAcaoRecord(record, index));
+filteredAcoes = allAcoes;
+allAcoesLocais = loadStoredAcoesLocais().map((record, index) => normalizeAcaoLocalRecord(record, index));
 currentView = loadStoredView();
 
 const dataHandler = {
@@ -1099,6 +1357,7 @@ const dataHandler = {
     updateFiltersOptions();
     applyFilters();
     updateDashboard();
+    if (currentView === 'acoes') renderAcoesDashboardView();
   }
 };
 
@@ -1106,26 +1365,30 @@ async function initDataSDK() {
   setOperationStatus('Sincronizando dados...', 'syncing');
   const result = await window.dataSdk.init(dataHandler);
   const obrasResult = await loadObrasData();
+  const acoesResult = await loadAcoesDashboardData();
   if (!result.isOk) showToast('Erro ao inicializar sistema de dados', 'error');
   if (obrasResult.fallbackReason === 'api_unavailable') {
     showToast('API de obras indisponível no momento. Não foi possível ler dados do banco.', 'warning');
   }
-  if (result.syncedLocalToApi || obrasResult.syncedLocalToApi) {
+  if (acoesResult.fallbackReason === 'api_unavailable') {
+    showToast('API do painel de acoes indisponivel. Usando cache local quando existir.', 'warning');
+  }
+  if (result.syncedLocalToApi || obrasResult.syncedLocalToApi || acoesResult.syncedLocalToApi) {
     showToast('Dados locais sincronizados com o banco de dados.', 'success');
   }
   updateStorageModeStatus();
   updateFiltersOptions();
   applyFilters();
   updateDashboard();
-  if (!result.isOk || !obrasResult.isOk) {
+  if (!result.isOk || !obrasResult.isOk || !acoesResult.isOk) {
     setOperationStatus('Falha parcial ao carregar dados', 'warning');
   } else {
     setOperationStatus('Sistema pronto', 'success');
   }
 
   return {
-    isOk: result.isOk && obrasResult.isOk,
-    source: result.source === 'api' && obrasResult.source === 'api' ? 'api' : 'local'
+    isOk: result.isOk && obrasResult.isOk && acoesResult.isOk,
+    source: result.source === 'api' && obrasResult.source === 'api' && acoesResult.source === 'api' ? 'api' : 'local'
   };
 }
 
@@ -1599,12 +1862,18 @@ function updateMapLegend() {
 
 function updateDataViewUI() {
   const isObras = currentView === 'obras';
+  const isAcoes = currentView === 'acoes';
   const fiscalizacoesBtn = document.getElementById('view-fiscalizacoes-btn');
   const obrasBtn = document.getElementById('view-obras-btn');
+  const acoesBtn = document.getElementById('view-acoes-btn');
+  const filtersBtn = document.getElementById('filters-btn');
   const importBtn = document.getElementById('import-fiscalizacoes-btn');
   const uploadBtn = document.getElementById('upload-obras-btn');
+  const uploadAcoesBtn = document.getElementById('upload-acoes-btn');
   const addBtn = document.getElementById('add-fiscalizacao-btn');
   const dashboardBtn = document.getElementById('dashboard-btn');
+  const mapStage = document.getElementById('map-stage');
+  const acoesDashboardView = document.getElementById('acoes-dashboard-view');
   const filterRegiao = document.getElementById('filter-regiao');
   const filterSituacao = document.getElementById('filter-situacao');
   const filterAno = document.getElementById('filter-ano');
@@ -1614,19 +1883,37 @@ function updateDataViewUI() {
   const subtitle = document.getElementById('app-subtitle');
 
   if (fiscalizacoesBtn && obrasBtn) {
+    fiscalizacoesBtn.className = currentView === 'fiscalizacoes'
+      ? 'px-3 py-1.5 rounded-md bg-blue-600 text-white text-xs sm:text-sm font-medium transition-colors'
+      : 'px-3 py-1.5 rounded-md text-slate-300 text-xs sm:text-sm font-medium transition-colors';
+    obrasBtn.className = isObras
+      ? 'px-3 py-1.5 rounded-md bg-emerald-600 text-white text-xs sm:text-sm font-medium transition-colors'
+      : 'px-3 py-1.5 rounded-md text-slate-300 text-xs sm:text-sm font-medium transition-colors';
+  }
+  if (acoesBtn) {
+    acoesBtn.className = isAcoes
+      ? 'px-3 py-1.5 rounded-md bg-cyan-500 text-slate-950 text-xs sm:text-sm font-medium transition-colors'
+      : 'px-3 py-1.5 rounded-md text-slate-300 text-xs sm:text-sm font-medium transition-colors';
+  }
+
+  filtersBtn?.classList.toggle('hidden', isAcoes);
+  importBtn?.classList.toggle('hidden', isObras || isAcoes);
+  uploadBtn?.classList.toggle('hidden', !isObras);
+  uploadAcoesBtn?.classList.toggle('hidden', !isAcoes);
+  addBtn?.classList.toggle('hidden', isObras || isAcoes);
+  if (dashboardBtn) {
+    dashboardBtn.classList.toggle('hidden', isAcoes);
+  }
+  mapStage?.classList.toggle('hidden', isAcoes);
+  acoesDashboardView?.classList.toggle('hidden', !isAcoes);
+
+  if (!isAcoes && fiscalizacoesBtn && obrasBtn && !acoesBtn) {
     fiscalizacoesBtn.className = isObras
       ? 'px-3 py-1.5 rounded-md text-slate-300 text-xs sm:text-sm font-medium transition-colors'
       : 'px-3 py-1.5 rounded-md bg-blue-600 text-white text-xs sm:text-sm font-medium transition-colors';
     obrasBtn.className = isObras
       ? 'px-3 py-1.5 rounded-md bg-emerald-600 text-white text-xs sm:text-sm font-medium transition-colors'
       : 'px-3 py-1.5 rounded-md text-slate-300 text-xs sm:text-sm font-medium transition-colors';
-  }
-
-  importBtn?.classList.toggle('hidden', isObras);
-  uploadBtn?.classList.toggle('hidden', !isObras);
-  addBtn?.classList.toggle('hidden', isObras);
-  if (dashboardBtn) {
-    dashboardBtn.classList.remove('hidden');
   }
 
   if (filterRegiao?.previousElementSibling) {
@@ -1640,34 +1927,45 @@ function updateDataViewUI() {
   }
 
   const conformidadeGroup = filterConformidade?.parentElement?.parentElement;
-  if (conformidadeGroup) conformidadeGroup.classList.toggle('hidden', isObras);
+  if (conformidadeGroup) conformidadeGroup.classList.toggle('hidden', isObras || isAcoes);
 
   if (countBadge?.parentElement?.firstElementChild) {
-    countBadge.parentElement.firstElementChild.textContent = isObras ? 'Obras' : 'Fiscalizações';
+    countBadge.parentElement.firstElementChild.textContent = isAcoes ? 'Acoes' : (isObras ? 'Obras' : 'Fiscalizações');
   }
   if (searchInput) {
-    searchInput.placeholder = isObras
-      ? 'Item, local, ação, fornecedor...'
-      : 'ID, Processo, Destinatário...';
+    searchInput.placeholder = isAcoes
+      ? 'ID, processo, objetivo...'
+      : (isObras ? 'Item, local, ação, fornecedor...' : 'ID, Processo, Destinatário...');
   }
   if (subtitle) {
-    subtitle.textContent = isObras ? 'Mapa de Obras em Andamento' : defaultConfig.subtitle;
+    subtitle.textContent = isAcoes
+      ? 'Dashboard executivo de acoes e locais de fiscalizacao'
+      : (isObras ? 'Mapa de Obras em Andamento' : defaultConfig.subtitle);
   }
 
   updateMapLegend();
   updateObrasUploadActions();
+  updateAcoesUploadActions();
+  if (isAcoes) renderAcoesDashboardView();
 }
 
 function switchDataView(view) {
-  currentView = view === 'obras' ? 'obras' : 'fiscalizacoes';
+  currentView = ['fiscalizacoes', 'obras', 'acoes'].includes(view) ? view : 'fiscalizacoes';
   saveStoredView(currentView);
 
-  if (currentView === 'obras') {
+  if (currentView === 'obras' || currentView === 'acoes') {
     if (!document.getElementById('form-modal').classList.contains('hidden')) closeModal();
     if (!document.getElementById('import-modal').classList.contains('hidden')) closeImportModal();
+    if (currentView === 'obras' && !document.getElementById('acoes-upload-modal').classList.contains('hidden')) closeAcoesUploadModal();
+    if (currentView === 'acoes' && !document.getElementById('obras-upload-modal').classList.contains('hidden')) closeObrasUploadModal();
     disableMapSelection();
-  } else if (!document.getElementById('obras-upload-modal').classList.contains('hidden')) {
-    closeObrasUploadModal();
+  } else {
+    if (!document.getElementById('obras-upload-modal').classList.contains('hidden')) {
+      closeObrasUploadModal();
+    }
+    if (!document.getElementById('acoes-upload-modal').classList.contains('hidden')) {
+      closeAcoesUploadModal();
+    }
   }
 
   document.getElementById('dashboard-panel')?.classList.add('hidden');
@@ -1734,6 +2032,10 @@ document.addEventListener('keydown', (e) => {
       closeObrasUploadModal();
       return;
     }
+    if (isModalOpen('acoes-upload-modal')) {
+      closeAcoesUploadModal();
+      return;
+    }
     toggleFiltersPanel(false);
     return;
   }
@@ -1764,6 +2066,12 @@ document.addEventListener('keydown', (e) => {
   if (e.altKey && e.key === '2') {
     e.preventDefault();
     switchDataView('obras');
+    return;
+  }
+
+  if (e.altKey && e.key === '3') {
+    e.preventDefault();
+    switchDataView('acoes');
     return;
   }
 
@@ -2005,7 +2313,49 @@ function disableMapSelection() {
 
 // ======== Filters ========
 function updateFiltersOptions() {
-  if (currentView === 'obras') {
+  if (currentView === 'acoes') {
+    const regioes = [...new Set([
+      ...allAcoes.map((acao) => acao.regiao_administrativa).filter(Boolean),
+      ...allAcoesLocais.map((local) => local.ra).filter(Boolean)
+    ])].sort();
+    const situacoes = [...new Set(allAcoes.map((acao) => acao.situacao).filter(Boolean))].sort();
+    const anos = [...new Set(allAcoes.map((acao) => acao.ano).filter(Boolean))].sort((a, b) => b - a);
+
+    const regiaoSelect = document.getElementById('filter-regiao');
+    const currentRegiao = regiaoSelect.value;
+    regiaoSelect.innerHTML = '<option value="">Todas as Regioes</option>';
+    regioes.forEach((r) => {
+      const option = document.createElement('option');
+      option.value = r;
+      option.textContent = formatDisplayText(r);
+      if (r === currentRegiao) option.selected = true;
+      regiaoSelect.appendChild(option);
+    });
+
+    const anoSelect = document.getElementById('filter-ano');
+    const currentAno = anoSelect.value;
+    anoSelect.innerHTML = '<option value="">Todos os Anos</option>';
+    anos.forEach((a) => {
+      const option = document.createElement('option');
+      option.value = a;
+      option.textContent = a;
+      if (String(a) === currentAno) option.selected = true;
+      anoSelect.appendChild(option);
+    });
+
+    const situacaoSelect = document.getElementById('filter-situacao');
+    const currentSituacao = situacaoSelect.value;
+    situacaoSelect.innerHTML = '<option value="">Todas as Situacoes</option>';
+    situacoes.forEach((situacao) => {
+      const option = document.createElement('option');
+      option.value = situacao;
+      option.textContent = formatDisplayText(situacao);
+      if (situacao === currentSituacao) option.selected = true;
+      situacaoSelect.appendChild(option);
+    });
+
+    populateMapFocusOptions(regioes, situacoes);
+  } else if (currentView === 'obras') {
     const locais = [...new Set(allObras.map(o => o.local).filter(Boolean))].sort();
     const situacoes = [...new Set(allObras.map(o => o.situacao_contrato).filter(Boolean))].sort();
     const sistemas = [...new Set(allObras.map(o => o.sistema).filter(Boolean))].sort();
@@ -2136,6 +2486,13 @@ function applyFilters(options = {}) {
     listPage = 1;
   }
 
+  if (currentView === 'acoes') {
+    applyAcoesDashboardFilters();
+    document.getElementById('count-badge').textContent = filteredAcoes.length;
+    updateDashboard();
+    return;
+  }
+
   if (currentView === 'obras') {
     filteredObras = allObras.filter((obra) => {
       if (normalizedSearch) {
@@ -2214,6 +2571,15 @@ function resetFilterInputs() {
 }
 
 function clearFilters() {
+  if (currentView === 'acoes') {
+    acoesFilterState = {
+      search: '',
+      ano: '',
+      situacao: '',
+      regiao: '',
+      tipo: ''
+    };
+  }
   resetFilterInputs();
   applyFilters();
 }
@@ -3227,6 +3593,11 @@ function buildDashboardBar(value, maxValue, colorClass, valueClass, label) {
 }
 
 function updateDashboard() {
+  if (currentView === 'acoes') {
+    renderAcoesDashboardView();
+    return;
+  }
+
   if (currentView === 'obras') {
     const total = allObras.length;
     const comCoordenadas = allObras.filter((obra) => hasObraCoordinates(obra)).length;
@@ -3391,6 +3762,359 @@ function updateDashboard() {
     `).join('')
     : '<p class="text-center text-slate-500 py-8">Nenhuma região cadastrada</p>';
 }
+
+function setAcoesFilter(key, value) {
+  if (!Object.prototype.hasOwnProperty.call(acoesFilterState, key)) return;
+  acoesFilterState = {
+    ...acoesFilterState,
+    [key]: String(value || '')
+  };
+  applyAcoesDashboardFilters();
+}
+window.setAcoesFilter = setAcoesFilter;
+
+function resetAcoesDashboardFilters() {
+  acoesFilterState = {
+    search: '',
+    ano: '',
+    situacao: '',
+    regiao: '',
+    tipo: ''
+  };
+  applyAcoesDashboardFilters();
+}
+window.resetAcoesDashboardFilters = resetAcoesDashboardFilters;
+
+function applyAcoesDashboardFilters() {
+  const filters = acoesFilterState;
+  const search = normalizePlainText(filters.search);
+  filteredAcoes = allAcoes.filter((acao) => {
+    if (search) {
+      const haystack = normalizePlainText([
+        acao.id,
+        acao.processo_sei,
+        acao.objetivo,
+        acao.regiao_administrativa,
+        acao.situacao,
+        acao.direta_indireta,
+        acao.programada,
+        acao.local_motivo
+      ].join(' '));
+      if (!haystack.includes(search)) return false;
+    }
+    if (filters.ano && String(acao.ano || '') !== filters.ano) return false;
+    if (filters.situacao && acao.situacao !== filters.situacao) return false;
+    if (filters.regiao && acao.regiao_administrativa !== filters.regiao && acao.local_ra !== filters.regiao) return false;
+    if (filters.tipo && acao.local_tipo !== filters.tipo) return false;
+    return true;
+  });
+
+  renderAcoesDashboardView();
+}
+window.applyAcoesDashboardFilters = applyAcoesDashboardFilters;
+
+function countAcoesBy(records, getter) {
+  const counts = new Map();
+  (records || []).forEach((record) => {
+    const value = String(getter(record) || '').trim() || 'Nao informado';
+    counts.set(value, (counts.get(value) || 0) + 1);
+  });
+  return Array.from(counts.entries())
+    .map(([label, total]) => ({ label, total }))
+    .sort((a, b) => b.total - a.total || a.label.localeCompare(b.label));
+}
+
+function sumAcoes(records, getter) {
+  return (records || []).reduce((sum, record) => sum + (Number(getter(record)) || 0), 0);
+}
+
+function isAcaoConcluida(acao) {
+  const status = normalizePlainText(acao?.situacao);
+  return status.includes('concluida') && !status.includes('nao');
+}
+
+function isAcaoNaoConcluida(acao) {
+  const status = normalizePlainText(acao?.situacao);
+  return status.includes('nao concluida');
+}
+
+function getFilteredAcoesLocais() {
+  const filters = acoesFilterState;
+  const actionKeys = new Set(filteredAcoes.map((acao) => `${acao.id}::${acao.ano || ''}`));
+  return allAcoesLocais.filter((local) => {
+    if (filters.ano && String(local.ano || '') !== filters.ano) return false;
+    if (filters.regiao && local.ra !== filters.regiao) return false;
+    if (filters.tipo && local.tipo !== filters.tipo) return false;
+    if (actionKeys.has(`${local.id}::${local.ano || ''}`)) return true;
+    return !filters.search && !filters.situacao;
+  });
+}
+
+function getAcoesDashboardMetrics(records = filteredAcoes) {
+  const locais = getFilteredAcoesLocais();
+  const total = records.length;
+  const concluidas = records.filter(isAcaoConcluida).length;
+  const emAndamento = records.filter((acao) => normalizePlainText(acao.situacao).includes('andamento')).length;
+  const naoConcluidas = records.filter(isAcaoNaoConcluida).length;
+  const diretas = records.filter((acao) => normalizePlainText(acao.direta_indireta) === 'direta').length;
+  const indiretas = records.filter((acao) => normalizePlainText(acao.direta_indireta) === 'indireta').length;
+  const locaisComCoordenadas = locais.filter((local) => Number.isFinite(local.latitude) && Number.isFinite(local.longitude)).length;
+  const totalAutos = sumAcoes(records, (acao) => acao.autos_infracao);
+  const totalTn = sumAcoes(records, (acao) => acao.termos_notificacao);
+  const totalNaoConformes = sumAcoes(records, (acao) => acao.constatacoes_nao_conformes);
+  const totalRecomendacoes = sumAcoes(records, (acao) => acao.recomendacoes_solicitacoes);
+  const taxaConclusao = total ? Math.round((concluidas / total) * 100) : 0;
+
+  return {
+    total,
+    concluidas,
+    emAndamento,
+    naoConcluidas,
+    diretas,
+    indiretas,
+    locais: locais.length,
+    locaisComCoordenadas,
+    totalAutos,
+    totalTn,
+    totalNaoConformes,
+    totalRecomendacoes,
+    taxaConclusao,
+    porAno: countAcoesBy(records, (acao) => acao.ano).sort((a, b) => Number(a.label) - Number(b.label)),
+    porSituacao: countAcoesBy(records, (acao) => acao.situacao),
+    porRegiao: countAcoesBy(records, (acao) => acao.regiao_administrativa || acao.local_ra),
+    porTipoLocal: countAcoesBy(locais, (local) => local.tipo),
+    porProgramacao: countAcoesBy(records, (acao) => acao.programada)
+  };
+}
+
+function renderAcoesMetric(label, value, tone = 'cyan', note = '') {
+  const tones = {
+    cyan: 'text-cyan-300 bg-cyan-500/15 border-cyan-500/20',
+    emerald: 'text-emerald-300 bg-emerald-500/15 border-emerald-500/20',
+    amber: 'text-amber-300 bg-amber-500/15 border-amber-500/20',
+    rose: 'text-rose-300 bg-rose-500/15 border-rose-500/20',
+    blue: 'text-blue-300 bg-blue-500/15 border-blue-500/20',
+    slate: 'text-slate-200 bg-slate-800/80 border-slate-700'
+  };
+  return `
+    <div class="rounded-xl border ${tones[tone] || tones.slate} p-4">
+      <p class="text-xs uppercase tracking-wide text-slate-400 mb-2">${escapeHtml(label)}</p>
+      <p class="text-2xl sm:text-3xl font-extrabold ${tone === 'slate' ? 'text-white' : ''}">${escapeHtml(value)}</p>
+      ${note ? `<p class="text-xs text-slate-400 mt-2">${escapeHtml(note)}</p>` : ''}
+    </div>
+  `;
+}
+
+function renderAcoesBars(items, colorClass = 'bg-cyan-400', emptyText = 'Sem dados') {
+  const max = Math.max(...(items || []).map((item) => item.total), 1);
+  if (!items || items.length === 0) {
+    return `<p class="text-sm text-slate-500 py-6 text-center">${emptyText}</p>`;
+  }
+
+  return items.map((item) => `
+    <div class="grid grid-cols-[minmax(90px,160px)_1fr_42px] items-center gap-3">
+      <span class="text-xs text-slate-300 truncate" title="${escapeHtml(item.label)}">${escapeHtml(formatDisplayText(item.label))}</span>
+      <div class="h-3 rounded-full bg-slate-800 overflow-hidden">
+        <div class="h-full ${colorClass} rounded-full" style="width: ${(item.total / max) * 100}%"></div>
+      </div>
+      <span class="text-xs font-bold text-slate-200 text-right">${item.total}</span>
+    </div>
+  `).join('');
+}
+
+function renderAcoesTimeline(items) {
+  const max = Math.max(...(items || []).map((item) => item.total), 1);
+  if (!items || items.length === 0) {
+    return '<p class="text-sm text-slate-500 py-6 text-center">Sem anos cadastrados</p>';
+  }
+
+  return `
+    <div class="h-56 flex items-end justify-center gap-3 sm:gap-5">
+      ${items.map((item) => {
+        const height = Math.max((item.total / max) * 170, 18);
+        return `
+          <div class="flex min-w-10 flex-col items-center">
+            <div class="w-9 sm:w-12 rounded-t-lg bg-gradient-to-t from-cyan-700 to-cyan-300" style="height:${height}px"></div>
+            <p class="mt-2 text-sm font-bold text-cyan-200">${item.total}</p>
+            <p class="text-[11px] text-slate-400">${escapeHtml(item.label)}</p>
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `;
+}
+
+function renderAcoesSelectOptions(values, selected, placeholder) {
+  const options = [`<option value="">${escapeHtml(placeholder)}</option>`];
+  values.forEach((value) => {
+    const text = String(value || '').trim();
+    if (!text) return;
+    options.push(`<option value="${escapeHtml(text)}" ${text === selected ? 'selected' : ''}>${escapeHtml(formatDisplayText(text))}</option>`);
+  });
+  return options.join('');
+}
+
+function renderAcoesTableRows(records) {
+  if (!records.length) {
+    return '<tr><td colspan="9" class="px-3 py-8 text-center text-slate-500">Nenhuma acao encontrada.</td></tr>';
+  }
+
+  return records.slice(0, 250).map((acao) => `
+    <tr class="border-t border-slate-800/80 hover:bg-slate-900/70">
+      <td class="px-3 py-3">
+        <span class="inline-flex min-w-8 justify-center rounded-md bg-slate-800 px-2 py-1 text-xs font-bold text-cyan-200">${escapeHtml(acao.id || '-')}</span>
+      </td>
+      <td class="px-3 py-3 text-slate-300">${escapeHtml(acao.ano || '-')}</td>
+      <td class="px-3 py-3 text-slate-300 max-w-[180px] truncate" title="${escapeHtml(acao.processo_sei)}">${escapeHtml(acao.processo_sei || '-')}</td>
+      <td class="px-3 py-3 text-slate-100 font-semibold max-w-[340px]" title="${escapeHtml(acao.objetivo)}">${escapeHtml(acao.objetivo || '-')}</td>
+      <td class="px-3 py-3 text-slate-300">${escapeHtml(formatDisplayText(acao.regiao_administrativa || acao.local_ra || '-'))}</td>
+      <td class="px-3 py-3">
+        <span class="rounded-full bg-slate-800 px-2 py-1 text-xs font-semibold text-slate-200">${escapeHtml(formatDisplayText(acao.situacao || '-'))}</span>
+      </td>
+      <td class="px-3 py-3 text-slate-300">${escapeHtml(formatDisplayText(acao.direta_indireta || '-'))}</td>
+      <td class="px-3 py-3 text-slate-300">${escapeHtml(normalizeDateDisplay(acao.data))}</td>
+      <td class="px-3 py-3 text-right text-slate-200 font-semibold">${Number(acao.autos_infracao || 0)}</td>
+    </tr>
+  `).join('');
+}
+
+function renderAcoesDashboardView() {
+  const container = document.getElementById('acoes-dashboard-view');
+  if (!container) return;
+
+  const filters = acoesFilterState;
+  const records = filteredAcoes || [];
+  const metrics = getAcoesDashboardMetrics(records);
+  const anos = [...new Set(allAcoes.map((acao) => acao.ano).filter(Boolean).map(String))].sort((a, b) => Number(b) - Number(a));
+  const situacoes = [...new Set(allAcoes.map((acao) => acao.situacao).filter(Boolean))].sort();
+  const regioes = [...new Set([
+    ...allAcoes.map((acao) => acao.regiao_administrativa).filter(Boolean),
+    ...allAcoesLocais.map((local) => local.ra).filter(Boolean)
+  ])].sort();
+  const tipos = [...new Set(allAcoesLocais.map((local) => local.tipo).filter(Boolean))].sort();
+
+  const emptyState = allAcoes.length === 0 ? `
+    <div class="rounded-xl border border-dashed border-slate-700 bg-slate-900/70 p-8 text-center">
+      <p class="text-lg font-bold text-slate-100">Nenhum dado carregado</p>
+      <p class="mt-2 text-sm text-slate-400">Painel aguardando as abas Acoes e Locais das Fiscalizacoes.</p>
+      <button type="button" onclick="openAcoesUploadModal()" class="mt-5 inline-flex items-center justify-center rounded-lg bg-cyan-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-cyan-500">
+        Upload da planilha
+      </button>
+    </div>
+  ` : '';
+
+  container.innerHTML = `
+    <div class="mx-auto max-w-7xl space-y-5">
+      <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <p class="text-xs font-bold uppercase tracking-[0.2em] text-cyan-300">Dados Acoes</p>
+          <h2 class="mt-1 text-2xl sm:text-3xl font-extrabold text-white">Painel executivo de fiscalizacoes</h2>
+          <p class="mt-2 text-sm text-slate-400">${records.length} de ${allAcoes.length} acoes exibidas, ${allAcoesLocais.length} locais cadastrados</p>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <button type="button" onclick="refreshAcoesDashboardData()" class="rounded-lg bg-slate-800 px-4 py-2 text-sm font-semibold text-slate-200 hover:bg-slate-700">Atualizar</button>
+          <button type="button" onclick="openAcoesUploadModal()" class="rounded-lg bg-cyan-600 px-4 py-2 text-sm font-semibold text-white hover:bg-cyan-500">Upload</button>
+        </div>
+      </div>
+
+      ${emptyState}
+
+      <section class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3">
+        ${renderAcoesMetric('Total de acoes', metrics.total, 'cyan', `${metrics.taxaConclusao}% concluidas`)}
+        ${renderAcoesMetric('Em andamento', metrics.emAndamento, 'amber', `${metrics.naoConcluidas} nao concluidas`)}
+        ${renderAcoesMetric('Locais mapeados', metrics.locaisComCoordenadas, 'emerald', `${metrics.locais} registros de locais`)}
+        ${renderAcoesMetric('Autos de infracao', metrics.totalAutos, 'rose', `${metrics.totalTn} termos de notificacao`)}
+        ${renderAcoesMetric('Nao conformes', metrics.totalNaoConformes, 'blue', `${metrics.totalRecomendacoes} recomendacoes`)}
+      </section>
+
+      <section class="acoes-dashboard-card rounded-xl p-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3">
+          <input id="acoes-filter-search" value="${escapeHtml(filters.search)}" onchange="setAcoesFilter('search', this.value)" placeholder="ID, processo, objetivo..." class="acoes-dashboard-control">
+          <select id="acoes-filter-ano" onchange="setAcoesFilter('ano', this.value)" class="acoes-dashboard-control">${renderAcoesSelectOptions(anos, filters.ano, 'Todos os anos')}</select>
+          <select id="acoes-filter-situacao" onchange="setAcoesFilter('situacao', this.value)" class="acoes-dashboard-control">${renderAcoesSelectOptions(situacoes, filters.situacao, 'Todas as situacoes')}</select>
+          <select id="acoes-filter-regiao" onchange="setAcoesFilter('regiao', this.value)" class="acoes-dashboard-control">${renderAcoesSelectOptions(regioes, filters.regiao, 'Todas as regioes')}</select>
+          <select id="acoes-filter-tipo" onchange="setAcoesFilter('tipo', this.value)" class="acoes-dashboard-control">${renderAcoesSelectOptions(tipos, filters.tipo, 'Todos os tipos')}</select>
+        </div>
+        <div class="mt-3 flex justify-end">
+          <button type="button" onclick="resetAcoesDashboardFilters()" class="rounded-lg bg-slate-800 px-3 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-700">Limpar filtros</button>
+        </div>
+      </section>
+
+      <section class="grid grid-cols-1 xl:grid-cols-3 gap-4">
+        <div class="acoes-dashboard-card rounded-xl p-4 xl:col-span-2">
+          <h3 class="text-base font-bold text-white">Acoes por ano</h3>
+          ${renderAcoesTimeline(metrics.porAno)}
+        </div>
+        <div class="acoes-dashboard-card rounded-xl p-4">
+          <h3 class="text-base font-bold text-white mb-4">Situacao</h3>
+          <div class="space-y-3">${renderAcoesBars(metrics.porSituacao.slice(0, 6), 'bg-amber-400', 'Sem situacoes')}</div>
+        </div>
+      </section>
+
+      <section class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div class="acoes-dashboard-card rounded-xl p-4">
+          <h3 class="text-base font-bold text-white mb-4">Regioes com mais acoes</h3>
+          <div class="space-y-3">${renderAcoesBars(metrics.porRegiao.slice(0, 8), 'bg-cyan-400', 'Sem regioes')}</div>
+        </div>
+        <div class="acoes-dashboard-card rounded-xl p-4">
+          <h3 class="text-base font-bold text-white mb-4">Tipo de local</h3>
+          <div class="space-y-3">${renderAcoesBars(metrics.porTipoLocal.slice(0, 8), 'bg-emerald-400', 'Sem locais')}</div>
+        </div>
+        <div class="acoes-dashboard-card rounded-xl p-4">
+          <h3 class="text-base font-bold text-white mb-4">Programacao</h3>
+          <div class="space-y-3">${renderAcoesBars(metrics.porProgramacao.slice(0, 8), 'bg-blue-400', 'Sem programacao')}</div>
+          <div class="mt-5 grid grid-cols-2 gap-3">
+            <div class="rounded-lg border border-slate-800 bg-slate-950 p-3">
+              <p class="text-xs text-slate-500">Diretas</p>
+              <p class="text-2xl font-bold text-cyan-200">${metrics.diretas}</p>
+            </div>
+            <div class="rounded-lg border border-slate-800 bg-slate-950 p-3">
+              <p class="text-xs text-slate-500">Indiretas</p>
+              <p class="text-2xl font-bold text-emerald-200">${metrics.indiretas}</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="acoes-dashboard-card rounded-xl p-4">
+        <div class="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h3 class="text-base font-bold text-white">Tabela de acoes</h3>
+            <p class="text-xs text-slate-500">Exibindo ate 250 linhas filtradas</p>
+          </div>
+          <p class="text-xs text-slate-400">${records.length} registros</p>
+        </div>
+        <div class="overflow-x-auto custom-scrollbar">
+          <table class="w-full min-w-[1120px] text-left text-sm">
+            <thead>
+              <tr class="text-xs uppercase tracking-wide text-slate-500">
+                <th class="px-3 py-2">ID</th>
+                <th class="px-3 py-2">Ano</th>
+                <th class="px-3 py-2">Processo</th>
+                <th class="px-3 py-2">Objetivo</th>
+                <th class="px-3 py-2">Regiao</th>
+                <th class="px-3 py-2">Situacao</th>
+                <th class="px-3 py-2">Tipo</th>
+                <th class="px-3 py-2">Data</th>
+                <th class="px-3 py-2 text-right">AI</th>
+              </tr>
+            </thead>
+            <tbody>${renderAcoesTableRows(records)}</tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  `;
+}
+
+async function refreshAcoesDashboardData() {
+  setOperationStatus('Atualizando painel de acoes...', 'syncing');
+  const result = await loadAcoesDashboardData();
+  filteredAcoes = allAcoes;
+  applyAcoesDashboardFilters();
+  setOperationStatus(result.isOk ? 'Painel de acoes atualizado' : 'Falha ao atualizar painel de acoes', result.isOk ? 'success' : 'warning');
+}
+window.refreshAcoesDashboardData = refreshAcoesDashboardData;
 
 // ======== Obras Upload ========
 function updateObrasUploadActions() {
@@ -3631,13 +4355,379 @@ async function clearObrasData() {
 }
 window.clearObrasData = clearObrasData;
 
+// ======== Acoes Dashboard Upload ========
+function updateAcoesUploadActions() {
+  const uploadBtn = document.getElementById('acoes-upload-btn');
+  const clearBtn = document.getElementById('clear-acoes-btn');
+
+  if (uploadBtn) uploadBtn.disabled = pendingAcoesUpload.length === 0;
+  if (clearBtn) clearBtn.classList.toggle('hidden', !(pendingAcoesMeta || allAcoes.length > 0 || allAcoesLocais.length > 0));
+}
+
+function renderAcoesUploadPreview(records = [], locais = [], meta = null) {
+  const summary = document.getElementById('acoes-upload-summary');
+  const fileLabel = document.getElementById('acoes-summary-file');
+  const sheetLabel = document.getElementById('acoes-summary-sheet');
+  const countLabel = document.getElementById('acoes-summary-count');
+  const locaisCountLabel = document.getElementById('acoes-summary-locais-count');
+  const previewBody = document.getElementById('acoes-preview-body');
+  if (!summary || !fileLabel || !sheetLabel || !countLabel || !locaisCountLabel || !previewBody) return;
+
+  if (!meta) {
+    summary.classList.add('hidden');
+    fileLabel.textContent = '-';
+    sheetLabel.textContent = '-';
+    countLabel.textContent = '0';
+    locaisCountLabel.textContent = '0';
+    previewBody.innerHTML = '';
+    return;
+  }
+
+  fileLabel.textContent = meta.fileName || '-';
+  sheetLabel.textContent = meta.acoesSheetName || '-';
+  countLabel.textContent = String(records.length);
+  locaisCountLabel.textContent = String(locais.length);
+  previewBody.innerHTML = records.slice(0, 10).map((acao) => `
+    <tr class="border-t border-slate-600">
+      <td class="px-2 py-2 text-slate-300">${escapeHtml(acao.id || '-')}</td>
+      <td class="px-2 py-2 text-slate-300">${escapeHtml(acao.ano || '-')}</td>
+      <td class="px-2 py-2 text-slate-300">${escapeHtml(formatDisplayText(acao.regiao_administrativa || '-'))}</td>
+      <td class="px-2 py-2 text-slate-300">${escapeHtml(formatDisplayText(acao.situacao || '-'))}</td>
+      <td class="px-2 py-2 text-slate-300">${escapeHtml(formatDisplayText(acao.direta_indireta || '-'))}</td>
+      <td class="px-2 py-2 text-slate-300">${escapeHtml(acao.local_ra || (Number.isFinite(acao.latitude) ? 'Coordenado' : '-'))}</td>
+    </tr>
+  `).join('');
+  summary.classList.remove('hidden');
+}
+
+function openAcoesUploadModal() {
+  document.getElementById('acoes-upload-modal').classList.remove('hidden');
+  renderAcoesUploadPreview(pendingAcoesUpload, pendingAcoesLocaisUpload, pendingAcoesMeta);
+  updateAcoesUploadActions();
+}
+window.openAcoesUploadModal = openAcoesUploadModal;
+
+function closeAcoesUploadModal() {
+  document.getElementById('acoes-upload-modal').classList.add('hidden');
+  updateAcoesUploadActions();
+}
+window.closeAcoesUploadModal = closeAcoesUploadModal;
+
+function selectAcoesSheetName(sheetNames) {
+  if (!Array.isArray(sheetNames) || sheetNames.length === 0) return null;
+  return sheetNames.find((name) => normalizePlainText(name) === 'acoes') ||
+    sheetNames.find((name) => normalizePlainText(name).includes('acoes')) ||
+    sheetNames[0];
+}
+
+function selectAcoesLocaisSheetName(sheetNames) {
+  if (!Array.isArray(sheetNames) || sheetNames.length === 0) return null;
+  return sheetNames.find((name) => {
+    const normalized = normalizePlainText(name);
+    return normalized.includes('locais') && normalized.includes('fiscaliz');
+  }) || sheetNames.find((name) => normalizePlainText(name).includes('locais')) || null;
+}
+
+function findAcoesHeaderRow(rows) {
+  if (!Array.isArray(rows)) return -1;
+  for (let index = 0; index < Math.min(rows.length, 50); index += 1) {
+    const headerSet = new Set((rows[index] || []).map(normalizeHeaderKey).filter(Boolean));
+    if (headerSet.has('id') && headerSet.has('n_processo_sei') && headerSet.has('direta_ou_indireta')) {
+      return index;
+    }
+  }
+  return -1;
+}
+
+function findAcoesLocaisHeaderRow(rows) {
+  if (!Array.isArray(rows)) return -1;
+  for (let index = 0; index < Math.min(rows.length, 30); index += 1) {
+    const headerSet = new Set((rows[index] || []).map(normalizeHeaderKey).filter(Boolean));
+    if (headerSet.has('id') && headerSet.has('ano') && headerSet.has('ra') && headerSet.has('latitude') && headerSet.has('longitude')) {
+      return index;
+    }
+  }
+  return -1;
+}
+
+function sheetRowsToObjects(rows, headerRowIndex) {
+  const headers = (rows[headerRowIndex] || []).map(normalizeHeaderKey);
+  return rows.slice(headerRowIndex + 1)
+    .map((row) => {
+      const record = {};
+      headers.forEach((header, index) => {
+        if (!header) return;
+        record[header] = Array.isArray(row) ? row[index] : '';
+      });
+      return record;
+    })
+    .filter(hasMeaningfulRecordData);
+}
+
+function parseSheetInteger(value, min = 0, max = 100000) {
+  const parsed = parseLocalizedNumber(value);
+  if (!Number.isFinite(parsed)) return null;
+  const integer = Math.trunc(parsed);
+  return integer >= min && integer <= max ? integer : null;
+}
+
+function normalizeChoiceText(value) {
+  return String(value ?? '').trim().replace(/\s+/g, ' ');
+}
+
+function mapUploadedAcaoRecord(rawRecord, index) {
+  const record = {};
+  Object.entries(rawRecord || {}).forEach(([key, value]) => {
+    record[normalizeHeaderKey(key)] = value;
+  });
+  if (!hasMeaningfulRecordData(record)) return null;
+
+  const id = normalizeChoiceText(getFirstRecordValue(record, ['id']));
+  const processo = normalizeChoiceText(getFirstRecordValue(record, ['n_processo_sei', 'processo_sei']));
+  if (!id && !processo) return null;
+
+  const ano = parseSheetInteger(getFirstRecordValue(record, ['ano']), 1900, 2100);
+  return normalizeAcaoRecord({
+    __acaoId: buildAcoesId('acao', [ano, id, processo], index),
+    id,
+    processo_sei: processo,
+    ano,
+    objetivo: normalizeChoiceText(getFirstRecordValue(record, ['objetivo'])),
+    regiao_administrativa: normalizeChoiceText(getFirstRecordValue(record, ['regiao_administrativa'])),
+    situacao: normalizeChoiceText(getFirstRecordValue(record, ['situacao'])),
+    tipo_documento: normalizeChoiceText(getFirstRecordValue(record, ['tipo_de_documento', 'tipo_documento'])),
+    destinatario: normalizeChoiceText(getFirstRecordValue(record, ['destinatario'])),
+    direta_indireta: normalizeChoiceText(getFirstRecordValue(record, ['direta_ou_indireta'])),
+    programada: normalizeChoiceText(getFirstRecordValue(record, ['programada_ou_nao_programada', 'programada'])),
+    sei_documento: normalizeChoiceText(getFirstRecordValue(record, ['n_sei_do_documento', 'sei_documento'])),
+    data: toIsoDate(getFirstRecordValue(record, ['data'])),
+    constatacoes: parseSheetInteger(getFirstRecordValue(record, ['constatacoes'])),
+    constatacoes_nao_conformes: parseSheetInteger(getFirstRecordValue(record, ['constatacoes_nao_conformes'])),
+    recomendacoes_solicitacoes: parseSheetInteger(getFirstRecordValue(record, ['recomendacoes_solicitacoes', 'recomendacoes_solicitacoes_'])),
+    termos_notificacao: parseSheetInteger(getFirstRecordValue(record, ['termos_de_notificacao_tn', 'termos_notificacao'])),
+    autos_infracao: parseSheetInteger(getFirstRecordValue(record, ['autos_de_infracao_ai', 'autos_infracao'])),
+    termos_ajustes_conduta: parseSheetInteger(getFirstRecordValue(record, ['termos_de_ajustes_de_conduta_tac', 'termos_ajustes_conduta']))
+  }, index);
+}
+
+function mapUploadedAcaoLocalRecord(rawRecord, index) {
+  const record = {};
+  Object.entries(rawRecord || {}).forEach(([key, value]) => {
+    record[normalizeHeaderKey(key)] = value;
+  });
+  if (!hasMeaningfulRecordData(record)) return null;
+
+  const id = normalizeChoiceText(getFirstRecordValue(record, ['id']));
+  const ano = parseSheetInteger(getFirstRecordValue(record, ['ano']), 1900, 2100);
+  const ra = normalizeChoiceText(getFirstRecordValue(record, ['ra']));
+  if (!id && !ra) return null;
+
+  return normalizeAcaoLocalRecord({
+    __localId: buildAcoesId('local', [ano, id, ra], index),
+    id,
+    ano,
+    ra,
+    latitude: sanitizeCoordinate(getFirstRecordValue(record, ['latitude']), 'lat'),
+    longitude: sanitizeCoordinate(getFirstRecordValue(record, ['longitude']), 'lng'),
+    data: toIsoDate(getFirstRecordValue(record, ['data'])),
+    tipo: normalizeChoiceText(getFirstRecordValue(record, ['tipo'])),
+    motivo: normalizeChoiceText(getFirstRecordValue(record, ['motivo']))
+  }, index);
+}
+
+function findMatchingAcaoLocal(acao, locais) {
+  const exact = locais.find((local) => String(local.id || '') === String(acao.id || '') && String(local.ano || '') === String(acao.ano || ''));
+  if (exact) return exact;
+
+  const acaoRegiao = normalizePlainText(acao.regiao_administrativa);
+  if (!acaoRegiao) return null;
+  return locais.find((local) => {
+    if (String(local.ano || '') !== String(acao.ano || '')) return false;
+    const localRegiao = normalizePlainText(local.ra);
+    return localRegiao && (localRegiao === acaoRegiao || acaoRegiao.includes(localRegiao) || localRegiao.includes(acaoRegiao));
+  }) || null;
+}
+
+function enrichAcoesWithLocais(acoes, locais) {
+  return acoes.map((acao) => {
+    const local = findMatchingAcaoLocal(acao, locais);
+    if (!local) return acao;
+    return normalizeAcaoRecord({
+      ...acao,
+      latitude: Number.isFinite(acao.latitude) ? acao.latitude : local.latitude,
+      longitude: Number.isFinite(acao.longitude) ? acao.longitude : local.longitude,
+      local_ra: local.ra,
+      local_tipo: local.tipo,
+      local_motivo: local.motivo
+    });
+  });
+}
+
+async function handleAcoesFileSelected(event) {
+  const input = event?.target;
+  const file = input?.files?.[0];
+  if (!file) return;
+
+  if (typeof XLSX === 'undefined') {
+    showToast('Leitor de planilha indisponivel no navegador.', 'error');
+    return;
+  }
+
+  showLoading('Lendo Dados Acoes...');
+  setOperationStatus('Lendo planilha Dados Acoes...', 'syncing');
+
+  try {
+    const workbook = XLSX.read(await file.arrayBuffer(), { type: 'array', cellDates: false });
+    const acoesSheetName = selectAcoesSheetName(workbook.SheetNames);
+    const locaisSheetName = selectAcoesLocaisSheetName(workbook.SheetNames);
+    const acoesSheet = acoesSheetName ? workbook.Sheets[acoesSheetName] : null;
+    const locaisSheet = locaisSheetName ? workbook.Sheets[locaisSheetName] : null;
+    if (!acoesSheet) throw new Error('Aba Acoes nao encontrada.');
+    if (!locaisSheet) throw new Error('Aba Locais das Fiscalizacoes nao encontrada.');
+
+    const acoesRows = XLSX.utils.sheet_to_json(acoesSheet, { header: 1, raw: false, defval: '' });
+    const locaisRows = XLSX.utils.sheet_to_json(locaisSheet, { header: 1, raw: false, defval: '' });
+    const acoesHeaderRowIndex = findAcoesHeaderRow(acoesRows);
+    const locaisHeaderRowIndex = findAcoesLocaisHeaderRow(locaisRows);
+    if (acoesHeaderRowIndex < 0) throw new Error('Cabecalho da aba Acoes nao encontrado.');
+    if (locaisHeaderRowIndex < 0) throw new Error('Cabecalho da aba Locais nao encontrado.');
+
+    const locais = sheetRowsToObjects(locaisRows, locaisHeaderRowIndex)
+      .map(mapUploadedAcaoLocalRecord)
+      .filter(Boolean);
+    const acoes = enrichAcoesWithLocais(
+      sheetRowsToObjects(acoesRows, acoesHeaderRowIndex)
+        .map(mapUploadedAcaoRecord)
+        .filter(Boolean),
+      locais
+    );
+
+    pendingAcoesUpload = acoes;
+    pendingAcoesLocaisUpload = locais;
+    pendingAcoesMeta = {
+      fileName: file.name,
+      acoesSheetName,
+      locaisSheetName,
+      acoesHeaderRowIndex,
+      locaisHeaderRowIndex
+    };
+    renderAcoesUploadPreview(acoes, locais, pendingAcoesMeta);
+    updateAcoesUploadActions();
+    setOperationStatus('Planilha Dados Acoes pronta para salvar', 'success');
+    showToast(`${acoes.length} acoes e ${locais.length} locais detectados.`, 'success');
+  } catch (error) {
+    pendingAcoesUpload = [];
+    pendingAcoesLocaisUpload = [];
+    pendingAcoesMeta = null;
+    renderAcoesUploadPreview();
+    updateAcoesUploadActions();
+    setOperationStatus('Falha ao ler Dados Acoes', 'error');
+    showToast(error?.message || 'Erro ao ler planilha Dados Acoes.', 'error');
+  } finally {
+    hideLoading();
+    if (input) input.value = '';
+  }
+}
+window.handleAcoesFileSelected = handleAcoesFileSelected;
+
+async function executeAcoesUpload() {
+  if (pendingAcoesUpload.length === 0) {
+    showToast('Selecione a planilha Dados Acoes primeiro.', 'warning');
+    return;
+  }
+
+  setOperationStatus(`Salvando ${pendingAcoesUpload.length} acoes...`, 'syncing');
+  showLoading('Salvando painel no banco...');
+  const btn = document.getElementById('acoes-upload-btn');
+  if (btn) btn.disabled = true;
+
+  const result = await persistAcoesDashboardData(pendingAcoesUpload, pendingAcoesLocaisUpload);
+
+  hideLoading();
+  if (btn) btn.disabled = false;
+
+  if (!result.isOk) {
+    setOperationStatus('Falha ao salvar painel de acoes', 'warning');
+    showToast('Nao foi possivel salvar o painel no banco. Verifique a API/Neon.', 'warning');
+    return;
+  }
+
+  pendingAcoesUpload = [];
+  pendingAcoesLocaisUpload = [];
+  pendingAcoesMeta = null;
+  renderAcoesUploadPreview();
+  updateAcoesUploadActions();
+  closeAcoesUploadModal();
+  bumpSessionMetric('imports');
+  setOperationStatus('Painel de acoes atualizado', 'success');
+  switchDataView('acoes');
+  showToast(`${allAcoes.length} acoes salvas no painel.`, result.source === 'local' ? 'warning' : 'success');
+}
+window.executeAcoesUpload = executeAcoesUpload;
+
+async function clearAcoesDashboardData() {
+  if (!pendingAcoesMeta && allAcoes.length === 0 && allAcoesLocais.length === 0) {
+    showToast('Nao ha dados de acoes para limpar.', 'info');
+    return;
+  }
+
+  if (!window.confirm('Limpar todos os dados do painel de acoes?')) return;
+
+  setOperationStatus('Removendo dados do painel de acoes...', 'syncing');
+  showLoading('Limpando painel...');
+  const result = await deleteAcoesDashboardData();
+  hideLoading();
+
+  if (!result.isOk) {
+    setOperationStatus('Falha ao limpar painel de acoes', 'warning');
+    showToast('Nao foi possivel limpar os dados do banco.', 'warning');
+    return;
+  }
+
+  pendingAcoesUpload = [];
+  pendingAcoesLocaisUpload = [];
+  pendingAcoesMeta = null;
+  renderAcoesUploadPreview();
+  updateAcoesUploadActions();
+  applyAcoesDashboardFilters();
+  setOperationStatus('Painel de acoes limpo', 'success');
+  showToast('Dados do painel removidos.', result.source === 'local' ? 'warning' : 'success');
+}
+window.clearAcoesDashboardData = clearAcoesDashboardData;
+
 // ======== Export ========
 function exportToCSV() {
   let headers = [];
   let rows = [];
   let filename = '';
 
-  if (currentView === 'obras') {
+  if (currentView === 'acoes') {
+    if (allAcoes.length === 0) {
+      showToast('Nenhuma acao para exportar', 'warning');
+      return;
+    }
+
+    headers = [
+      'ID', 'Processo SEI', 'Ano', 'Objetivo', 'Regiao', 'Situacao',
+      'Tipo Documento', 'Destinatario', 'Direta/Indireta', 'Programada',
+      'SEI Documento', 'Data', 'Constatacoes', 'Nao Conformes',
+      'Recomendacoes/Solicitacoes', 'TN', 'AI', 'TAC',
+      'Latitude', 'Longitude', 'Local RA', 'Local Tipo', 'Local Motivo'
+    ];
+
+    rows = allAcoes.map((acao) => [
+      acao.id, acao.processo_sei, acao.ano, acao.objetivo,
+      acao.regiao_administrativa, acao.situacao, acao.tipo_documento,
+      acao.destinatario, acao.direta_indireta, acao.programada,
+      acao.sei_documento, acao.data, acao.constatacoes,
+      acao.constatacoes_nao_conformes, acao.recomendacoes_solicitacoes,
+      acao.termos_notificacao, acao.autos_infracao,
+      acao.termos_ajustes_conduta, acao.latitude, acao.longitude,
+      acao.local_ra, acao.local_tipo, acao.local_motivo
+    ]);
+
+    filename = `acoes_${new Date().toISOString().split('T')[0]}.csv`;
+  } else if (currentView === 'obras') {
     if (allObras.length === 0) {
       showToast('Nenhuma obra para exportar', 'warning');
       return;
@@ -4321,6 +5411,7 @@ async function init() {
   applyFilters();
   renderSavedFilterButtons();
   updateObrasUploadActions();
+  updateAcoesUploadActions();
   setDraftStatus('Sem alterações pendentes', 'idle');
   setOperationStatus('Sistema pronto', 'success');
 }

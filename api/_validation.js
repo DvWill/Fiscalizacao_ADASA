@@ -2,6 +2,8 @@ const crypto = require("crypto");
 
 const MAX_FISCALIZACOES = 999;
 const MAX_OBRAS = 5000;
+const MAX_ACOES_FISCALIZATORIAS = 10000;
+const MAX_LOCAIS_FISCALIZACOES = 10000;
 const MAX_TEXT_LENGTH = 10000;
 const MAX_IMAGE_BYTES = 2 * 1024 * 1024;
 const MAX_AUDIT_PAYLOAD_BYTES = 200 * 1024;
@@ -84,6 +86,11 @@ function normalizeProvidedId(value) {
   return /^[A-Za-z0-9_.:-]{1,128}$/.test(raw) ? raw : "";
 }
 
+function toCleanText(value, maxLength = MAX_TEXT_LENGTH) {
+  if (value == null) return "";
+  return String(value).trim().replace(/\s+/g, " ").slice(0, maxLength);
+}
+
 function toText(value, maxLength, fieldName, errors) {
   if (value == null) return "";
   const text = String(value).trim();
@@ -110,6 +117,26 @@ function toNumber(value, rule, fieldName, errors) {
     errors.push(`${fieldName} esta fora do intervalo permitido.`);
   }
   return normalized;
+}
+
+function toLenientNumber(value, rule = {}) {
+  if (value == null || value === "") return null;
+  const parsed = typeof value === "number"
+    ? value
+    : Number(String(value).replace("%", "").replace(/\.(?=\d{3}(?:\D|$))/g, "").replace(",", "."));
+
+  if (!Number.isFinite(parsed)) return null;
+  const normalized = rule.integer ? Math.trunc(parsed) : parsed;
+  if (Number.isFinite(rule.min) && normalized < rule.min) return null;
+  if (Number.isFinite(rule.max) && normalized > rule.max) return null;
+  return normalized;
+}
+
+function toIsoDateOrNull(value) {
+  const raw = String(value == null ? "" : value).trim();
+  if (!raw) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+  return null;
 }
 
 function validateImage(value, errors) {
@@ -229,6 +256,119 @@ function sanitizeObraRecords(records) {
   return { records: sanitized, errors };
 }
 
+function sanitizeAcaoFiscalizatoriaRecord(input, options = {}) {
+  const errors = [];
+  if (!isPlainObject(input)) {
+    return { record: null, errors: ["Registro de acao deve ser um objeto."] };
+  }
+
+  const providedId = normalizeProvidedId(input.__acaoId);
+  const id = toCleanText(input.id, 64);
+  const processoSei = toCleanText(input.processo_sei, 128);
+  const record = {
+    __acaoId: options.forcedId || (options.allowId && providedId ? providedId : buildRecordId()),
+    id,
+    processo_sei: processoSei,
+    ano: toLenientNumber(input.ano, { min: 1900, max: 2100, integer: true }),
+    objetivo: toCleanText(input.objetivo),
+    regiao_administrativa: toCleanText(input.regiao_administrativa, 200),
+    situacao: toCleanText(input.situacao, 80),
+    tipo_documento: toCleanText(input.tipo_documento, 160),
+    destinatario: toCleanText(input.destinatario, 500),
+    direta_indireta: toCleanText(input.direta_indireta, 20),
+    programada: toCleanText(input.programada, 80),
+    sei_documento: toCleanText(input.sei_documento, 128),
+    data: toIsoDateOrNull(input.data),
+    constatacoes: toLenientNumber(input.constatacoes, { min: 0, max: 100000, integer: true }),
+    constatacoes_nao_conformes: toLenientNumber(input.constatacoes_nao_conformes, { min: 0, max: 100000, integer: true }),
+    recomendacoes_solicitacoes: toLenientNumber(input.recomendacoes_solicitacoes, { min: 0, max: 100000, integer: true }),
+    termos_notificacao: toLenientNumber(input.termos_notificacao, { min: 0, max: 100000, integer: true }),
+    autos_infracao: toLenientNumber(input.autos_infracao, { min: 0, max: 100000, integer: true }),
+    termos_ajustes_conduta: toLenientNumber(input.termos_ajustes_conduta, { min: 0, max: 100000, integer: true }),
+    latitude: toLenientNumber(input.latitude, { min: -90, max: 90 }),
+    longitude: toLenientNumber(input.longitude, { min: -180, max: 180 }),
+    local_ra: toCleanText(input.local_ra, 200),
+    local_tipo: toCleanText(input.local_tipo, 160),
+    local_motivo: toCleanText(input.local_motivo)
+  };
+
+  if (options.requireCore !== false && !record.id && !record.processo_sei) {
+    errors.push("id ou processo_sei e obrigatorio.");
+  }
+
+  return { record, errors };
+}
+
+function sanitizeAcaoFiscalizatoriaRecords(records, options = {}) {
+  if (!Array.isArray(records)) {
+    return { records: [], errors: ["Campo acoes deve ser uma lista."] };
+  }
+  if (records.length > MAX_ACOES_FISCALIZATORIAS) {
+    return { records: [], errors: [`Limite de ${MAX_ACOES_FISCALIZATORIAS} acoes excedido.`] };
+  }
+
+  const sanitized = [];
+  const errors = [];
+  records.forEach((record, index) => {
+    const result = sanitizeAcaoFiscalizatoriaRecord(record, { ...options, allowId: true });
+    if (result.errors.length) {
+      errors.push(...result.errors.map((error) => `Linha ${index + 1}: ${error}`));
+    }
+    if (result.record && result.errors.length === 0) sanitized.push(result.record);
+  });
+
+  return { records: sanitized, errors };
+}
+
+function sanitizeLocalFiscalizacaoRecord(input, options = {}) {
+  const errors = [];
+  if (!isPlainObject(input)) {
+    return { record: null, errors: ["Registro de local deve ser um objeto."] };
+  }
+
+  const providedId = normalizeProvidedId(input.__localId);
+  const id = toCleanText(input.id, 64);
+  const ra = toCleanText(input.ra, 200);
+  const record = {
+    __localId: options.forcedId || (options.allowId && providedId ? providedId : buildRecordId()),
+    id,
+    ano: toLenientNumber(input.ano, { min: 1900, max: 2100, integer: true }),
+    ra,
+    latitude: toLenientNumber(input.latitude, { min: -90, max: 90 }),
+    longitude: toLenientNumber(input.longitude, { min: -180, max: 180 }),
+    data: toIsoDateOrNull(input.data),
+    tipo: toCleanText(input.tipo, 160),
+    motivo: toCleanText(input.motivo)
+  };
+
+  if (options.requireCore !== false && !record.id && !record.ra) {
+    errors.push("id ou ra e obrigatorio.");
+  }
+
+  return { record, errors };
+}
+
+function sanitizeLocalFiscalizacaoRecords(records, options = {}) {
+  if (!Array.isArray(records)) {
+    return { records: [], errors: ["Campo locais deve ser uma lista."] };
+  }
+  if (records.length > MAX_LOCAIS_FISCALIZACOES) {
+    return { records: [], errors: [`Limite de ${MAX_LOCAIS_FISCALIZACOES} locais excedido.`] };
+  }
+
+  const sanitized = [];
+  const errors = [];
+  records.forEach((record, index) => {
+    const result = sanitizeLocalFiscalizacaoRecord(record, { ...options, allowId: true });
+    if (result.errors.length) {
+      errors.push(...result.errors.map((error) => `Linha ${index + 1}: ${error}`));
+    }
+    if (result.record && result.errors.length === 0) sanitized.push(result.record);
+  });
+
+  return { records: sanitized, errors };
+}
+
 function sanitizeAuditPayload(value, fieldName, errors) {
   if (value == null) return null;
   const serialized = JSON.stringify(value);
@@ -261,5 +401,7 @@ module.exports = {
   sanitizeFiscalizacaoRecord,
   sanitizeFiscalizacaoRecords,
   sanitizeObraRecords,
+  sanitizeAcaoFiscalizatoriaRecords,
+  sanitizeLocalFiscalizacaoRecords,
   sanitizeAuditEntry
 };
