@@ -3813,10 +3813,62 @@ function applyAcoesDashboardFilters() {
 }
 window.applyAcoesDashboardFilters = applyAcoesDashboardFilters;
 
+const ACOES_MONTH_NAMES = [
+  'janeiro',
+  'fevereiro',
+  'marco',
+  'abril',
+  'maio',
+  'junho',
+  'julho',
+  'agosto',
+  'setembro',
+  'outubro',
+  'novembro',
+  'dezembro'
+];
+
+const ACOES_DOCUMENT_ORDER = [
+  'Oficio',
+  'Reuniao',
+  'Relatorio de Fiscalizacao',
+  'Memorando',
+  '(Em branco)',
+  'Outros'
+];
+
+const ACOES_SERIES_COLORS = [
+  '#1e90f2',
+  '#72008b',
+  '#d4143a',
+  '#e86f33',
+  '#b8afd7',
+  '#64748b',
+  '#16a34a',
+  '#f59e0b'
+];
+
+const ACOES_COLOR_MAP = new Map([
+  ['Oficio', '#1e90f2'],
+  ['Reuniao', '#72008b'],
+  ['Relatorio de Fiscalizacao', '#d4143a'],
+  ['Memorando', '#e86f33'],
+  ['Programada', '#1e90f2'],
+  ['Nao programada', '#d4143a'],
+  ['Concluida', '#1e90f2'],
+  ['Nao Concluida', '#d4143a'],
+  ['(Em branco)', '#b8afd7'],
+  ['Direta', '#1e90f2'],
+  ['Indireta', '#d4143a'],
+  ['Quantidade de documentos', '#1e90f2'],
+  ['Quantidade de Termos de Notificacao (TN)', '#d4143a'],
+  ['Quantidade de Autos de Infracao (AI)', '#d4143a']
+]);
+
 function countAcoesBy(records, getter) {
   const counts = new Map();
   (records || []).forEach((record) => {
-    const value = String(getter(record) || '').trim() || 'Nao informado';
+    const value = String(getter(record) || '').trim() || '(Em branco)';
     counts.set(value, (counts.get(value) || 0) + 1);
   });
   return Array.from(counts.entries())
@@ -3838,6 +3890,148 @@ function isAcaoNaoConcluida(acao) {
   return status.includes('nao concluida');
 }
 
+function classifyAcaoSituacao(acao) {
+  const status = normalizePlainText(acao?.situacao);
+  if (!status) return '(Em branco)';
+  if (status.includes('nao concluida')) return 'Nao Concluida';
+  if (status.includes('concluida')) return 'Concluida';
+  return String(acao?.situacao || '').trim() || '(Em branco)';
+}
+
+function classifyAcaoProgramacao(value) {
+  const normalized = normalizePlainText(value);
+  if (!normalized) return '(Em branco)';
+  if (normalized.includes('nao')) return 'Nao programada';
+  if (normalized.includes('programada')) return 'Programada';
+  return String(value || '').trim() || '(Em branco)';
+}
+
+function isAcaoProgramada(acao) {
+  return classifyAcaoProgramacao(acao?.programada) === 'Programada';
+}
+
+function classifyAcaoDocumentType(value) {
+  const normalized = normalizePlainText(value);
+  if (!normalized) return '(Em branco)';
+  if (normalized.includes('oficio')) return 'Oficio';
+  if (normalized.includes('reuniao')) return 'Reuniao';
+  if (normalized.includes('memorando')) return 'Memorando';
+  if (normalized.includes('relatorio') && normalized.includes('fiscalizacao')) return 'Relatorio de Fiscalizacao';
+  return String(value || '').trim() || 'Outros';
+}
+
+function isAcaoFiscalizatoriaDocument(acao) {
+  return classifyAcaoDocumentType(acao?.tipo_documento) === 'Relatorio de Fiscalizacao';
+}
+
+function getAcaoYear(acao) {
+  if (Number.isFinite(Number(acao?.ano))) return Number(acao.ano);
+  const date = String(acao?.data || '');
+  const match = date.match(/^(\d{4})-/);
+  return match ? Number(match[1]) : null;
+}
+
+function getAcaoMonthIndex(acao) {
+  const date = String(acao?.data || '').trim();
+  const match = date.match(/^\d{4}-(\d{2})-/);
+  if (!match) return -1;
+  const index = Number(match[1]) - 1;
+  return index >= 0 && index < 12 ? index : -1;
+}
+
+function formatAcoesNumber(value, options = {}) {
+  const number = Number(value) || 0;
+  return number.toLocaleString('pt-BR', {
+    minimumFractionDigits: options.minimumFractionDigits ?? 0,
+    maximumFractionDigits: options.maximumFractionDigits ?? 0
+  });
+}
+
+function formatAcoesAverage(value) {
+  return formatAcoesNumber(value, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function getAcoesColor(label, index = 0) {
+  return ACOES_COLOR_MAP.get(label) || ACOES_SERIES_COLORS[index % ACOES_SERIES_COLORS.length];
+}
+
+function sortAcoesCounts(items, order = []) {
+  return [...(items || [])].sort((a, b) => {
+    const leftIndex = order.indexOf(a.label);
+    const rightIndex = order.indexOf(b.label);
+    if (leftIndex !== -1 || rightIndex !== -1) {
+      if (leftIndex === -1) return 1;
+      if (rightIndex === -1) return -1;
+      return leftIndex - rightIndex;
+    }
+    return b.total - a.total || a.label.localeCompare(b.label);
+  });
+}
+
+function buildAcoesCountMap(records, getter) {
+  const map = new Map();
+  (records || []).forEach((record) => {
+    const label = String(getter(record) || '').trim() || '(Em branco)';
+    map.set(label, (map.get(label) || 0) + 1);
+  });
+  return map;
+}
+
+function countAcoesMonths(records) {
+  const values = Array.from({ length: 12 }, (_, index) => ({
+    label: ACOES_MONTH_NAMES[index],
+    total: 0,
+    monthIndex: index
+  }));
+
+  (records || []).forEach((record) => {
+    const index = getAcaoMonthIndex(record);
+    if (index >= 0) values[index].total += 1;
+  });
+
+  return values.filter((item) => item.total > 0);
+}
+
+function countAcoesByYear(records, getter) {
+  const totals = new Map();
+  (records || []).forEach((record) => {
+    const year = getAcaoYear(record);
+    if (!year) return;
+    totals.set(year, (totals.get(year) || 0) + (Number(getter(record)) || 0));
+  });
+
+  return Array.from(totals.entries())
+    .map(([label, total]) => ({ label: String(label), total }))
+    .sort((a, b) => Number(a.label) - Number(b.label));
+}
+
+function buildAcoesMonthlyDocumentSeries(records) {
+  const seriesMap = new Map();
+  ACOES_DOCUMENT_ORDER.forEach((label) => {
+    seriesMap.set(label, Array(12).fill(0));
+  });
+
+  (records || []).forEach((record) => {
+    const monthIndex = getAcaoMonthIndex(record);
+    if (monthIndex < 0) return;
+    const label = classifyAcaoDocumentType(record.tipo_documento);
+    if (!seriesMap.has(label)) seriesMap.set(label, Array(12).fill(0));
+    seriesMap.get(label)[monthIndex] += 1;
+  });
+
+  const monthIndexes = Array.from({ length: 12 }, (_, index) => index)
+    .filter((monthIndex) => Array.from(seriesMap.values()).some((values) => values[monthIndex] > 0));
+
+  const series = sortAcoesCounts(
+    Array.from(seriesMap.entries())
+      .map(([label, values]) => ({ label, values, total: values.reduce((sum, value) => sum + value, 0) }))
+      .filter((item) => item.total > 0),
+    ACOES_DOCUMENT_ORDER
+  );
+
+  return { monthIndexes, series };
+}
+
 function getFilteredAcoesLocais() {
   const filters = acoesFilterState;
   const actionKeys = new Set(filteredAcoes.map((acao) => `${acao.id}::${acao.ano || ''}`));
@@ -3854,94 +4048,282 @@ function getAcoesDashboardMetrics(records = filteredAcoes) {
   const locais = getFilteredAcoesLocais();
   const total = records.length;
   const concluidas = records.filter(isAcaoConcluida).length;
-  const emAndamento = records.filter((acao) => normalizePlainText(acao.situacao).includes('andamento')).length;
   const naoConcluidas = records.filter(isAcaoNaoConcluida).length;
+  const programadas = records.filter(isAcaoProgramada).length;
+  const mediaMensal = total / 12;
+  const relatorios = records.filter(isAcaoFiscalizatoriaDocument);
+  const memorandos = records.filter((acao) => classifyAcaoDocumentType(acao.tipo_documento) === 'Memorando').length;
+  const reunioes = records.filter((acao) => classifyAcaoDocumentType(acao.tipo_documento) === 'Reuniao').length;
+  const oficios = records.filter((acao) => classifyAcaoDocumentType(acao.tipo_documento) === 'Oficio').length;
   const diretas = records.filter((acao) => normalizePlainText(acao.direta_indireta) === 'direta').length;
   const indiretas = records.filter((acao) => normalizePlainText(acao.direta_indireta) === 'indireta').length;
+  const relatoriosDiretas = relatorios.filter((acao) => normalizePlainText(acao.direta_indireta) === 'direta').length;
+  const relatoriosIndiretas = relatorios.filter((acao) => normalizePlainText(acao.direta_indireta) === 'indireta').length;
   const locaisComCoordenadas = locais.filter((local) => Number.isFinite(local.latitude) && Number.isFinite(local.longitude)).length;
   const totalAutos = sumAcoes(records, (acao) => acao.autos_infracao);
   const totalTn = sumAcoes(records, (acao) => acao.termos_notificacao);
   const totalNaoConformes = sumAcoes(records, (acao) => acao.constatacoes_nao_conformes);
   const totalRecomendacoes = sumAcoes(records, (acao) => acao.recomendacoes_solicitacoes);
-  const taxaConclusao = total ? Math.round((concluidas / total) * 100) : 0;
+  const tipoAcaoItems = sortAcoesCounts(countAcoesBy(records, (acao) => classifyAcaoProgramacao(acao.programada)), ['Programada', 'Nao programada', '(Em branco)']);
+  const situacaoItems = sortAcoesCounts(countAcoesBy(records, classifyAcaoSituacao), ['Concluida', 'Nao Concluida', '(Em branco)']);
+  const documentoItems = sortAcoesCounts(countAcoesBy(records, (acao) => classifyAcaoDocumentType(acao.tipo_documento)), ACOES_DOCUMENT_ORDER);
+  const relatorioProgramacaoItems = sortAcoesCounts(countAcoesBy(relatorios, (acao) => classifyAcaoProgramacao(acao.programada)), ['Programada', 'Nao programada', '(Em branco)']);
+  const relatorioRealizacaoItems = sortAcoesCounts(countAcoesBy(relatorios, (acao) => {
+    const value = normalizePlainText(acao.direta_indireta);
+    if (value === 'direta') return 'Direta';
+    if (value === 'indireta') return 'Indireta';
+    return '(Em branco)';
+  }), ['Direta', 'Indireta', '(Em branco)']);
+
+  const documentCountByYear = countAcoesByYear(records, (acao) => acao.sei_documento || classifyAcaoDocumentType(acao.tipo_documento) !== '(Em branco)' ? 1 : 0);
+  const termosByYear = countAcoesByYear(records, (acao) => acao.termos_notificacao);
+  const autosByYear = countAcoesByYear(records, (acao) => acao.autos_infracao);
+  const docsByYearMap = new Map(documentCountByYear.map((item) => [item.label, item.total]));
+  const termosByYearMap = new Map(termosByYear.map((item) => [item.label, item.total]));
+  const autosByYearMap = new Map(autosByYear.map((item) => [item.label, item.total]));
+  const yearLabels = [...new Set([
+    ...documentCountByYear.map((item) => item.label),
+    ...termosByYear.map((item) => item.label),
+    ...autosByYear.map((item) => item.label)
+  ])].sort((a, b) => Number(a) - Number(b));
 
   return {
     total,
     concluidas,
-    emAndamento,
     naoConcluidas,
+    programadas,
+    mediaMensal,
+    relatorios: relatorios.length,
+    memorandos,
+    reunioes,
+    oficios,
     diretas,
     indiretas,
+    relatoriosDiretas,
+    relatoriosIndiretas,
     locais: locais.length,
     locaisComCoordenadas,
     totalAutos,
     totalTn,
     totalNaoConformes,
     totalRecomendacoes,
-    taxaConclusao,
+    tipoAcaoItems,
+    situacaoItems,
+    documentoItems,
+    documentosPorMes: buildAcoesMonthlyDocumentSeries(records),
+    relatoriosPorMes: countAcoesMonths(relatorios),
+    oficiosPorMes: countAcoesMonths(records.filter((acao) => classifyAcaoDocumentType(acao.tipo_documento) === 'Oficio')),
+    relatorioProgramacaoItems,
+    relatorioRealizacaoItems,
+    documentosTermosPorAno: yearLabels.map((label) => ({
+      label,
+      documento: docsByYearMap.get(label) || 0,
+      indicador: termosByYearMap.get(label) || 0
+    })),
+    documentosAutosPorAno: yearLabels.map((label) => ({
+      label,
+      documento: docsByYearMap.get(label) || 0,
+      indicador: autosByYearMap.get(label) || 0
+    })),
     porAno: countAcoesBy(records, (acao) => acao.ano).sort((a, b) => Number(a.label) - Number(b.label)),
-    porSituacao: countAcoesBy(records, (acao) => acao.situacao),
     porRegiao: countAcoesBy(records, (acao) => acao.regiao_administrativa || acao.local_ra),
     porTipoLocal: countAcoesBy(locais, (local) => local.tipo),
-    porProgramacao: countAcoesBy(records, (acao) => acao.programada)
+    porProgramacao: tipoAcaoItems
   };
 }
 
-function renderAcoesMetric(label, value, tone = 'cyan', note = '') {
-  const tones = {
-    cyan: 'text-cyan-300 bg-cyan-500/15 border-cyan-500/20',
-    emerald: 'text-emerald-300 bg-emerald-500/15 border-emerald-500/20',
-    amber: 'text-amber-300 bg-amber-500/15 border-amber-500/20',
-    rose: 'text-rose-300 bg-rose-500/15 border-rose-500/20',
-    blue: 'text-blue-300 bg-blue-500/15 border-blue-500/20',
-    slate: 'text-slate-200 bg-slate-800/80 border-slate-700'
-  };
+function renderAcoesKpiCard(label, value, note = '') {
   return `
-    <div class="rounded-xl border ${tones[tone] || tones.slate} p-4">
-      <p class="text-xs uppercase tracking-wide text-slate-400 mb-2">${escapeHtml(label)}</p>
-      <p class="text-2xl sm:text-3xl font-extrabold ${tone === 'slate' ? 'text-white' : ''}">${escapeHtml(value)}</p>
-      ${note ? `<p class="text-xs text-slate-400 mt-2">${escapeHtml(note)}</p>` : ''}
+    <div class="acoes-kpi-card">
+      <p class="acoes-kpi-label">${escapeHtml(label).replace(/\|/g, '<br>')}</p>
+      <p class="acoes-kpi-value">${escapeHtml(value)}</p>
+      ${note ? `<p class="acoes-kpi-note">${escapeHtml(note)}</p>` : ''}
     </div>
   `;
 }
 
-function renderAcoesBars(items, colorClass = 'bg-cyan-400', emptyText = 'Sem dados') {
-  const max = Math.max(...(items || []).map((item) => item.total), 1);
-  if (!items || items.length === 0) {
-    return `<p class="text-sm text-slate-500 py-6 text-center">${emptyText}</p>`;
-  }
-
-  return items.map((item) => `
-    <div class="grid grid-cols-[minmax(90px,160px)_1fr_42px] items-center gap-3">
-      <span class="text-xs text-slate-300 truncate" title="${escapeHtml(item.label)}">${escapeHtml(formatDisplayText(item.label))}</span>
-      <div class="h-3 rounded-full bg-slate-800 overflow-hidden">
-        <div class="h-full ${colorClass} rounded-full" style="width: ${(item.total / max) * 100}%"></div>
-      </div>
-      <span class="text-xs font-bold text-slate-200 text-right">${item.total}</span>
-    </div>
-  `).join('');
+function renderAcoesChartCard(title, body, extraClass = '') {
+  return `
+    <section class="acoes-chart-card ${extraClass}">
+      <div class="acoes-chart-title">${escapeHtml(title)}</div>
+      <div class="acoes-chart-body">${body}</div>
+    </section>
+  `;
 }
 
-function renderAcoesTimeline(items) {
-  const max = Math.max(...(items || []).map((item) => item.total), 1);
-  if (!items || items.length === 0) {
-    return '<p class="text-sm text-slate-500 py-6 text-center">Sem anos cadastrados</p>';
+function renderAcoesEmptyChart(text = 'Sem dados para exibir') {
+  return `<div class="acoes-empty-chart">${escapeHtml(text)}</div>`;
+}
+
+function renderAcoesLegend(items) {
+  if (!items || items.length === 0) return '';
+  const total = items.reduce((sum, item) => sum + item.total, 0) || 1;
+  return `
+    <div class="acoes-chart-legend">
+      ${items.map((item, index) => `
+        <div class="acoes-legend-row">
+          <span class="acoes-legend-dot" style="background:${getAcoesColor(item.label, index)}"></span>
+          <span class="acoes-legend-label">${escapeHtml(item.label)}</span>
+          <span class="acoes-legend-value">${item.total} (${Math.round((item.total / total) * 100)}%)</span>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+function buildAcoesPieGradient(items) {
+  const total = items.reduce((sum, item) => sum + item.total, 0);
+  if (!total) return '#cbd5e1 0 100%';
+  let current = 0;
+  return items.map((item, index) => {
+    const start = current;
+    current += (item.total / total) * 100;
+    return `${getAcoesColor(item.label, index)} ${start}% ${current}%`;
+  }).join(', ');
+}
+
+function renderAcoesPieChart(title, items, legendTitle = '') {
+  const visibleItems = (items || []).filter((item) => item.total > 0);
+  if (!visibleItems.length) {
+    return renderAcoesChartCard(title, renderAcoesEmptyChart());
   }
 
-  return `
-    <div class="h-56 flex items-end justify-center gap-3 sm:gap-5">
+  const total = visibleItems.reduce((sum, item) => sum + item.total, 0);
+  return renderAcoesChartCard(title, `
+    <div class="acoes-pie-layout">
+      <div class="acoes-pie" style="background: conic-gradient(${buildAcoesPieGradient(visibleItems)});">
+        <div class="acoes-pie-center">
+          <span>${total}</span>
+          <small>total</small>
+        </div>
+      </div>
+      <div>
+        ${legendTitle ? `<p class="acoes-legend-title">${escapeHtml(legendTitle)}</p>` : ''}
+        ${renderAcoesLegend(visibleItems)}
+      </div>
+    </div>
+  `);
+}
+
+function renderAcoesHorizontalBars(title, items, valueLabel = 'Quantidade') {
+  const max = Math.max(...(items || []).map((item) => item.total), 1);
+  if (!items || items.length === 0) {
+    return renderAcoesChartCard(title, renderAcoesEmptyChart());
+  }
+
+  return renderAcoesChartCard(title, `
+    <div class="acoes-horizontal-bars">
+      ${items.map((item, index) => `
+        <div class="acoes-horizontal-row">
+          <span class="acoes-horizontal-label" title="${escapeHtml(item.label)}">${escapeHtml(item.label)}</span>
+          <div class="acoes-horizontal-track">
+            <div class="acoes-horizontal-fill" style="width:${Math.max((item.total / max) * 100, 3)}%; background:${getAcoesColor(item.label, index)}">
+              <span>${escapeHtml(formatAcoesNumber(item.total))}</span>
+            </div>
+          </div>
+        </div>
+      `).join('')}
+      <p class="acoes-axis-caption">${escapeHtml(valueLabel)}</p>
+    </div>
+  `);
+}
+
+function renderAcoesVerticalBars(title, items, yLabel = 'Quantidade') {
+  const max = Math.max(...(items || []).map((item) => item.total), 1);
+  if (!items || items.length === 0) {
+    return renderAcoesChartCard(title, renderAcoesEmptyChart());
+  }
+
+  return renderAcoesChartCard(title, `
+    <div class="acoes-vertical-wrap">
+      <span class="acoes-y-label">${escapeHtml(yLabel)}</span>
+      <div class="acoes-vertical-chart">
       ${items.map((item) => {
-        const height = Math.max((item.total / max) * 170, 18);
+        const height = Math.max((item.total / max) * 132, 18);
         return `
-          <div class="flex min-w-10 flex-col items-center">
-            <div class="w-9 sm:w-12 rounded-t-lg bg-gradient-to-t from-cyan-700 to-cyan-300" style="height:${height}px"></div>
-            <p class="mt-2 text-sm font-bold text-cyan-200">${item.total}</p>
-            <p class="text-[11px] text-slate-400">${escapeHtml(item.label)}</p>
+          <div class="acoes-vertical-item">
+            <span class="acoes-vertical-value">${escapeHtml(formatAcoesNumber(item.total))}</span>
+            <div class="acoes-vertical-bar" style="height:${height}px"></div>
+            <span class="acoes-vertical-label">${escapeHtml(item.label)}</span>
           </div>
         `;
       }).join('')}
     </div>
-  `;
+    </div>
+  `);
+}
+
+function renderAcoesGroupedMonthlyChart(title, data) {
+  const monthIndexes = data?.monthIndexes || [];
+  const series = data?.series || [];
+  const max = Math.max(...series.flatMap((item) => item.values), 1);
+  if (!monthIndexes.length || !series.length) {
+    return renderAcoesChartCard(title, renderAcoesEmptyChart());
+  }
+
+  return renderAcoesChartCard(title, `
+    <div class="acoes-grouped-legend">
+      ${series.map((item, index) => `
+        <span><i style="background:${getAcoesColor(item.label, index)}"></i>${escapeHtml(item.label)}</span>
+      `).join('')}
+    </div>
+    <div class="acoes-grouped-chart" style="--series-count:${Math.max(series.length, 1)}">
+      ${monthIndexes.map((monthIndex) => `
+        <div class="acoes-month-group">
+          <div class="acoes-month-bars">
+            ${series.map((item, index) => {
+              const value = item.values[monthIndex] || 0;
+              const height = value ? Math.max((value / max) * 135, 10) : 0;
+              return `
+                <div class="acoes-month-bar" style="height:${height}px; background:${getAcoesColor(item.label, index)}" title="${escapeHtml(item.label)}: ${value}">
+                  ${value ? `<span>${value}</span>` : ''}
+                </div>
+              `;
+            }).join('')}
+          </div>
+          <span class="acoes-month-label">${escapeHtml(ACOES_MONTH_NAMES[monthIndex])}</span>
+        </div>
+      `).join('')}
+    </div>
+  `);
+}
+
+function renderAcoesDualYearBars(title, rows, indicatorLabel) {
+  const max = Math.max(
+    ...((rows || []).map((item) => item.documento)),
+    ...((rows || []).map((item) => item.indicador)),
+    1
+  );
+
+  if (!rows || rows.length === 0) {
+    return renderAcoesChartCard(title, renderAcoesEmptyChart());
+  }
+
+  return renderAcoesChartCard(title, `
+    <div class="acoes-grouped-legend compact">
+      <span><i style="background:${getAcoesColor('Quantidade de documentos')}"></i>Quantidade de documentos</span>
+      <span><i style="background:${getAcoesColor(indicatorLabel)}"></i>${escapeHtml(indicatorLabel)}</span>
+    </div>
+    <div class="acoes-dual-year-chart">
+      ${rows.map((row) => `
+        <div class="acoes-dual-year-row">
+          <span class="acoes-dual-year-label">${escapeHtml(row.label)}</span>
+          <div class="acoes-dual-year-bars">
+            <div class="acoes-dual-year-track">
+              <div class="acoes-dual-year-fill blue" style="width:${Math.max((row.documento / max) * 100, row.documento ? 3 : 0)}%">
+                ${row.documento ? `<span>${escapeHtml(formatAcoesNumber(row.documento))}</span>` : ''}
+              </div>
+            </div>
+            <div class="acoes-dual-year-track">
+              <div class="acoes-dual-year-fill red" style="width:${Math.max((row.indicador / max) * 100, row.indicador ? 3 : 0)}%">
+                ${row.indicador ? `<span>${escapeHtml(formatAcoesNumber(row.indicador))}</span>` : ''}
+              </div>
+            </div>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  `);
 }
 
 function renderAcoesSelectOptions(values, selected, placeholder) {
@@ -3960,23 +4342,28 @@ function renderAcoesTableRows(records) {
   }
 
   return records.slice(0, 250).map((acao) => `
-    <tr class="border-t border-slate-800/80 hover:bg-slate-900/70">
+    <tr class="border-t border-slate-200 hover:bg-blue-50/70">
       <td class="px-3 py-3">
-        <span class="inline-flex min-w-8 justify-center rounded-md bg-slate-800 px-2 py-1 text-xs font-bold text-cyan-200">${escapeHtml(acao.id || '-')}</span>
+        <span class="inline-flex min-w-8 justify-center rounded-md bg-blue-900 px-2 py-1 text-xs font-bold text-white">${escapeHtml(acao.id || '-')}</span>
       </td>
-      <td class="px-3 py-3 text-slate-300">${escapeHtml(acao.ano || '-')}</td>
-      <td class="px-3 py-3 text-slate-300 max-w-[180px] truncate" title="${escapeHtml(acao.processo_sei)}">${escapeHtml(acao.processo_sei || '-')}</td>
-      <td class="px-3 py-3 text-slate-100 font-semibold max-w-[340px]" title="${escapeHtml(acao.objetivo)}">${escapeHtml(acao.objetivo || '-')}</td>
-      <td class="px-3 py-3 text-slate-300">${escapeHtml(formatDisplayText(acao.regiao_administrativa || acao.local_ra || '-'))}</td>
+      <td class="px-3 py-3 text-slate-700">${escapeHtml(acao.ano || '-')}</td>
+      <td class="px-3 py-3 text-slate-700 max-w-[180px] truncate" title="${escapeHtml(acao.processo_sei)}">${escapeHtml(acao.processo_sei || '-')}</td>
+      <td class="px-3 py-3 text-slate-900 font-semibold max-w-[340px]" title="${escapeHtml(acao.objetivo)}">${escapeHtml(acao.objetivo || '-')}</td>
+      <td class="px-3 py-3 text-slate-700">${escapeHtml(formatDisplayText(acao.regiao_administrativa || acao.local_ra || '-'))}</td>
       <td class="px-3 py-3">
-        <span class="rounded-full bg-slate-800 px-2 py-1 text-xs font-semibold text-slate-200">${escapeHtml(formatDisplayText(acao.situacao || '-'))}</span>
+        <span class="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">${escapeHtml(formatDisplayText(acao.situacao || '-'))}</span>
       </td>
-      <td class="px-3 py-3 text-slate-300">${escapeHtml(formatDisplayText(acao.direta_indireta || '-'))}</td>
-      <td class="px-3 py-3 text-slate-300">${escapeHtml(normalizeDateDisplay(acao.data))}</td>
-      <td class="px-3 py-3 text-right text-slate-200 font-semibold">${Number(acao.autos_infracao || 0)}</td>
+      <td class="px-3 py-3 text-slate-700">${escapeHtml(formatDisplayText(acao.direta_indireta || '-'))}</td>
+      <td class="px-3 py-3 text-slate-700">${escapeHtml(normalizeDateDisplay(acao.data))}</td>
+      <td class="px-3 py-3 text-right text-slate-900 font-semibold">${Number(acao.autos_infracao || 0)}</td>
     </tr>
   `).join('');
 }
+
+function scrollAcoesInfoTable() {
+  document.getElementById('acoes-info-table')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+window.scrollAcoesInfoTable = scrollAcoesInfoTable;
 
 function renderAcoesDashboardView() {
   const container = document.getElementById('acoes-dashboard-view');
@@ -3992,102 +4379,104 @@ function renderAcoesDashboardView() {
     ...allAcoesLocais.map((local) => local.ra).filter(Boolean)
   ])].sort();
   const tipos = [...new Set(allAcoesLocais.map((local) => local.tipo).filter(Boolean))].sort();
+  const selectedYearLabel = filters.ano || (anos.length === 1 ? anos[0] : 'Todos');
 
   const emptyState = allAcoes.length === 0 ? `
-    <div class="rounded-xl border border-dashed border-slate-700 bg-slate-900/70 p-8 text-center">
-      <p class="text-lg font-bold text-slate-100">Nenhum dado carregado</p>
-      <p class="mt-2 text-sm text-slate-400">Painel aguardando as abas Acoes e Locais das Fiscalizacoes.</p>
-      <button type="button" onclick="openAcoesUploadModal()" class="mt-5 inline-flex items-center justify-center rounded-lg bg-cyan-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-cyan-500">
+    <div class="acoes-empty-state">
+      <p class="text-lg font-bold text-slate-900">Nenhum dado carregado</p>
+      <p class="mt-2 text-sm text-slate-600">Painel aguardando as abas Acoes e Locais das Fiscalizacoes.</p>
+      <button type="button" onclick="openAcoesUploadModal()" class="mt-5 inline-flex items-center justify-center rounded-lg bg-blue-900 px-5 py-2.5 text-sm font-bold text-white hover:bg-blue-800">
         Upload da planilha
       </button>
     </div>
   ` : '';
 
   container.innerHTML = `
-    <div class="mx-auto max-w-7xl space-y-5">
-      <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <p class="text-xs font-bold uppercase tracking-[0.2em] text-cyan-300">Dados Acoes</p>
-          <h2 class="mt-1 text-2xl sm:text-3xl font-extrabold text-white">Painel executivo de fiscalizacoes</h2>
-          <p class="mt-2 text-sm text-slate-400">${records.length} de ${allAcoes.length} acoes exibidas, ${allAcoesLocais.length} locais cadastrados</p>
+    <div class="acoes-cofa-shell">
+      <header class="acoes-cofa-header">
+        <button type="button" onclick="switchDataView('fiscalizacoes')" class="acoes-nav-tile">
+          <span aria-hidden="true">&larr;</span>
+          <strong>Inicio</strong>
+        </button>
+        <div class="acoes-brand-block">
+          <div class="acoes-brand-mark"></div>
+          <span>Adasa</span>
         </div>
-        <div class="flex flex-wrap gap-2">
-          <button type="button" onclick="refreshAcoesDashboardData()" class="rounded-lg bg-slate-800 px-4 py-2 text-sm font-semibold text-slate-200 hover:bg-slate-700">Atualizar</button>
-          <button type="button" onclick="openAcoesUploadModal()" class="rounded-lg bg-cyan-600 px-4 py-2 text-sm font-semibold text-white hover:bg-cyan-500">Upload</button>
+        <div class="acoes-title-block">ACOES COFA</div>
+        <div class="acoes-header-actions">
+          <button type="button" onclick="refreshAcoesDashboardData()" class="acoes-header-button">Atualizar</button>
+          <button type="button" onclick="openAcoesUploadModal()" class="acoes-header-button primary">Upload</button>
         </div>
-      </div>
+        <button type="button" onclick="scrollAcoesInfoTable()" class="acoes-nav-tile right">
+          <span aria-hidden="true">&rarr;</span>
+          <strong>Tabela</strong>
+        </button>
+      </header>
 
       ${emptyState}
 
-      <section class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3">
-        ${renderAcoesMetric('Total de acoes', metrics.total, 'cyan', `${metrics.taxaConclusao}% concluidas`)}
-        ${renderAcoesMetric('Em andamento', metrics.emAndamento, 'amber', `${metrics.naoConcluidas} nao concluidas`)}
-        ${renderAcoesMetric('Locais mapeados', metrics.locaisComCoordenadas, 'emerald', `${metrics.locais} registros de locais`)}
-        ${renderAcoesMetric('Autos de infracao', metrics.totalAutos, 'rose', `${metrics.totalTn} termos de notificacao`)}
-        ${renderAcoesMetric('Nao conformes', metrics.totalNaoConformes, 'blue', `${metrics.totalRecomendacoes} recomendacoes`)}
+      <section class="acoes-filter-strip">
+        <input id="acoes-filter-search" value="${escapeHtml(filters.search)}" onchange="setAcoesFilter('search', this.value)" placeholder="ID, processo, objetivo..." class="acoes-dashboard-control">
+        <select id="acoes-filter-ano" onchange="setAcoesFilter('ano', this.value)" class="acoes-dashboard-control">${renderAcoesSelectOptions(anos, filters.ano, 'Todos os anos')}</select>
+        <select id="acoes-filter-situacao" onchange="setAcoesFilter('situacao', this.value)" class="acoes-dashboard-control">${renderAcoesSelectOptions(situacoes, filters.situacao, 'Todas as situacoes')}</select>
+        <select id="acoes-filter-regiao" onchange="setAcoesFilter('regiao', this.value)" class="acoes-dashboard-control">${renderAcoesSelectOptions(regioes, filters.regiao, 'Todas as regioes')}</select>
+        <select id="acoes-filter-tipo" onchange="setAcoesFilter('tipo', this.value)" class="acoes-dashboard-control">${renderAcoesSelectOptions(tipos, filters.tipo, 'Todos os tipos')}</select>
+        <button type="button" onclick="resetAcoesDashboardFilters()" class="acoes-filter-reset">Limpar filtros</button>
       </section>
 
-      <section class="acoes-dashboard-card rounded-xl p-4">
-        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3">
-          <input id="acoes-filter-search" value="${escapeHtml(filters.search)}" onchange="setAcoesFilter('search', this.value)" placeholder="ID, processo, objetivo..." class="acoes-dashboard-control">
-          <select id="acoes-filter-ano" onchange="setAcoesFilter('ano', this.value)" class="acoes-dashboard-control">${renderAcoesSelectOptions(anos, filters.ano, 'Todos os anos')}</select>
-          <select id="acoes-filter-situacao" onchange="setAcoesFilter('situacao', this.value)" class="acoes-dashboard-control">${renderAcoesSelectOptions(situacoes, filters.situacao, 'Todas as situacoes')}</select>
-          <select id="acoes-filter-regiao" onchange="setAcoesFilter('regiao', this.value)" class="acoes-dashboard-control">${renderAcoesSelectOptions(regioes, filters.regiao, 'Todas as regioes')}</select>
-          <select id="acoes-filter-tipo" onchange="setAcoesFilter('tipo', this.value)" class="acoes-dashboard-control">${renderAcoesSelectOptions(tipos, filters.tipo, 'Todos os tipos')}</select>
-        </div>
-        <div class="mt-3 flex justify-end">
-          <button type="button" onclick="resetAcoesDashboardFilters()" class="rounded-lg bg-slate-800 px-3 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-700">Limpar filtros</button>
-        </div>
+      <section class="acoes-kpi-grid top">
+        ${renderAcoesKpiCard('TOTAL DE ACOES', formatAcoesNumber(metrics.total))}
+        ${renderAcoesKpiCard('ACOES|CONCLUIDAS', formatAcoesNumber(metrics.concluidas))}
+        ${renderAcoesKpiCard('ACOES NAO|CONCLUIDAS', formatAcoesNumber(metrics.naoConcluidas))}
+        ${renderAcoesKpiCard('ACOES|PROGRAMADAS', formatAcoesNumber(metrics.programadas))}
+        ${renderAcoesKpiCard('MEDIA DE ACOES|POR MES', formatAcoesAverage(metrics.mediaMensal))}
       </section>
 
-      <section class="grid grid-cols-1 xl:grid-cols-3 gap-4">
-        <div class="acoes-dashboard-card rounded-xl p-4 xl:col-span-2">
-          <h3 class="text-base font-bold text-white">Acoes por ano</h3>
-          ${renderAcoesTimeline(metrics.porAno)}
-        </div>
-        <div class="acoes-dashboard-card rounded-xl p-4">
-          <h3 class="text-base font-bold text-white mb-4">Situacao</h3>
-          <div class="space-y-3">${renderAcoesBars(metrics.porSituacao.slice(0, 6), 'bg-amber-400', 'Sem situacoes')}</div>
-        </div>
+      <section class="acoes-chart-grid two">
+        ${renderAcoesPieChart('TIPO DE ACOES', metrics.tipoAcaoItems, 'TIPO:')}
+        ${renderAcoesPieChart('STATUS DAS ACOES', metrics.situacaoItems, 'SITUACAO:')}
       </section>
 
-      <section class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div class="acoes-dashboard-card rounded-xl p-4">
-          <h3 class="text-base font-bold text-white mb-4">Regioes com mais acoes</h3>
-          <div class="space-y-3">${renderAcoesBars(metrics.porRegiao.slice(0, 8), 'bg-cyan-400', 'Sem regioes')}</div>
-        </div>
-        <div class="acoes-dashboard-card rounded-xl p-4">
-          <h3 class="text-base font-bold text-white mb-4">Tipo de local</h3>
-          <div class="space-y-3">${renderAcoesBars(metrics.porTipoLocal.slice(0, 8), 'bg-emerald-400', 'Sem locais')}</div>
-        </div>
-        <div class="acoes-dashboard-card rounded-xl p-4">
-          <h3 class="text-base font-bold text-white mb-4">Programacao</h3>
-          <div class="space-y-3">${renderAcoesBars(metrics.porProgramacao.slice(0, 8), 'bg-blue-400', 'Sem programacao')}</div>
-          <div class="mt-5 grid grid-cols-2 gap-3">
-            <div class="rounded-lg border border-slate-800 bg-slate-950 p-3">
-              <p class="text-xs text-slate-500">Diretas</p>
-              <p class="text-2xl font-bold text-cyan-200">${metrics.diretas}</p>
-            </div>
-            <div class="rounded-lg border border-slate-800 bg-slate-950 p-3">
-              <p class="text-xs text-slate-500">Indiretas</p>
-              <p class="text-2xl font-bold text-emerald-200">${metrics.indiretas}</p>
-            </div>
-          </div>
-        </div>
+      <section class="acoes-chart-grid two">
+        ${renderAcoesGroupedMonthlyChart('DOCUMENTOS POR TIPO E MES', metrics.documentosPorMes)}
+        ${renderAcoesHorizontalBars('RELACAO DOS DOCUMENTOS GERADOS POR TIPO', metrics.documentoItems, 'Quantidade')}
       </section>
 
-      <section class="acoes-dashboard-card rounded-xl p-4">
+      <section class="acoes-kpi-grid documents">
+        ${renderAcoesKpiCard('RELATORIO DE|FISCALIZACAO', formatAcoesNumber(metrics.relatorios))}
+        ${renderAcoesKpiCard('MEMORANDO', formatAcoesNumber(metrics.memorandos))}
+        <div class="acoes-year-card">
+          <p>ANO</p>
+          <select onchange="setAcoesFilter('ano', this.value)" class="acoes-year-select">
+            ${renderAcoesSelectOptions(anos, filters.ano, 'Todos')}
+          </select>
+          <strong>${escapeHtml(selectedYearLabel)}</strong>
+        </div>
+        ${renderAcoesKpiCard('REUNIOES', formatAcoesNumber(metrics.reunioes))}
+        ${renderAcoesKpiCard('OFICIOS', formatAcoesNumber(metrics.oficios))}
+      </section>
+
+      <section class="acoes-chart-grid three">
+        ${renderAcoesVerticalBars('QUANTIDADE DE ACOES FISCALIZATORIAS POR MES', metrics.relatoriosPorMes, 'Quantidade')}
+        ${renderAcoesDualYearBars('QUANTIDADE DE TERMOS DE NOTIFICACAO POR ANO', metrics.documentosTermosPorAno, 'Quantidade de Termos de Notificacao (TN)')}
+        ${renderAcoesVerticalBars('QUANTIDADE DE OFICIOS POR MES', metrics.oficiosPorMes, 'Quantidade de oficios')}
+        ${renderAcoesPieChart('ACOES FISCALIZATORIAS POR REALIZACAO', metrics.relatorioRealizacaoItems)}
+        ${renderAcoesDualYearBars('QUANTIDADE DE AUTOS DE INFRACAO POR ANO', metrics.documentosAutosPorAno, 'Quantidade de Autos de Infracao (AI)')}
+        ${renderAcoesPieChart('ACOES FISCALIZATORIAS POR CATEGORIA', metrics.relatorioProgramacaoItems)}
+      </section>
+
+      <section id="acoes-info-table" class="acoes-table-card">
         <div class="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <h3 class="text-base font-bold text-white">Tabela de acoes</h3>
+            <h3 class="text-base font-bold text-slate-900">Tabela de acoes</h3>
             <p class="text-xs text-slate-500">Exibindo ate 250 linhas filtradas</p>
           </div>
-          <p class="text-xs text-slate-400">${records.length} registros</p>
+          <p class="text-xs text-slate-500">${records.length} de ${allAcoes.length} registros, ${allAcoesLocais.length} locais cadastrados</p>
         </div>
         <div class="overflow-x-auto custom-scrollbar">
           <table class="w-full min-w-[1120px] text-left text-sm">
             <thead>
-              <tr class="text-xs uppercase tracking-wide text-slate-500">
+              <tr class="text-xs uppercase tracking-wide text-slate-500 bg-slate-100">
                 <th class="px-3 py-2">ID</th>
                 <th class="px-3 py-2">Ano</th>
                 <th class="px-3 py-2">Processo</th>
