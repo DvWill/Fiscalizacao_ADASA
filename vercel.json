@@ -1,4 +1,9 @@
 {
+  "functions": {
+    "api/rvf-relatorios.js": {
+      "maxDuration": 300
+    }
+  },
   "headers": [
     {
       "source": "/(.*)",

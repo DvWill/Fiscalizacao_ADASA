@@ -44,11 +44,13 @@ Porta:
 
 ## Deploy no Vercel (Serverless)
 
-Este projeto inclui funcoes em `api/fiscalizacoes.js` e `api/obras.js` para uso no Vercel.
+Este projeto inclui funcoes em `api/fiscalizacoes.js`, `api/obras.js`, `api/acoes-dashboard.js` e `api/rvf-relatorios.js` para uso no Vercel.
 
 - Endpoints:
   - `/api/fiscalizacoes` (`GET`, `POST`, `PUT`, `DELETE`)
   - `/api/obras` (`GET`, `PUT`, `DELETE`)
+  - `/api/acoes-dashboard` (`GET`, `PUT`, `DELETE`)
+  - `/api/rvf-relatorios` (`GET` para listar, `POST` para sincronizar links da ADASA)
 - Reescrita para ID: `vercel.json` mapeia `/api/fiscalizacoes/:id` para a funcao.
 
 Persistencia: as funcoes usam PostgreSQL (`pg`) e exigem a variavel de ambiente:
@@ -87,3 +89,5 @@ Por padrao, o frontend usa `/api`. Para apontar para um backend externo, defina:
 - `POST /api/auth/login` (login/senha)
 - `GET /api/auth/me` (sessao atual)
 - `POST /api/auth/logout` (encerrar sessao)
+- `GET /api/rvf-relatorios`
+- `POST /api/rvf-relatorios` (sincroniza os Relatorios de Vistoria e Fiscalizacao - RVF da ADASA)

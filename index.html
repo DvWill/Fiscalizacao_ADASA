@@ -60,6 +60,10 @@
             class="px-3 py-1.5 rounded-md text-slate-300 text-xs sm:text-sm font-medium transition-colors">
             A&ccedil;&otilde;es
           </button>
+          <button id="view-rvf-btn" onclick="switchDataView('rvf')"
+            class="px-3 py-1.5 rounded-md text-slate-300 text-xs sm:text-sm font-medium transition-colors">
+            RVF
+          </button>
         </div>
 
         <button id="filters-btn" onclick="toggleFiltersPanel(true)"
@@ -399,6 +403,8 @@
       </div>
 
       <section id="acoes-dashboard-view" class="hidden absolute inset-0 overflow-y-auto custom-scrollbar bg-white p-2 sm:p-4">
+      </section>
+      <section id="rvf-view" class="hidden absolute inset-0 overflow-y-auto custom-scrollbar bg-white p-2 sm:p-4">
       </section>
     </div>
 

@@ -201,6 +201,71 @@ async function ensureSchema() {
         CREATE INDEX IF NOT EXISTS fiscalizacoes_audit_created_at_idx
         ON public.fiscalizacoes_audit (created_at DESC)
       `);
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS public.rvf_relatorios (
+          id SERIAL PRIMARY KEY,
+          titulo TEXT NOT NULL,
+          ano INTEGER NOT NULL,
+          mes VARCHAR(30),
+          url_original TEXT NOT NULL,
+          url_pdf_final TEXT,
+          dominio_origem VARCHAR(255),
+          status_link VARCHAR(50) DEFAULT 'pendente',
+          erro_importacao TEXT,
+          data_importacao TIMESTAMPTZ DEFAULT NOW(),
+          data_atualizacao TIMESTAMPTZ DEFAULT NOW()
+        )
+      `);
+      await db.query(`
+        ALTER TABLE public.rvf_relatorios
+        ADD COLUMN IF NOT EXISTS mes VARCHAR(30)
+      `);
+      await db.query(`
+        ALTER TABLE public.rvf_relatorios
+        ADD COLUMN IF NOT EXISTS url_pdf_final TEXT
+      `);
+      await db.query(`
+        ALTER TABLE public.rvf_relatorios
+        ADD COLUMN IF NOT EXISTS dominio_origem VARCHAR(255)
+      `);
+      await db.query(`
+        ALTER TABLE public.rvf_relatorios
+        ADD COLUMN IF NOT EXISTS status_link VARCHAR(50) DEFAULT 'pendente'
+      `);
+      await db.query(`
+        ALTER TABLE public.rvf_relatorios
+        ADD COLUMN IF NOT EXISTS erro_importacao TEXT
+      `);
+      await db.query(`
+        ALTER TABLE public.rvf_relatorios
+        ADD COLUMN IF NOT EXISTS data_importacao TIMESTAMPTZ DEFAULT NOW()
+      `);
+      await db.query(`
+        ALTER TABLE public.rvf_relatorios
+        ADD COLUMN IF NOT EXISTS data_atualizacao TIMESTAMPTZ DEFAULT NOW()
+      `);
+      await db.query(`
+        DO $$
+        BEGIN
+          IF NOT EXISTS (
+            SELECT 1
+            FROM pg_constraint
+            WHERE conname = 'rvf_relatorios_unique_ano_titulo_url_original'
+          ) THEN
+            ALTER TABLE public.rvf_relatorios
+            ADD CONSTRAINT rvf_relatorios_unique_ano_titulo_url_original
+            UNIQUE (ano, titulo, url_original);
+          END IF;
+        END $$;
+      `);
+      await db.query(`
+        CREATE INDEX IF NOT EXISTS rvf_relatorios_ano_idx
+        ON public.rvf_relatorios (ano DESC)
+      `);
+      await db.query(`
+        CREATE INDEX IF NOT EXISTS rvf_relatorios_status_idx
+        ON public.rvf_relatorios (status_link)
+      `);
     })();
   }
 

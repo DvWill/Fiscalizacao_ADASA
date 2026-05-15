@@ -210,6 +210,20 @@ async function listLocais(db) {
   return result.rows.map(localRowToRecord);
 }
 
+async function getDashboardUpdatedAt(db) {
+  const result = await db.query(`
+    SELECT MAX(updated_at) AS updated_at
+    FROM (
+      SELECT updated_at FROM public.acoes_fiscalizatorias
+      UNION ALL
+      SELECT updated_at FROM public.locais_fiscalizacoes
+    ) dados
+  `);
+
+  const value = result.rows[0]?.updated_at;
+  return value ? new Date(value).toISOString() : "";
+}
+
 async function replaceDashboardData(db, acoes, locais) {
   const seenAcoes = new Set();
   const seenLocais = new Set();
@@ -351,7 +365,12 @@ module.exports = async function handler(req, res) {
       if (method === "GET") {
         const acoes = await listAcoes(db);
         const locais = await listLocais(db);
-        res.status(200).json({ acoes, locais, dashboard: buildDashboard(acoes, locais) });
+        res.status(200).json({
+          acoes,
+          locais,
+          dashboard: buildDashboard(acoes, locais),
+          updatedAt: await getDashboardUpdatedAt(db)
+        });
         return;
       }
 
@@ -370,7 +389,8 @@ module.exports = async function handler(req, res) {
         const result = await replaceDashboardData(db, acoes.records, locais.records);
         res.status(200).json({
           ...result,
-          dashboard: buildDashboard(result.acoes, result.locais)
+          dashboard: buildDashboard(result.acoes, result.locais),
+          updatedAt: await getDashboardUpdatedAt(db)
         });
         return;
       }
@@ -384,7 +404,8 @@ module.exports = async function handler(req, res) {
           await db.query("COMMIT");
           res.status(200).json({
             deletedAcoes: acoesDeleted.rowCount || 0,
-            deletedLocais: locaisDeleted.rowCount || 0
+            deletedLocais: locaisDeleted.rowCount || 0,
+            updatedAt: ""
           });
         } catch (error) {
           await db.query("ROLLBACK");
