@@ -35,6 +35,8 @@
   <link rel="stylesheet" href="./styles/app.css" />
   <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
   <link rel="shortcut icon" href="./favicon.svg" />
+  <link rel="icon" type="image/png" href="./assets/sae-logo-symbol.png" />
+  <link rel="apple-touch-icon" href="./assets/sae-logo-symbol.png" />
 </head>
 
 <body class="app-page h-full overflow-hidden">
@@ -43,13 +45,10 @@
     <!-- Header (RESPONSIVO) -->
     <header class="app-header glass-card border-b border-slate-700 px-4 sm:px-6 py-3 sm:py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 z-50">
       <div class="app-brand flex items-center gap-4">
-        <div class="app-brand-mark w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
-          <svg class="icon-min w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path d="M12 21s-6-5.2-6-10a6 6 0 1112 0c0 4.8-6 10-6 10z" />
-            <circle cx="12" cy="11" r="2.5" />
-          </svg>
+        <div class="brand-logo-frame app-brand-logo-frame">
+          <img src="./assets/sae-logo.png" alt="SAE" class="brand-logo-image" />
         </div>
-        <div class="min-w-0">
+        <div class="min-w-0 app-brand-copy">
           <p class="app-kicker">COFA</p>
           <h1 id="app-title" class="text-lg sm:text-xl font-bold text-white truncate">Painel de Fiscalizações</h1>
           <p id="app-subtitle" class="text-xs sm:text-sm text-slate-400 truncate">Monitoramento territorial e conformidade em tempo real</p>
