@@ -179,6 +179,30 @@ body.app-page .app-shell {
   display: none;
 }
 
+.theme-toggle-btn {
+  border: 1px solid var(--border-strong);
+  color: var(--text-strong);
+  box-shadow:
+    0 10px 24px rgba(0, 0, 0, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.theme-icon {
+  flex: 0 0 auto;
+}
+
+.theme-icon-moon {
+  display: none;
+}
+
+html[data-theme="light"] .theme-icon-sun {
+  display: none;
+}
+
+html[data-theme="light"] .theme-icon-moon {
+  display: block;
+}
+
 body.app-page .app-stage {
   border-radius: 34px;
   background: rgba(15, 23, 42, 0.56);
@@ -2130,6 +2154,229 @@ body:is(.app-page, .public-page, .auth-page) table,
 body:is(.app-page, .public-page, .auth-page) tbody,
 body:is(.app-page, .public-page, .auth-page) tr {
   color: var(--text-body);
+}
+
+html[data-theme="light"] {
+  --page-bg: #eef3f8;
+  --page-bg-alt: #f8fafc;
+  --surface: rgba(255, 255, 255, 0.82);
+  --surface-strong: rgba(255, 255, 255, 0.96);
+  --surface-solid: #ffffff;
+  --surface-muted: rgba(241, 245, 249, 0.9);
+  --border-soft: rgba(86, 107, 127, 0.18);
+  --border-strong: rgba(71, 85, 105, 0.28);
+  --text-strong: #172033;
+  --text-body: #475569;
+  --text-muted: #64748b;
+  --text-faint: #7b8ba0;
+  --graphite: #172033;
+  --graphite-soft: #334155;
+  --accent: #2563eb;
+  --accent-soft: #0f766e;
+  --success: #047857;
+  --warning: #b45309;
+  --danger: #be123c;
+  --shadow-sm: 0 12px 30px rgba(15, 23, 42, 0.08);
+  --shadow-md: 0 18px 52px rgba(15, 23, 42, 0.12);
+  --shadow-xl: 0 30px 80px rgba(15, 23, 42, 0.14);
+  color-scheme: light;
+  background: var(--page-bg);
+}
+
+html[data-theme="light"] body {
+  color: var(--text-strong);
+  background:
+    radial-gradient(circle at 12% 10%, rgba(37, 99, 235, 0.1), transparent 28%),
+    radial-gradient(circle at 88% 4%, rgba(15, 118, 110, 0.08), transparent 24%),
+    radial-gradient(circle at 50% 120%, rgba(180, 83, 9, 0.07), transparent 30%),
+    linear-gradient(180deg, #f8fafc 0%, #eef3f8 52%, #e4ebf3 100%);
+}
+
+html[data-theme="light"] body.app-page::before,
+html[data-theme="light"] body.public-page::before {
+  background: rgba(37, 99, 235, 0.1);
+}
+
+html[data-theme="light"] body.app-page::after,
+html[data-theme="light"] body.public-page::after {
+  background: rgba(15, 118, 110, 0.08);
+}
+
+html[data-theme="light"] body.auth-page::before {
+  background: rgba(37, 99, 235, 0.12);
+}
+
+html[data-theme="light"] body.auth-page::after {
+  background: rgba(15, 118, 110, 0.1);
+}
+
+html[data-theme="light"] body.app-page .app-stage {
+  background: rgba(255, 255, 255, 0.68);
+  border-color: var(--border-soft);
+  box-shadow: var(--shadow-xl);
+}
+
+html[data-theme="light"] body.app-page .app-filters-drawer,
+html[data-theme="light"] body.app-page .detail-shell {
+  background: rgba(255, 255, 255, 0.98);
+}
+
+html[data-theme="light"] .map-legend-card,
+html[data-theme="light"] .map-hint-card,
+html[data-theme="light"] .metric-card,
+html[data-theme="light"] .module-summary-card,
+html[data-theme="light"] .rvf-mobile-card {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.94));
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-sm);
+}
+
+html[data-theme="light"] .module-page-shell {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.74), rgba(241, 245, 249, 0.56));
+}
+
+html[data-theme="light"] .module-page-header,
+html[data-theme="light"] .module-filter-panel,
+html[data-theme="light"] .module-table-card,
+html[data-theme="light"] .acoes-chart-card,
+html[data-theme="light"] .module-empty-state,
+html[data-theme="light"] .list-card,
+html[data-theme="light"] .detail-field,
+html[data-theme="light"] .detail-rich-text {
+  background: var(--surface-strong);
+  border-color: var(--border-soft);
+  box-shadow: var(--shadow-sm);
+}
+
+html[data-theme="light"] body:is(.app-page, .public-page, .auth-page) input,
+html[data-theme="light"] body:is(.app-page, .public-page, .auth-page) select,
+html[data-theme="light"] body:is(.app-page, .public-page, .auth-page) textarea,
+html[data-theme="light"] .module-control {
+  background-color: rgba(255, 255, 255, 0.95) !important;
+  border-color: var(--border-strong) !important;
+  color: var(--text-strong) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+html[data-theme="light"] body:is(.app-page, .public-page, .auth-page) input::placeholder,
+html[data-theme="light"] body:is(.app-page, .public-page, .auth-page) textarea::placeholder {
+  color: var(--text-muted) !important;
+}
+
+html[data-theme="light"] body.app-page .view-switch,
+html[data-theme="light"] body.app-page #storage-mode-wrapper,
+html[data-theme="light"] body.app-page #auth-user-badge,
+html[data-theme="light"] body.app-page #operation-status,
+html[data-theme="light"] body.app-page button[class*="bg-slate-700"],
+html[data-theme="light"] body.public-page button[class*="bg-slate-700"],
+html[data-theme="light"] body.auth-page a[class*="border-slate-600"],
+html[data-theme="light"] body.public-page a[class*="border-slate-600"],
+html[data-theme="light"] body.public-page .kind-toggle {
+  background: rgba(255, 255, 255, 0.92) !important;
+  border-color: var(--border-strong) !important;
+  color: var(--text-strong) !important;
+  box-shadow:
+    0 10px 24px rgba(15, 23, 42, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+html[data-theme="light"] body.app-page button[class*="bg-slate-700"]:hover,
+html[data-theme="light"] body.public-page button[class*="bg-slate-700"]:hover,
+html[data-theme="light"] body.auth-page a[class*="border-slate-600"]:hover,
+html[data-theme="light"] body.public-page a[class*="border-slate-600"]:hover,
+html[data-theme="light"] body.public-page .kind-toggle:hover {
+  background: #f8fafc !important;
+  border-color: rgba(37, 99, 235, 0.28) !important;
+}
+
+html[data-theme="light"] body.app-page #view-fiscalizacoes-btn,
+html[data-theme="light"] body.app-page #view-obras-btn,
+html[data-theme="light"] body.app-page #view-acoes-btn,
+html[data-theme="light"] body.app-page #view-rvf-btn {
+  color: var(--text-body) !important;
+}
+
+html[data-theme="light"] body.app-page #view-fiscalizacoes-btn.bg-blue-600,
+html[data-theme="light"] body.app-page #view-acoes-btn.bg-cyan-500,
+html[data-theme="light"] body.app-page #view-rvf-btn.bg-blue-600 {
+  background: linear-gradient(180deg, #35556b, #1d3345) !important;
+  color: #ffffff !important;
+  box-shadow: 0 10px 24px rgba(53, 85, 107, 0.18);
+}
+
+html[data-theme="light"] body.app-page #view-obras-btn.bg-emerald-600 {
+  background: linear-gradient(180deg, #047857, #065f46) !important;
+  color: #ffffff !important;
+  box-shadow: 0 10px 24px rgba(4, 120, 87, 0.18);
+}
+
+html[data-theme="light"] body.app-page #storage-mode-select {
+  background: rgba(255, 255, 255, 0.96) !important;
+  border-color: var(--border-soft) !important;
+  color: var(--text-strong) !important;
+}
+
+html[data-theme="light"] body.app-page #filters-drawer,
+html[data-theme="light"] body.app-page #detail-panel,
+html[data-theme="light"] body.app-page #dashboard-panel .app-modal-shell,
+html[data-theme="light"] body.app-page #form-modal .app-modal-shell,
+html[data-theme="light"] body.app-page #import-modal .app-modal-shell,
+html[data-theme="light"] body.app-page #obras-upload-modal .app-modal-shell,
+html[data-theme="light"] body.app-page #delete-confirm .app-modal-shell,
+html[data-theme="light"] body.app-page #loading-overlay .app-modal-shell {
+  border-color: var(--border-soft) !important;
+}
+
+html[data-theme="light"] body:is(.app-page, .public-page, .auth-page) [class*="bg-slate-800/90"],
+html[data-theme="light"] body:is(.app-page, .public-page, .auth-page) [class*="bg-slate-800/70"],
+html[data-theme="light"] body:is(.app-page, .public-page, .auth-page) [class*="bg-slate-800/60"],
+html[data-theme="light"] body:is(.app-page, .public-page, .auth-page) [class*="bg-slate-800/50"],
+html[data-theme="light"] body:is(.app-page, .public-page, .auth-page) [class*="bg-slate-700/70"],
+html[data-theme="light"] body:is(.app-page, .public-page, .auth-page) [class*="bg-slate-900/80"],
+html[data-theme="light"] body:is(.app-page, .public-page, .auth-page) [class*="bg-slate-900/60"],
+html[data-theme="light"] body:is(.app-page, .public-page, .auth-page) [class*="bg-slate-900/40"],
+html[data-theme="light"] body:is(.app-page, .public-page, .auth-page) thead[class*="bg-slate-700"] {
+  background: rgba(255, 255, 255, 0.86) !important;
+  border-color: var(--border-soft) !important;
+}
+
+html[data-theme="light"] .module-table thead tr,
+html[data-theme="light"] .acoes-chart-title {
+  background: rgba(241, 245, 249, 0.88);
+  color: var(--text-faint);
+}
+
+html[data-theme="light"] .module-table-row {
+  border-top-color: rgba(71, 85, 105, 0.12);
+}
+
+html[data-theme="light"] .module-table-row:hover {
+  background: rgba(37, 99, 235, 0.06);
+}
+
+html[data-theme="light"] .module-secondary-button,
+html[data-theme="light"] .module-id-pill,
+html[data-theme="light"] .module-action-button {
+  background: rgba(255, 255, 255, 0.94);
+  border-color: var(--border-strong);
+  color: var(--text-strong);
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
+}
+
+html[data-theme="light"] .acoes-pie-center,
+html[data-theme="light"] .acoes-horizontal-track,
+html[data-theme="light"] .acoes-dual-year-track {
+  background: rgba(241, 245, 249, 0.88);
+}
+
+html[data-theme="light"] .leaflet-popup-content-wrapper,
+html[data-theme="light"] .leaflet-popup-tip,
+html[data-theme="light"] .leaflet-bar a,
+html[data-theme="light"] .app-toast {
+  background: rgba(255, 255, 255, 0.96);
+  color: var(--text-strong);
+  border-color: var(--border-soft);
 }
 
 @media (min-width: 640px) {

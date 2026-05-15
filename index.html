@@ -5,6 +5,17 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Painel de Fiscalizações</title>
 
+  <script>
+    (function () {
+      try {
+        var storedTheme = localStorage.getItem("fiscalizacoes_theme_v1");
+        document.documentElement.setAttribute("data-theme", storedTheme === "light" ? "light" : "dark");
+      } catch (error) {
+        document.documentElement.setAttribute("data-theme", "dark");
+      }
+    })();
+  </script>
+
   <!-- Tailwind CDN -->
   <script src="https://cdn.tailwindcss.com/3.4.17"></script>
 
@@ -131,6 +142,26 @@
           </svg>
           <span class="hidden sm:inline">Exportar</span>
           <span class="sm:hidden">Export</span>
+        </button>
+
+        <button id="theme-toggle-btn" type="button" onclick="toggleTheme()"
+          class="theme-toggle-btn shrink-0 px-3 sm:px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 transition-colors flex items-center gap-2 text-xs sm:text-sm font-medium"
+          aria-label="Alternar para modo claro" aria-pressed="true" title="Alternar para modo claro">
+          <svg class="theme-icon theme-icon-sun icon-min w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="4"></circle>
+            <path d="M12 2v2"></path>
+            <path d="M12 20v2"></path>
+            <path d="M4.93 4.93l1.41 1.41"></path>
+            <path d="M17.66 17.66l1.41 1.41"></path>
+            <path d="M2 12h2"></path>
+            <path d="M20 12h2"></path>
+            <path d="M6.34 17.66l-1.41 1.41"></path>
+            <path d="M19.07 4.93l-1.41 1.41"></path>
+          </svg>
+          <svg class="theme-icon theme-icon-moon icon-min w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path d="M20.5 14.5A8.5 8.5 0 119.5 3.5a6.7 6.7 0 0011 11z"></path>
+          </svg>
+          <span id="theme-toggle-text" class="hidden sm:inline">Claro</span>
         </button>
 
         <div id="auth-user-badge" class="shrink-0 hidden md:flex items-center gap-1.5 rounded-lg bg-slate-800/80 border border-slate-700 px-2.5 py-1.5">

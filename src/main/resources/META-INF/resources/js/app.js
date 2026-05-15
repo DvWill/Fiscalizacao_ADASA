@@ -68,6 +68,7 @@ const AUDIT_LOCAL_KEY = 'fiscalizacoes_audit_local_v1';
 const SESSION_METRICS_KEY = 'fiscalizacoes_session_metrics_v1';
 const MAP_LAYER_STATE_KEY = 'fiscalizacoes_map_layers_v1';
 const MAP_LEGEND_STATE_KEY = 'fiscalizacoes_map_legend_v1';
+const THEME_STORAGE_KEY = 'fiscalizacoes_theme_v1';
 const MAX_AUDIT_ENTRIES = 300;
 
 const FISCALIZACAO_FORM_FIELDS = [
@@ -652,6 +653,60 @@ function writeStoredJson(key, value) {
     return false;
   }
 }
+
+function readStoredTheme() {
+  try {
+    return localStorage.getItem(THEME_STORAGE_KEY) === 'light' ? 'light' : 'dark';
+  } catch {
+    return 'dark';
+  }
+}
+
+function getActiveTheme() {
+  return document.documentElement.dataset.theme === 'light' ? 'light' : 'dark';
+}
+
+function updateThemeToggleUI(theme = getActiveTheme()) {
+  const button = document.getElementById('theme-toggle-btn');
+  const label = document.getElementById('theme-toggle-text');
+  if (!button || !label) return;
+
+  const isDark = theme === 'dark';
+  const actionLabel = isDark ? 'Alternar para modo claro' : 'Alternar para modo escuro';
+  button.setAttribute('aria-label', actionLabel);
+  button.setAttribute('title', actionLabel);
+  button.setAttribute('aria-pressed', isDark ? 'true' : 'false');
+  label.textContent = isDark ? 'Claro' : 'Escuro';
+}
+
+function applyTheme(theme, options = {}) {
+  const nextTheme = theme === 'light' ? 'light' : 'dark';
+  document.documentElement.dataset.theme = nextTheme;
+
+  if (options.persist !== false) {
+    try {
+      localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
+    } catch {
+      // Preference persistence is optional; the theme still changes for this session.
+    }
+  }
+
+  updateThemeToggleUI(nextTheme);
+}
+
+function initTheme() {
+  applyTheme(document.documentElement.dataset.theme === 'light' ? 'light' : readStoredTheme(), { persist: false });
+}
+
+function toggleTheme() {
+  const nextTheme = getActiveTheme() === 'dark' ? 'light' : 'dark';
+  applyTheme(nextTheme);
+
+  if (typeof showToast === 'function') {
+    showToast(`Modo ${nextTheme === 'dark' ? 'escuro' : 'claro'} ativado.`, 'success');
+  }
+}
+window.toggleTheme = toggleTheme;
 
 function nowIso() {
   return new Date().toISOString();
@@ -6446,6 +6501,8 @@ window.executeImport = executeImport;
 
 // ======== Init ========
 async function init() {
+  initTheme();
+
   // titulos
   const t = document.getElementById('app-title');
   const s = document.getElementById('app-subtitle');
