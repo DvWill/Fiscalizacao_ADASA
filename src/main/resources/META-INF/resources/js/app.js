@@ -55,6 +55,8 @@ let acoesLastUpdatedAt = '';
 let rvfLastUpdatedAt = '';
 let isRvfSyncing = false;
 let hasAttemptedInitialRvfSync = false;
+let acoesFilterDebounceTimer = null;
+let rvfFilterDebounceTimer = null;
 
 const LIST_DEFAULT_PAGE_SIZE = 12;
 const LIST_STATE_KEY = 'fiscalizacoes_list_state_v1';
@@ -303,6 +305,33 @@ function isSafeImageDataUrl(value) {
 function getSafeImageSrc(value) {
   const raw = String(value ?? '').trim();
   return isSafeImageDataUrl(raw) ? raw : '';
+}
+
+function captureActiveTextControl() {
+  const node = document.activeElement;
+  if (!node || !node.id) return null;
+  const tag = node.tagName?.toLowerCase();
+  if (tag !== 'input' && tag !== 'textarea') return null;
+
+  return {
+    id: node.id,
+    start: Number.isFinite(node.selectionStart) ? node.selectionStart : null,
+    end: Number.isFinite(node.selectionEnd) ? node.selectionEnd : null
+  };
+}
+
+function restoreTextControlFocus(snapshot) {
+  if (!snapshot?.id) return;
+
+  requestAnimationFrame(() => {
+    const node = document.getElementById(snapshot.id);
+    if (!node) return;
+    node.focus({ preventScroll: true });
+    if (snapshot.start != null && typeof node.setSelectionRange === 'function') {
+      const end = snapshot.end == null ? snapshot.start : snapshot.end;
+      node.setSelectionRange(snapshot.start, end);
+    }
+  });
 }
 
 function hasMeaningfulRecordData(record) {
@@ -3988,6 +4017,15 @@ function setAcoesFilter(key, value) {
     ...acoesFilterState,
     [key]: String(value || '')
   };
+
+  if (key === 'search') {
+    clearTimeout(acoesFilterDebounceTimer);
+    acoesFilterDebounceTimer = setTimeout(() => {
+      applyAcoesDashboardFilters({ preserveFocus: true });
+    }, 220);
+    return;
+  }
+
   applyAcoesDashboardFilters();
 }
 window.setAcoesFilter = setAcoesFilter;
@@ -4004,7 +4042,8 @@ function resetAcoesDashboardFilters() {
 }
 window.resetAcoesDashboardFilters = resetAcoesDashboardFilters;
 
-function applyAcoesDashboardFilters() {
+function applyAcoesDashboardFilters(options = {}) {
+  const focusSnapshot = options.preserveFocus ? captureActiveTextControl() : null;
   const filters = acoesFilterState;
   const search = normalizePlainText(filters.search);
   filteredAcoes = allAcoes.filter((acao) => {
@@ -4029,6 +4068,7 @@ function applyAcoesDashboardFilters() {
   });
 
   renderAcoesDashboardView();
+  restoreTextControlFocus(focusSnapshot);
 }
 window.applyAcoesDashboardFilters = applyAcoesDashboardFilters;
 
@@ -4807,6 +4847,15 @@ function setRvfFilter(key, value) {
     ...rvfFilterState,
     [key]: String(value || '')
   };
+
+  if (key === 'search') {
+    clearTimeout(rvfFilterDebounceTimer);
+    rvfFilterDebounceTimer = setTimeout(() => {
+      applyRvfFilters({ preserveFocus: true });
+    }, 220);
+    return;
+  }
+
   applyRvfFilters();
 }
 window.setRvfFilter = setRvfFilter;
@@ -4822,7 +4871,8 @@ function resetRvfFilters() {
 }
 window.resetRvfFilters = resetRvfFilters;
 
-function applyRvfFilters() {
+function applyRvfFilters(options = {}) {
+  const focusSnapshot = options.preserveFocus ? captureActiveTextControl() : null;
   const filters = rvfFilterState;
   const search = normalizePlainText(filters.search);
 
@@ -4844,6 +4894,7 @@ function applyRvfFilters() {
   });
 
   renderRvfView();
+  restoreTextControlFocus(focusSnapshot);
 }
 window.applyRvfFilters = applyRvfFilters;
 
@@ -5006,7 +5057,7 @@ function renderRvfView() {
         <div class="module-filter-grid rvf-filter-grid">
           <label>
             <span>Palavra-chave</span>
-            <input value="${escapeHtml(filters.search)}" oninput="setRvfFilter('search', this.value)" placeholder="Titulo, dominio, status..." class="module-control">
+            <input id="rvf-filter-search" value="${escapeHtml(filters.search)}" oninput="setRvfFilter('search', this.value)" placeholder="Titulo, dominio, status..." class="module-control">
           </label>
           <label>
             <span>Ano</span>
