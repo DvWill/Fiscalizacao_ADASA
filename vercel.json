@@ -37,6 +37,10 @@
       "destination": "/publico.html"
     },
     {
+      "source": "/telao",
+      "destination": "/telao.html"
+    },
+    {
       "source": "/api/fiscalizacoes/:id",
       "destination": "/api/fiscalizacoes?id=:id"
     }

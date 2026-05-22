@@ -1,0 +1,378 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tel&atilde;o COFA | Mapas e Indicadores</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+  <link rel="stylesheet" href="./styles/app.css" />
+  <link rel="icon" type="image/png" href="./assets/favicon-sae.png?v=sae2" />
+  <link rel="shortcut icon" type="image/png" href="./assets/favicon-sae.png?v=sae2" />
+  <link rel="apple-touch-icon" href="./assets/sae-logo-symbol.png?v=sae2" />
+</head>
+<body class="telao-page">
+  <div class="telao-shell">
+    <header class="telao-header">
+      <div class="telao-brand">
+        <img src="./assets/sae-logo.png" alt="SAE" class="telao-logo" />
+        <div>
+          <p class="telao-kicker">COFA</p>
+          <h1>Tel&atilde;o de fiscaliza&ccedil;&otilde;es e obras</h1>
+          <p id="telao-slide-title">Mapa territorial</p>
+        </div>
+      </div>
+
+      <div class="telao-header-status">
+        <div class="telao-status-pill" id="telao-data-status">
+          <span class="telao-status-dot"></span>
+          <span>Sistema carregando</span>
+        </div>
+        <div class="telao-clock">
+          <span id="telao-clock">--:--</span>
+          <small id="telao-updated-at">Atualiza&ccedil;&atilde;o: -</small>
+        </div>
+        <a class="telao-header-link" href="/">Painel</a>
+      </div>
+    </header>
+
+    <main class="telao-main">
+      <section class="telao-slide is-active" data-title="Mapa territorial">
+        <div class="telao-map-layout">
+          <div class="telao-map-card">
+            <div class="telao-map-toolbar">
+              <div>
+                <p class="telao-panel-kicker">Distribui&ccedil;&atilde;o territorial</p>
+                <h2>Mapa de fiscaliza&ccedil;&otilde;es e obras</h2>
+              </div>
+              <div class="telao-map-legend">
+                <span><i class="telao-legend-dot telao-legend-fisc"></i>Fiscaliza&ccedil;&otilde;es</span>
+                <span><i class="telao-legend-dot telao-legend-obra"></i>Obras</span>
+              </div>
+            </div>
+            <div id="telao-map" aria-label="Mapa do tel&atilde;o"></div>
+          </div>
+
+          <aside class="telao-side-stack">
+            <div class="telao-kpi-grid telao-kpi-grid--three">
+              <article class="telao-kpi">
+                <span>Pontos no mapa</span>
+                <strong id="map-total">0</strong>
+                <small id="map-coverage">Com coordenadas</small>
+              </article>
+              <article class="telao-kpi">
+                <span>Fiscaliza&ccedil;&otilde;es</span>
+                <strong id="map-fisc">0</strong>
+                <small>Registros georreferenciados</small>
+              </article>
+              <article class="telao-kpi">
+                <span>Obras</span>
+                <strong id="map-obras">0</strong>
+                <small>Locais acompanhados</small>
+              </article>
+            </div>
+
+            <section class="telao-panel">
+              <div class="telao-panel-heading">
+                <p class="telao-panel-kicker">Status geral</p>
+                <h3>Panorama do mapa</h3>
+              </div>
+              <div id="map-status-bars" class="telao-bars"></div>
+            </section>
+
+            <section class="telao-panel">
+              <div class="telao-panel-heading">
+                <p class="telao-panel-kicker">Regi&otilde;es em destaque</p>
+                <h3>Maior concentra&ccedil;&atilde;o</h3>
+              </div>
+              <div id="map-area-bars" class="telao-bars"></div>
+            </section>
+          </aside>
+        </div>
+      </section>
+
+      <section class="telao-slide" data-title="Dashboard de fiscaliza&ccedil;&otilde;es">
+        <div class="telao-dashboard-layout">
+          <div class="telao-section-head">
+            <p class="telao-panel-kicker">Fiscaliza&ccedil;&otilde;es</p>
+            <h2>Conformidade, situa&ccedil;&atilde;o e pontos de aten&ccedil;&atilde;o</h2>
+          </div>
+
+          <div class="telao-kpi-grid">
+            <article class="telao-kpi">
+              <span>Total</span>
+              <strong id="fisc-total">0</strong>
+              <small>Fiscaliza&ccedil;&otilde;es cadastradas</small>
+            </article>
+            <article class="telao-kpi">
+              <span>Em andamento</span>
+              <strong id="fisc-andamento">0</strong>
+              <small>Demandas em curso</small>
+            </article>
+            <article class="telao-kpi">
+              <span>Conclu&iacute;das</span>
+              <strong id="fisc-concluidas">0</strong>
+              <small>Finalizadas</small>
+            </article>
+            <article class="telao-kpi">
+              <span>Pendentes</span>
+              <strong id="fisc-pendentes">0</strong>
+              <small>Aguardando provid&ecirc;ncia</small>
+            </article>
+            <article class="telao-kpi telao-kpi--accent">
+              <span>Conformidade m&eacute;dia</span>
+              <strong id="fisc-conformidade">-</strong>
+              <small>Registros com indicador</small>
+            </article>
+            <article class="telao-kpi">
+              <span>Autos de infra&ccedil;&atilde;o</span>
+              <strong id="fisc-ai">0</strong>
+              <small>Total informado</small>
+            </article>
+            <article class="telao-kpi">
+              <span>Termos de notifica&ccedil;&atilde;o</span>
+              <strong id="fisc-tn">0</strong>
+              <small>Total informado</small>
+            </article>
+            <article class="telao-kpi telao-kpi--warning">
+              <span>Pontos de aten&ccedil;&atilde;o</span>
+              <strong id="fisc-risk">0</strong>
+              <small>Baixa conformidade ou n&atilde;o conformes</small>
+            </article>
+          </div>
+
+          <div class="telao-two-columns">
+            <section class="telao-panel">
+              <div class="telao-panel-heading">
+                <p class="telao-panel-kicker">Situa&ccedil;&atilde;o</p>
+                <h3>Distribui&ccedil;&atilde;o dos registros</h3>
+              </div>
+              <div id="fisc-status-bars" class="telao-bars telao-bars--large"></div>
+            </section>
+            <section class="telao-panel">
+              <div class="telao-panel-heading">
+                <p class="telao-panel-kicker">Territ&oacute;rio</p>
+                <h3>Regi&otilde;es administrativas</h3>
+              </div>
+              <div id="fisc-region-bars" class="telao-bars telao-bars--large"></div>
+            </section>
+          </div>
+
+          <section class="telao-panel">
+            <div class="telao-panel-heading">
+              <p class="telao-panel-kicker">Monitoramento ativo</p>
+              <h3>Fiscaliza&ccedil;&otilde;es para acompanhar</h3>
+            </div>
+            <div id="fisc-alert-list" class="telao-list"></div>
+          </section>
+        </div>
+      </section>
+
+      <section class="telao-slide" data-title="Dashboard de obras">
+        <div class="telao-dashboard-layout">
+          <div class="telao-section-head">
+            <p class="telao-panel-kicker">Obras</p>
+            <h2>Execu&ccedil;&atilde;o, contratos e situa&ccedil;&otilde;es por local</h2>
+          </div>
+
+          <div class="telao-kpi-grid">
+            <article class="telao-kpi">
+              <span>Total</span>
+              <strong id="obras-total">0</strong>
+              <small>Obras carregadas</small>
+            </article>
+            <article class="telao-kpi">
+              <span>Em execu&ccedil;&atilde;o</span>
+              <strong id="obras-execucao">0</strong>
+              <small>Contratos ativos</small>
+            </article>
+            <article class="telao-kpi">
+              <span>Recebimento</span>
+              <strong id="obras-recebimento">0</strong>
+              <small>Em fase de entrega</small>
+            </article>
+            <article class="telao-kpi telao-kpi--accent">
+              <span>Execu&ccedil;&atilde;o m&eacute;dia</span>
+              <strong id="obras-media">-</strong>
+              <small>Percentual informado</small>
+            </article>
+            <article class="telao-kpi">
+              <span>Valor total</span>
+              <strong id="obras-valor-total">R$ 0</strong>
+              <small>Contratos acompanhados</small>
+            </article>
+            <article class="telao-kpi">
+              <span>Executado 2025</span>
+              <strong id="obras-valor-executado">R$ 0</strong>
+              <small>Valor informado</small>
+            </article>
+            <article class="telao-kpi telao-kpi--warning">
+              <span>Execu&ccedil;&atilde;o baixa</span>
+              <strong id="obras-baixa">0</strong>
+              <small>Abaixo de 40% ou com alerta</small>
+            </article>
+            <article class="telao-kpi">
+              <span>Com coordenadas</span>
+              <strong id="obras-com-coord">0</strong>
+              <small>Vis&iacute;veis no mapa</small>
+            </article>
+          </div>
+
+          <div class="telao-two-columns">
+            <section class="telao-panel">
+              <div class="telao-panel-heading">
+                <p class="telao-panel-kicker">Contratos</p>
+                <h3>Situa&ccedil;&atilde;o das obras</h3>
+              </div>
+              <div id="obras-status-bars" class="telao-bars telao-bars--large"></div>
+            </section>
+            <section class="telao-panel">
+              <div class="telao-panel-heading">
+                <p class="telao-panel-kicker">Locais</p>
+                <h3>Maior concentra&ccedil;&atilde;o de obras</h3>
+              </div>
+              <div id="obras-local-bars" class="telao-bars telao-bars--large"></div>
+            </section>
+          </div>
+
+          <section class="telao-panel">
+            <div class="telao-panel-heading">
+              <p class="telao-panel-kicker">Monitoramento ativo</p>
+              <h3>Obras para acompanhar</h3>
+            </div>
+            <div id="obras-alert-list" class="telao-list"></div>
+          </section>
+        </div>
+      </section>
+
+      <section class="telao-slide" data-title="A&ccedil;&otilde;es COFA e RVF">
+        <div class="telao-dashboard-layout">
+          <div class="telao-section-head">
+            <p class="telao-panel-kicker">A&ccedil;&otilde;es e relat&oacute;rios</p>
+            <h2>Painel COFA e acervo RVF em acompanhamento</h2>
+            <small id="telao-protected-note">Os dados completos aparecem quando a sess&atilde;o do sistema estiver ativa.</small>
+          </div>
+
+          <div class="telao-kpi-grid">
+            <article class="telao-kpi">
+              <span>A&ccedil;&otilde;es COFA</span>
+              <strong id="acoes-total">0</strong>
+              <small>Total cadastrado</small>
+            </article>
+            <article class="telao-kpi">
+              <span>Conclu&iacute;das</span>
+              <strong id="acoes-concluidas">0</strong>
+              <small>A&ccedil;&otilde;es finalizadas</small>
+            </article>
+            <article class="telao-kpi">
+              <span>Em andamento</span>
+              <strong id="acoes-andamento">0</strong>
+              <small>Demandas ativas</small>
+            </article>
+            <article class="telao-kpi telao-kpi--warning">
+              <span>Pendentes</span>
+              <strong id="acoes-pendentes">0</strong>
+              <small>A&ccedil;&otilde;es a acompanhar</small>
+            </article>
+            <article class="telao-kpi">
+              <span>Autos de infra&ccedil;&atilde;o</span>
+              <strong id="acoes-ai">0</strong>
+              <small>Nas a&ccedil;&otilde;es COFA</small>
+            </article>
+            <article class="telao-kpi">
+              <span>Termos de notifica&ccedil;&atilde;o</span>
+              <strong id="acoes-tn">0</strong>
+              <small>Nas a&ccedil;&otilde;es COFA</small>
+            </article>
+            <article class="telao-kpi">
+              <span>Locais fiscalizados</span>
+              <strong id="acoes-locais">0</strong>
+              <small>Base territorial</small>
+            </article>
+            <article class="telao-kpi telao-kpi--accent">
+              <span>RVF ativos</span>
+              <strong id="rvf-ativos">0</strong>
+              <small id="rvf-total-note">0 relat&oacute;rios</small>
+            </article>
+          </div>
+
+          <div class="telao-three-columns">
+            <section class="telao-panel">
+              <div class="telao-panel-heading">
+                <p class="telao-panel-kicker">Status</p>
+                <h3>A&ccedil;&otilde;es COFA</h3>
+              </div>
+              <div id="acoes-status-bars" class="telao-bars telao-bars--large"></div>
+            </section>
+            <section class="telao-panel">
+              <div class="telao-panel-heading">
+                <p class="telao-panel-kicker">Documentos</p>
+                <h3>Tipos gerados</h3>
+              </div>
+              <div id="acoes-doc-bars" class="telao-bars telao-bars--large"></div>
+            </section>
+            <section class="telao-panel">
+              <div class="telao-panel-heading">
+                <p class="telao-panel-kicker">RVF</p>
+                <h3>Relat&oacute;rios oficiais</h3>
+              </div>
+              <div class="telao-rvf-summary">
+                <div><span>Total</span><strong id="rvf-total">0</strong></div>
+                <div><span>Com erro</span><strong id="rvf-erros">0</strong></div>
+                <div><span>&Uacute;ltimo ano</span><strong id="rvf-ano">-</strong></div>
+              </div>
+              <div id="rvf-status-bars" class="telao-bars"></div>
+            </section>
+          </div>
+
+          <div class="telao-two-columns">
+            <section class="telao-panel">
+              <div class="telao-panel-heading">
+                <p class="telao-panel-kicker">Territ&oacute;rio</p>
+                <h3>A&ccedil;&otilde;es por regi&atilde;o</h3>
+              </div>
+              <div id="acoes-regiao-bars" class="telao-bars"></div>
+            </section>
+            <section class="telao-panel">
+              <div class="telao-panel-heading">
+                <p class="telao-panel-kicker">Acervo RVF</p>
+                <h3>Relat&oacute;rios recentes</h3>
+              </div>
+              <div id="rvf-list" class="telao-list"></div>
+            </section>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="telao-footer">
+      <div class="telao-slide-controls" aria-label="Controles do tel&atilde;o">
+        <button id="telao-prev" type="button" aria-label="Slide anterior">&#8249;</button>
+        <button id="telao-pause" type="button">Pausar</button>
+        <button id="telao-next" type="button" aria-label="Pr&oacute;ximo slide">&#8250;</button>
+      </div>
+      <div class="telao-dots" id="telao-dots"></div>
+      <div class="telao-slide-meta">
+        <span id="telao-slide-counter">1/4</span>
+        <span id="telao-refresh-status">Atualiza a cada 5 minutos</span>
+      </div>
+      <div class="telao-progress"><span id="telao-progress-bar"></span></div>
+    </footer>
+  </div>
+
+  <script>
+    const externalApiBaseUrl = String(window.__FISCALIZACOES_API_BASE_URL__ || "").trim();
+    window.TELAO_CONFIG = {
+      apiBaseUrl: externalApiBaseUrl || "/api"
+    };
+  </script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+  <script src="./js/telao.js"></script>
+</body>
+</html>

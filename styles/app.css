@@ -2119,6 +2119,746 @@ body.public-page #public-map {
     0 10px 26px rgba(15, 23, 42, 0.16);
 }
 
+body.telao-page {
+  min-height: 100vh;
+  overflow: hidden;
+  background:
+    linear-gradient(135deg, rgba(6, 12, 24, 0.94), rgba(12, 20, 36, 0.96)),
+    #07111f;
+  color: #f8fafc;
+}
+
+body.telao-page * {
+  box-sizing: border-box;
+}
+
+.telao-shell {
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: clamp(10px, 1vw, 16px);
+  padding: clamp(12px, 1.35vw, 24px);
+}
+
+.telao-header,
+.telao-footer,
+.telao-panel,
+.telao-kpi,
+.telao-map-card {
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: rgba(15, 23, 42, 0.78);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.26);
+  backdrop-filter: blur(18px);
+  border-radius: 8px;
+}
+
+.telao-header {
+  min-height: 86px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: clamp(12px, 1.05vw, 18px) clamp(16px, 1.6vw, 28px);
+}
+
+.telao-brand {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: clamp(14px, 1.2vw, 22px);
+}
+
+.telao-logo {
+  width: clamp(118px, 9vw, 170px);
+  height: auto;
+  object-fit: contain;
+}
+
+.telao-kicker,
+.telao-panel-kicker {
+  margin: 0;
+  color: #7dd3fc;
+  font-size: clamp(0.68rem, 0.62vw, 0.84rem);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+}
+
+.telao-brand h1,
+.telao-section-head h2,
+.telao-map-toolbar h2,
+.telao-panel-heading h3 {
+  margin: 0;
+  color: #f8fafc;
+  letter-spacing: 0;
+}
+
+.telao-brand h1 {
+  font-size: clamp(1.4rem, 2vw, 2.45rem);
+  line-height: 1.02;
+  white-space: nowrap;
+}
+
+.telao-brand p:last-child {
+  margin: 0.32rem 0 0;
+  color: #cbd5e1;
+  font-size: clamp(0.88rem, 0.9vw, 1.05rem);
+}
+
+.telao-header-status {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: clamp(10px, 0.9vw, 16px);
+}
+
+.telao-status-pill,
+.telao-header-link,
+.telao-clock {
+  min-height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(30, 41, 59, 0.72);
+  color: #e2e8f0;
+  font-size: clamp(0.78rem, 0.74vw, 0.95rem);
+  font-weight: 700;
+}
+
+.telao-status-pill {
+  gap: 0.55rem;
+  padding: 0 0.9rem;
+}
+
+.telao-status-pill.is-ok {
+  color: #bbf7d0;
+  border-color: rgba(34, 197, 94, 0.38);
+  background: rgba(22, 101, 52, 0.28);
+}
+
+.telao-status-pill.is-warn {
+  color: #fde68a;
+  border-color: rgba(245, 158, 11, 0.4);
+  background: rgba(120, 53, 15, 0.28);
+}
+
+.telao-status-pill.is-error {
+  color: #fecdd3;
+  border-color: rgba(244, 63, 94, 0.42);
+  background: rgba(136, 19, 55, 0.3);
+}
+
+.telao-status-dot {
+  width: 0.58rem;
+  height: 0.58rem;
+  border-radius: 999px;
+  background: currentColor;
+  box-shadow: 0 0 0 5px rgba(255, 255, 255, 0.08);
+}
+
+.telao-clock {
+  flex-direction: column;
+  align-items: flex-end;
+  padding: 0.38rem 0.9rem;
+}
+
+.telao-clock span {
+  font-size: clamp(1.2rem, 1.25vw, 1.65rem);
+  line-height: 1;
+}
+
+.telao-clock small {
+  margin-top: 0.2rem;
+  color: #94a3b8;
+  font-size: clamp(0.62rem, 0.58vw, 0.74rem);
+  font-weight: 600;
+}
+
+.telao-header-link {
+  padding: 0 1rem;
+  text-decoration: none;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.telao-header-link:hover {
+  background: rgba(14, 165, 233, 0.22);
+  border-color: rgba(56, 189, 248, 0.42);
+}
+
+.telao-main {
+  position: relative;
+  min-height: 0;
+}
+
+.telao-slide {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(10px);
+  transition: opacity 0.38s ease, transform 0.38s ease;
+}
+
+.telao-slide.is-active {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.telao-map-layout {
+  height: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1.65fr) minmax(360px, 0.75fr);
+  gap: clamp(10px, 1vw, 16px);
+}
+
+.telao-dashboard-layout {
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) minmax(130px, 0.62fr);
+  gap: clamp(10px, 1vw, 16px);
+}
+
+.telao-map-card,
+.telao-panel {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.telao-map-card {
+  display: grid;
+  grid-template-rows: auto 1fr;
+}
+
+.telao-map-toolbar,
+.telao-panel-heading,
+.telao-section-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.telao-map-toolbar {
+  padding: clamp(14px, 1.15vw, 20px);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+.telao-map-toolbar h2,
+.telao-section-head h2 {
+  margin-top: 0.28rem;
+  font-size: clamp(1.55rem, 2.2vw, 3rem);
+  line-height: 1.03;
+}
+
+.telao-map-legend {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: #cbd5e1;
+  font-size: clamp(0.72rem, 0.72vw, 0.9rem);
+  font-weight: 700;
+}
+
+.telao-map-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  white-space: nowrap;
+}
+
+.telao-legend-dot,
+.telao-marker-dot {
+  display: inline-block;
+  width: 0.84rem;
+  height: 0.84rem;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 255, 255, 0.96);
+}
+
+.telao-legend-fisc,
+.telao-marker-dot.is-fisc {
+  background: #f59e0b;
+}
+
+.telao-legend-obra,
+.telao-marker-dot.is-obra {
+  background: #10b981;
+}
+
+#telao-map {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  background: #dbeafe;
+}
+
+.telao-marker {
+  background: transparent !important;
+  border: 0 !important;
+}
+
+.telao-marker-dot {
+  width: 18px;
+  height: 18px;
+  box-shadow: 0 0 0 4px rgba(15, 23, 42, 0.2), 0 12px 24px rgba(15, 23, 42, 0.22);
+}
+
+.telao-cluster {
+  display: grid !important;
+  place-items: center;
+  border-radius: 999px;
+  border: 3px solid rgba(255, 255, 255, 0.92);
+  background: #0ea5e9;
+  color: #ffffff;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.28);
+  font-weight: 900;
+}
+
+.telao-cluster.is-medium {
+  background: #14b8a6;
+}
+
+.telao-cluster.is-large {
+  background: #f59e0b;
+}
+
+.telao-cluster span {
+  font-size: 0.86rem;
+  line-height: 1;
+}
+
+.telao-popup {
+  display: grid;
+  gap: 3px;
+  min-width: 190px;
+  color: #0f172a;
+  font-family: "Manrope", sans-serif;
+}
+
+.telao-popup strong {
+  font-size: 0.9rem;
+}
+
+.telao-popup span {
+  font-size: 0.75rem;
+}
+
+.telao-side-stack {
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) minmax(0, 1fr);
+  gap: clamp(10px, 1vw, 16px);
+}
+
+.telao-section-head {
+  padding: clamp(14px, 1.25vw, 22px) clamp(16px, 1.5vw, 26px);
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.62);
+}
+
+.telao-section-head small {
+  color: #cbd5e1;
+  font-size: clamp(0.78rem, 0.78vw, 0.95rem);
+  font-weight: 700;
+}
+
+.telao-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: clamp(10px, 1vw, 16px);
+}
+
+.telao-kpi-grid--three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.telao-kpi {
+  min-height: clamp(112px, 10vh, 146px);
+  display: grid;
+  align-content: space-between;
+  gap: 0.45rem;
+  padding: clamp(14px, 1.18vw, 22px);
+  background: linear-gradient(180deg, rgba(30, 41, 59, 0.82), rgba(15, 23, 42, 0.84));
+}
+
+.telao-kpi span {
+  color: #cbd5e1;
+  font-size: clamp(0.68rem, 0.68vw, 0.86rem);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.telao-kpi strong {
+  overflow-wrap: anywhere;
+  color: #f8fafc;
+  font-size: clamp(1.72rem, 2.3vw, 3.35rem);
+  line-height: 0.98;
+}
+
+.telao-kpi small {
+  color: #94a3b8;
+  font-size: clamp(0.7rem, 0.7vw, 0.86rem);
+  font-weight: 700;
+}
+
+.telao-kpi--accent {
+  border-color: rgba(56, 189, 248, 0.42);
+  background: linear-gradient(180deg, rgba(14, 116, 144, 0.34), rgba(15, 23, 42, 0.82));
+}
+
+.telao-kpi--warning {
+  border-color: rgba(245, 158, 11, 0.44);
+  background: linear-gradient(180deg, rgba(146, 64, 14, 0.34), rgba(15, 23, 42, 0.82));
+}
+
+.telao-two-columns,
+.telao-three-columns {
+  min-height: 0;
+  display: grid;
+  gap: clamp(10px, 1vw, 16px);
+}
+
+.telao-two-columns {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.telao-three-columns {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.telao-panel {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  padding: clamp(14px, 1.12vw, 20px);
+}
+
+.telao-panel-heading {
+  margin-bottom: 0.9rem;
+}
+
+.telao-panel-heading h3 {
+  margin-top: 0.22rem;
+  font-size: clamp(1rem, 1.05vw, 1.35rem);
+}
+
+.telao-bars {
+  min-height: 0;
+  display: grid;
+  align-content: start;
+  gap: clamp(7px, 0.65vw, 12px);
+  overflow: hidden;
+}
+
+.telao-bars--large {
+  gap: clamp(9px, 0.82vw, 14px);
+}
+
+.telao-bar-row {
+  display: grid;
+  grid-template-columns: minmax(96px, 0.48fr) minmax(120px, 1fr) minmax(42px, auto);
+  align-items: center;
+  gap: clamp(8px, 0.8vw, 14px);
+  min-height: clamp(27px, 2.7vh, 38px);
+}
+
+.telao-bar-label {
+  min-width: 0;
+  overflow: hidden;
+  color: #e2e8f0;
+  font-size: clamp(0.72rem, 0.74vw, 0.94rem);
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.telao-bar-track {
+  height: clamp(10px, 1.05vh, 16px);
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(51, 65, 85, 0.8);
+}
+
+.telao-bar-track i {
+  display: block;
+  height: 100%;
+  min-width: 5px;
+  border-radius: inherit;
+}
+
+.telao-bar-row strong {
+  color: #f8fafc;
+  font-size: clamp(0.82rem, 0.82vw, 1.05rem);
+  text-align: right;
+}
+
+.telao-list {
+  min-height: 0;
+  display: grid;
+  align-content: start;
+  gap: clamp(8px, 0.75vw, 12px);
+  overflow: hidden;
+}
+
+.telao-list-row {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-height: clamp(44px, 4.8vh, 64px);
+  padding: clamp(9px, 0.78vw, 14px);
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 8px;
+  background: rgba(30, 41, 59, 0.58);
+}
+
+.telao-list-row div {
+  min-width: 0;
+  display: grid;
+  gap: 0.18rem;
+}
+
+.telao-list-row strong,
+.telao-list-row span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.telao-list-row strong {
+  color: #f8fafc;
+  font-size: clamp(0.78rem, 0.82vw, 1.02rem);
+}
+
+.telao-list-row span {
+  color: #94a3b8;
+  font-size: clamp(0.68rem, 0.68vw, 0.84rem);
+  font-weight: 700;
+}
+
+.telao-list-row em {
+  color: #bae6fd;
+  font-size: clamp(0.78rem, 0.82vw, 1.02rem);
+  font-style: normal;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.telao-empty {
+  margin: 0;
+  display: grid;
+  place-items: center;
+  min-height: 100%;
+  color: #94a3b8;
+  font-size: clamp(0.82rem, 0.82vw, 1rem);
+  font-weight: 700;
+  text-align: center;
+}
+
+.telao-rvf-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 0.9rem;
+}
+
+.telao-rvf-summary div {
+  min-width: 0;
+  padding: 10px;
+  border-radius: 8px;
+  background: rgba(30, 41, 59, 0.66);
+}
+
+.telao-rvf-summary span,
+.telao-rvf-summary strong {
+  display: block;
+}
+
+.telao-rvf-summary span {
+  overflow: hidden;
+  color: #94a3b8;
+  font-size: clamp(0.62rem, 0.62vw, 0.78rem);
+  font-weight: 800;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.telao-rvf-summary strong {
+  margin-top: 0.35rem;
+  color: #f8fafc;
+  font-size: clamp(1rem, 1.12vw, 1.45rem);
+}
+
+.telao-footer {
+  position: relative;
+  min-height: 52px;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 12px;
+}
+
+.telao-slide-controls,
+.telao-dots,
+.telao-slide-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.telao-slide-controls button,
+.telao-dots button {
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  background: rgba(30, 41, 59, 0.8);
+  color: #e2e8f0;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.telao-slide-controls button {
+  min-width: 38px;
+  height: 36px;
+  padding: 0 12px;
+  border-radius: 8px;
+  font-size: 0.95rem;
+}
+
+.telao-dots {
+  justify-content: center;
+}
+
+.telao-dots button {
+  width: 42px;
+  height: 8px;
+  padding: 0;
+  border-radius: 999px;
+}
+
+.telao-dots button.is-active {
+  border-color: rgba(56, 189, 248, 0.72);
+  background: #38bdf8;
+}
+
+.telao-slide-meta {
+  justify-content: flex-end;
+  color: #cbd5e1;
+  font-size: clamp(0.72rem, 0.72vw, 0.9rem);
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.telao-slide-meta span + span {
+  color: #94a3b8;
+}
+
+.telao-progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  overflow: hidden;
+  border-radius: 0 0 8px 8px;
+  background: rgba(51, 65, 85, 0.75);
+}
+
+.telao-progress span {
+  display: block;
+  width: 0%;
+  height: 100%;
+  background: linear-gradient(90deg, #38bdf8, #22c55e, #f59e0b);
+}
+
+@media (max-width: 1180px) {
+  body.telao-page {
+    overflow: auto;
+  }
+
+  .telao-shell {
+    min-height: 100vh;
+    height: auto;
+  }
+
+  .telao-main,
+  .telao-slide,
+  .telao-slide.is-active {
+    position: relative;
+    inset: auto;
+  }
+
+  .telao-slide:not(.is-active) {
+    display: none;
+  }
+
+  .telao-map-layout,
+  .telao-dashboard-layout,
+  .telao-two-columns,
+  .telao-three-columns {
+    grid-template-columns: 1fr;
+  }
+
+  .telao-dashboard-layout {
+    grid-template-rows: auto;
+  }
+
+  .telao-kpi-grid,
+  .telao-kpi-grid--three {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  #telao-map {
+    min-height: 520px;
+  }
+
+  .telao-header,
+  .telao-footer {
+    grid-template-columns: 1fr;
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+@media (max-width: 760px) {
+  .telao-shell {
+    padding: 10px;
+  }
+
+  .telao-header-status,
+  .telao-map-toolbar,
+  .telao-section-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .telao-brand h1 {
+    white-space: normal;
+  }
+
+  .telao-kpi-grid,
+  .telao-kpi-grid--three {
+    grid-template-columns: 1fr;
+  }
+
+  .telao-footer {
+    grid-template-columns: 1fr;
+  }
+
+  .telao-slide-meta {
+    justify-content: center;
+  }
+}
+
 @keyframes slideIn {
   from {
     transform: translateX(100%);

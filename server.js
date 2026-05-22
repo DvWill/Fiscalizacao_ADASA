@@ -162,6 +162,10 @@ app.delete("/api/fiscalizacoes/:id", async (req, res) => {
   }
 });
 
+app.get("/telao", (req, res) => {
+  res.sendFile(path.join(__dirname, "telao.html"));
+});
+
 app.get("*", (req, res) => {
   res.sendFile(path.join(__dirname, "index.html"));
 });
