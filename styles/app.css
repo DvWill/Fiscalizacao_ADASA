@@ -295,6 +295,11 @@ body.app-page .detail-shell {
   background: rgba(15, 23, 42, 0.92);
 }
 
+.map-legend-card {
+  max-height: calc(100vh - 8rem);
+  overflow-y: auto;
+}
+
 .metric-card {
   background: linear-gradient(180deg, rgba(30, 41, 59, 0.96), rgba(15, 23, 42, 0.92));
   border: 1px solid var(--border-strong);

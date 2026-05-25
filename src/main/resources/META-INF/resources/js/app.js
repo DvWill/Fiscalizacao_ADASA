@@ -12,6 +12,9 @@ let filteredFiscalizacoes = [];
 let currentFiscalizacao = null;
 let map = null;
 let markerClusterGroup = null;
+let sistemasAiLayer = null;
+let sistemasAiGeoJson = null;
+let sistemasAiLoadPromise = null;
 let markers = {};
 let isSelectingLocation = false;
 let tempMarker = null;
@@ -70,6 +73,15 @@ const MAP_LAYER_STATE_KEY = 'fiscalizacoes_map_layers_v1';
 const MAP_LEGEND_STATE_KEY = 'fiscalizacoes_map_legend_v1';
 const THEME_STORAGE_KEY = 'fiscalizacoes_theme_v1';
 const MAX_AUDIT_ENTRIES = 300;
+const SISTEMAS_AI_GEOJSON_URL = './assets/sistemas-ai.geojson';
+const SISTEMAS_AI_STYLES = [
+  { match: 'descoberto corumba', labelHtml: 'Descoberto/Corumb&aacute;', color: '#2563eb' },
+  { match: 'torto santa maria', labelHtml: 'Torto-Santa Maria', color: '#16a34a' },
+  { match: 'sobradinho planaltina', labelHtml: 'Sobradinho/Planaltina', color: '#9333ea' },
+  { match: 'paranoa norte', labelHtml: 'Parano&aacute; Norte', color: '#0891b2' },
+  { match: 'paranoa sul', labelHtml: 'Parano&aacute; Sul', color: '#f59e0b' },
+  { match: 'brazlandia', labelHtml: 'Brazl&acirc;ndia', color: '#dc2626' }
+];
 
 const FISCALIZACAO_FORM_FIELDS = [
   'form-backend-id',
@@ -122,6 +134,7 @@ const fieldLabels = {
 };
 
 let mapLayerVisibility = {
+  sistemas_ai: true,
   em_andamento: true,
   concluida: true,
   pendente: true,
@@ -1912,6 +1925,131 @@ function getObraLayerKey(obra) {
   return 'obra_baixa';
 }
 
+function normalizeSistemaAiKey(value) {
+  return normalizePlainText(value)
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+function getSistemaAiStyle(sistema) {
+  const key = normalizeSistemaAiKey(sistema);
+  const style = SISTEMAS_AI_STYLES.find((item) => key.includes(item.match));
+  return style || { match: '', labelHtml: 'Sistema AI', color: '#64748b' };
+}
+
+function renderSistemasAiLegendItems() {
+  return `
+    <div class="pt-2 mt-2 border-t border-slate-700/70">
+      <p class="text-[11px] text-slate-500 mb-2">Sistemas AI</p>
+      ${SISTEMAS_AI_STYLES.map((item) => `
+        <div class="flex items-center gap-2">
+          <div class="w-4 h-4 rounded-sm border border-white/40" style="background:${item.color};opacity:0.72;"></div>
+          <span class="text-xs text-slate-400">${item.labelHtml}</span>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+function createSistemasAiPopupContent(feature) {
+  const properties = feature?.properties || {};
+  const sistema = escapeHtml(properties.sistema || 'Sistema AI');
+  const regiao = escapeHtml(formatDisplayText(properties.ra_nome || 'Regiao nao informada'));
+
+  return `
+    <div style="padding: 14px; font-family: 'Manrope', sans-serif; min-width: 190px;">
+      <div style="font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #38bdf8; margin-bottom: 8px;">Sistema AI</div>
+      <div style="font-weight: 800; font-size: 15px; color: #e2e8f0; margin-bottom: 8px;">${regiao}</div>
+      <div style="color: #cbd5e1; font-size: 13px;"><strong>Sistema:</strong> ${sistema}</div>
+    </div>
+  `;
+}
+
+function createSistemasAiLayer(geojson) {
+  return L.geoJSON(geojson, {
+    pane: 'sistemasAiPane',
+    style: (feature) => {
+      const { color } = getSistemaAiStyle(feature?.properties?.sistema);
+      return {
+        color,
+        weight: 1.6,
+        opacity: 0.82,
+        fillColor: color,
+        fillOpacity: 0.14
+      };
+    },
+    onEachFeature: (feature, layer) => {
+      layer.bindPopup(createSistemasAiPopupContent(feature), {
+        maxWidth: 280,
+        className: 'custom-popup sistemas-ai-popup'
+      });
+      layer.on({
+        mouseover: () => {
+          const { color } = getSistemaAiStyle(feature?.properties?.sistema);
+          layer.setStyle({
+            color,
+            weight: 2.6,
+            opacity: 1,
+            fillOpacity: 0.24
+          });
+          layer.bringToFront();
+        },
+        mouseout: () => {
+          sistemasAiLayer?.resetStyle(layer);
+        }
+      });
+    }
+  });
+}
+
+function updateSistemasAiLayerVisibility() {
+  if (!map || !sistemasAiLayer) return;
+
+  const shouldShow = Boolean(mapLayerVisibility.sistemas_ai);
+  const isOnMap = map.hasLayer(sistemasAiLayer);
+
+  if (shouldShow && !isOnMap) {
+    sistemasAiLayer.addTo(map);
+    return;
+  }
+
+  if (!shouldShow && isOnMap) {
+    map.removeLayer(sistemasAiLayer);
+  }
+}
+
+async function loadSistemasAiLayer() {
+  if (sistemasAiLoadPromise) return sistemasAiLoadPromise;
+
+  sistemasAiLoadPromise = fetch(SISTEMAS_AI_GEOJSON_URL, {
+    cache: 'force-cache'
+  })
+    .then((response) => {
+      if (!response.ok) {
+        throw new Error('Nao foi possivel carregar os poligonos dos Sistemas AI.');
+      }
+      return response.json();
+    })
+    .then((geojson) => {
+      sistemasAiGeoJson = geojson;
+      sistemasAiLayer = createSistemasAiLayer(sistemasAiGeoJson);
+      updateSistemasAiLayerVisibility();
+
+      if (Object.keys(markers).length === 0) {
+        const bounds = sistemasAiLayer.getBounds();
+        if (bounds.isValid()) map.fitBounds(bounds.pad(0.08), { maxZoom: 12 });
+      }
+
+      return sistemasAiGeoJson;
+    })
+    .catch((error) => {
+      console.error(error);
+      return null;
+    });
+
+  return sistemasAiLoadPromise;
+}
+
 function canRenderMarker(record) {
   if (currentView === 'obras') {
     const layerKey = getObraLayerKey(record);
@@ -1926,7 +2064,7 @@ function renderMapLayerControls() {
   const container = document.getElementById('map-layer-toggles');
   if (!container) return;
 
-  const controls = currentView === 'obras'
+  const pointControls = currentView === 'obras'
     ? [
       { key: 'obra_alta', label: 'Execução >= 80%' },
       { key: 'obra_media', label: 'Execução 40%-79%' },
@@ -1938,6 +2076,10 @@ function renderMapLayerControls() {
       { key: 'concluida', label: 'Concluída' },
       { key: 'pendente', label: 'Pendente' }
     ];
+  const controls = [
+    { key: 'sistemas_ai', label: 'Poligonos Sistemas AI' },
+    ...pointControls
+  ];
 
   container.innerHTML = controls.map((control) => `
     <label class="flex items-center justify-between gap-2 text-[11px] text-slate-300">
@@ -1955,7 +2097,11 @@ function renderMapLayerControls() {
       if (!key) return;
       mapLayerVisibility[key] = Boolean(event.target.checked);
       saveMapLayerState();
-      updateMapMarkers();
+      if (key === 'sistemas_ai') {
+        updateSistemasAiLayerVisibility();
+      } else {
+        updateMapMarkers();
+      }
     });
   });
 }
@@ -2036,6 +2182,7 @@ function updateMapLegend() {
         <div class="w-4 h-4 rounded-full bg-gradient-to-br from-sky-400 to-blue-500"></div>
         <span class="text-xs text-slate-400">Sem percentual informado</span>
       </div>
+      ${renderSistemasAiLegendItems()}
     `;
     renderMapLayerControls();
     updateMapLegendCollapseUI();
@@ -2056,6 +2203,7 @@ function updateMapLegend() {
       <div class="w-4 h-4 rounded-full bg-gradient-to-br from-red-400 to-rose-500"></div>
       <span class="text-xs text-slate-400">Pendente</span>
     </div>
+    ${renderSistemasAiLegendItems()}
   `;
   renderMapLayerControls();
   updateMapLegendCollapseUI();
@@ -2191,6 +2339,9 @@ window.switchDataView = switchDataView;
 // ======== Map ========
 function initMap() {
   map = L.map('map').setView([-15.7942, -47.8822], 11);
+  map.createPane('sistemasAiPane');
+  map.getPane('sistemasAiPane').style.zIndex = 390;
+  map.getPane('sistemasAiPane').style.pointerEvents = 'auto';
 
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
@@ -2205,6 +2356,7 @@ function initMap() {
   });
   map.addLayer(markerClusterGroup);
 
+  loadSistemasAiLayer();
   map.on('click', handleMapClick);
 }
 
