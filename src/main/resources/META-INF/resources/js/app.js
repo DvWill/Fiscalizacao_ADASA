@@ -2426,7 +2426,7 @@ function updateDataViewUI() {
   if (subtitle) {
     subtitle.textContent = isAcoes
       ? 'Dashboard executivo de acoes e locais de fiscalizacao'
-      : (isRvf ? 'Relatorios de Vistoria e Fiscalizacao importados da ADASA' : (isObras ? 'Mapa de Obras em Andamento' : defaultConfig.subtitle));
+      : (isRvf ? 'Relat\u00f3rios provenientes de a\u00e7\u00f5es fiscalizatorias' : (isObras ? 'Mapa de Obras em Andamento' : defaultConfig.subtitle));
   }
 
   updateMapLegend();
@@ -4797,7 +4797,6 @@ function getAcoesDashboardMetrics(records = filteredAcoes) {
       indicador: autosByYearMap.get(label) || 0
     })),
     ultimoAno: availableYears[0] || null,
-    anosDisponiveis: availableYears.length,
     ultimaAtualizacao: acoesLastUpdatedAt || (latestActionDate ? new Date(latestActionDate).toISOString() : ''),
     porAno: countAcoesBy(records, (acao) => acao.ano).sort((a, b) => Number(a.label) - Number(b.label)),
     porRegiao: countAcoesBy(records, (acao) => acao.regiao_administrativa || acao.local_ra),
@@ -5122,7 +5121,6 @@ function renderAcoesDashboardView() {
         ${renderAcoesKpiCard('Acoes concluidas', formatAcoesNumber(metrics.concluidas), `${metrics.total ? Math.round((metrics.concluidas / metrics.total) * 100) : 0}% do total`, 'success')}
         ${renderAcoesKpiCard('Acoes pendentes', formatAcoesNumber(metrics.pendentes), `${metrics.atrasadas} atrasadas`, 'danger')}
         ${renderAcoesKpiCard('Em andamento', formatAcoesNumber(metrics.emAndamento), `${metrics.programadas} programadas`, 'warning')}
-        ${renderAcoesKpiCard('Acoes por ano', formatAcoesNumber(metrics.anosDisponiveis), metrics.ultimoAno ? `Ultimo ano ${metrics.ultimoAno}` : 'Sem ano informado', 'default')}
         ${renderAcoesKpiCard('Ultima atualizacao', formatDateShortDisplay(metrics.ultimaAtualizacao), formatDateTimeDisplay(metrics.ultimaAtualizacao), 'default')}
       </section>
 
@@ -5372,9 +5370,9 @@ function renderRvfView() {
     <div class="module-page-shell rvf-shell">
       <header class="module-page-header">
         <div class="module-title-group">
-          <p class="app-kicker">RVF</p>
-          <h2>RVF - Relat&oacute;rios de Vistoria e Fiscaliza&ccedil;&atilde;o</h2>
-          <p>Relat&oacute;rios oficiais da ADASA organizados por ano, m&ecirc;s, status e origem do documento.</p>
+          <p class="app-kicker">RF</p>
+          <h2>RF - Relat&oacute;rio de Fiscaliza&ccedil;&atilde;o</h2>
+          <p>Relat&oacute;rios provenientes de a&ccedil;&otilde;es fiscalizatorias</p>
         </div>
         <div class="module-header-actions">
           <button type="button" onclick="refreshRvfRelatorios()" class="module-secondary-button">
