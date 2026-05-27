@@ -15,6 +15,7 @@ let markerClusterGroup = null;
 let sistemasAiLayer = null;
 let sistemasAiGeoJson = null;
 let sistemasAiLoadPromise = null;
+let selectedSistemasAiRaKey = '';
 let markers = {};
 let isSelectingLocation = false;
 let tempMarker = null;
@@ -1945,6 +1946,12 @@ function normalizeSistemaAiKey(value) {
     .trim();
 }
 
+function getSistemaAiRaKey(value) {
+  return normalizePlainText(value)
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '') || 'ra_nao_informada';
+}
+
 function getSistemaAiStyle(sistema) {
   const key = normalizeSistemaAiKey(sistema);
   const styleIndex = SISTEMAS_AI_STYLES.findIndex((item) => key.includes(item.match));
@@ -1975,11 +1982,11 @@ function getSistemasAiRaLegendItems() {
 
   features.forEach((feature) => {
     const properties = feature?.properties || {};
+    const key = getSistemaAiRaKey(properties.ra_nome);
     const label = formatRaLegendName(properties.ra_nome);
     const style = getSistemaAiStyle(properties.sistema);
-    const key = `${style.color}|${label}`;
     if (!items.has(key)) {
-      items.set(key, { label, color: style.color, order: style.order });
+      items.set(key, { key, label, color: style.color, order: style.order });
     }
   });
 
@@ -1992,23 +1999,74 @@ function getSistemasAiRaLegendItems() {
 function renderSistemasAiLegendItems() {
   const raItems = getSistemasAiRaLegendItems();
   const legendRows = raItems.length
-    ? raItems.map((item) => `
-        <div class="flex items-center gap-2">
+    ? raItems.map((item) => {
+      const isSelected = item.key === selectedSistemasAiRaKey;
+      return `
+        <button type="button"
+          onclick="setSistemasAiRaFilter('${escapeJsString(isSelected ? '' : item.key)}')"
+          class="w-full flex items-center gap-2 rounded-md px-1.5 py-1 text-left transition-colors ${isSelected ? 'bg-blue-500/15 ring-1 ring-blue-400/60' : 'hover:bg-slate-700/60'}">
           <div class="w-4 h-4 shrink-0 rounded-sm border border-white/40" style="background:${item.color};opacity:0.72;"></div>
-          <span class="text-xs text-slate-400">${escapeHtml(item.label)}</span>
-        </div>
-      `).join('')
+          <span class="text-xs ${isSelected ? 'text-blue-100' : 'text-slate-400'}">${escapeHtml(item.label)}</span>
+        </button>
+      `;
+    }).join('')
     : '<p class="text-xs text-slate-500">Carregando RAs...</p>';
 
   return `
     <div class="pt-2 mt-2 border-t border-slate-700/70">
-      <p class="text-[11px] text-slate-500 mb-2">RA - Região Administrativa</p>
+      <div class="mb-2 flex items-center justify-between gap-2">
+        <p class="text-[11px] text-slate-500">RA - Região Administrativa</p>
+        ${selectedSistemasAiRaKey ? `
+          <button type="button" onclick="setSistemasAiRaFilter('')" class="rounded px-1.5 py-0.5 text-[11px] font-medium text-blue-200 hover:bg-blue-500/15">
+            Todas
+          </button>
+        ` : ''}
+      </div>
       <div class="max-h-56 overflow-y-auto custom-scrollbar pr-1 space-y-1">
         ${legendRows}
       </div>
     </div>
   `;
 }
+
+function shouldRenderSistemaAiFeature(feature) {
+  if (!selectedSistemasAiRaKey) return true;
+  return getSistemaAiRaKey(feature?.properties?.ra_nome) === selectedSistemasAiRaKey;
+}
+
+function rebuildSistemasAiLayer(options = {}) {
+  if (!map || !sistemasAiGeoJson) return;
+
+  const wasOnMap = Boolean(sistemasAiLayer && map.hasLayer(sistemasAiLayer));
+  if (sistemasAiLayer && wasOnMap) {
+    map.removeLayer(sistemasAiLayer);
+  }
+
+  sistemasAiLayer = createSistemasAiLayer(sistemasAiGeoJson);
+  if (mapLayerVisibility.sistemas_ai) {
+    sistemasAiLayer.addTo(map);
+  }
+
+  if (options.fitSelected && selectedSistemasAiRaKey && mapLayerVisibility.sistemas_ai) {
+    const bounds = sistemasAiLayer.getBounds();
+    if (bounds.isValid()) {
+      map.fitBounds(bounds.pad(0.12), { maxZoom: 13 });
+    }
+  }
+}
+
+function setSistemasAiRaFilter(key = '') {
+  selectedSistemasAiRaKey = String(key || '');
+
+  if (selectedSistemasAiRaKey && !mapLayerVisibility.sistemas_ai) {
+    mapLayerVisibility.sistemas_ai = true;
+    saveMapLayerState();
+  }
+
+  rebuildSistemasAiLayer({ fitSelected: Boolean(selectedSistemasAiRaKey) });
+  updateMapLegend();
+}
+window.setSistemasAiRaFilter = setSistemasAiRaFilter;
 
 function createSistemasAiPopupContent(feature) {
   const properties = feature?.properties || {};
@@ -2027,6 +2085,7 @@ function createSistemasAiPopupContent(feature) {
 function createSistemasAiLayer(geojson) {
   return L.geoJSON(geojson, {
     pane: 'sistemasAiPane',
+    filter: shouldRenderSistemaAiFeature,
     style: (feature) => {
       const { color } = getSistemaAiStyle(feature?.properties?.sistema);
       return {
@@ -2091,8 +2150,7 @@ async function loadSistemasAiLayer() {
     })
     .then((geojson) => {
       sistemasAiGeoJson = geojson;
-      sistemasAiLayer = createSistemasAiLayer(sistemasAiGeoJson);
-      updateSistemasAiLayerVisibility();
+      rebuildSistemasAiLayer();
       updateMapLegend();
 
       if (Object.keys(markers).length === 0) {
