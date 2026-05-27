@@ -2077,7 +2077,7 @@ function createSistemasAiPopupContent(feature) {
     <div style="padding: 14px; font-family: 'Manrope', sans-serif; min-width: 190px;">
       <div style="font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #38bdf8; margin-bottom: 8px;">RA - Região Administrativa</div>
       <div style="font-weight: 800; font-size: 15px; color: #e2e8f0; margin-bottom: 8px;">${regiao}</div>
-      <div style="color: #cbd5e1; font-size: 13px;"><strong>Sistema AI:</strong> ${sistema}</div>
+      <div style="color: #cbd5e1; font-size: 13px;"><strong>Local:</strong> ${sistema}</div>
     </div>
   `;
 }
