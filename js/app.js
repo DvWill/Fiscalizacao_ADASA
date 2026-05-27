@@ -82,6 +82,11 @@ const SISTEMAS_AI_STYLES = [
   { match: 'paranoa sul', labelHtml: 'Parano&aacute; Sul', color: '#f59e0b' },
   { match: 'brazlandia', labelHtml: 'Brazl&acirc;ndia', color: '#dc2626' }
 ];
+const FISCALIZACAO_STATUS_META = {
+  em_andamento: { label: 'em andamento', color: '#f59e0b', className: 'status-andamento' },
+  concluida: { label: 'concluída', color: '#10b981', className: 'status-concluida' },
+  pendente: { label: 'pendente', color: '#ef4444', className: 'status-pendente' }
+};
 
 const FISCALIZACAO_FORM_FIELDS = [
   'form-backend-id',
@@ -1910,11 +1915,20 @@ function saveMapLayerState() {
   writeStoredJson(MAP_LAYER_STATE_KEY, mapLayerVisibility);
 }
 
-function getFiscalizacaoLayerKey(situacao) {
+function getFiscalizacaoStatusKey(situacao) {
   const normalized = normalizePlainText(situacao);
+  if (normalized.includes('pend') || normalized.includes('nao conclu')) return 'pendente';
   if (normalized.includes('andamento')) return 'em_andamento';
   if (normalized.includes('concl')) return 'concluida';
   return 'pendente';
+}
+
+function getFiscalizacaoStatusMeta(situacao) {
+  return FISCALIZACAO_STATUS_META[getFiscalizacaoStatusKey(situacao)];
+}
+
+function getFiscalizacaoLayerKey(situacao) {
+  return getFiscalizacaoStatusKey(situacao);
 }
 
 function getObraLayerKey(obra) {
@@ -1933,34 +1947,79 @@ function normalizeSistemaAiKey(value) {
 
 function getSistemaAiStyle(sistema) {
   const key = normalizeSistemaAiKey(sistema);
-  const style = SISTEMAS_AI_STYLES.find((item) => key.includes(item.match));
-  return style || { match: '', labelHtml: 'Sistema AI', color: '#64748b' };
+  const styleIndex = SISTEMAS_AI_STYLES.findIndex((item) => key.includes(item.match));
+  const style = styleIndex >= 0 ? SISTEMAS_AI_STYLES[styleIndex] : { match: '', labelHtml: 'RA - Região Administrativa', color: '#64748b' };
+  return { ...style, order: styleIndex >= 0 ? styleIndex : SISTEMAS_AI_STYLES.length };
+}
+
+function formatRaLegendName(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return 'RA não informada';
+  const acronyms = new Set(['SCIA', 'SIA']);
+
+  return raw
+    .toLocaleLowerCase('pt-BR')
+    .split(/([/\-\s]+)/)
+    .map((part) => {
+      if (!part || /^[/\-\s]+$/.test(part)) return part;
+      const upper = part.toLocaleUpperCase('pt-BR');
+      if (acronyms.has(upper)) return upper;
+      return part.charAt(0).toLocaleUpperCase('pt-BR') + part.slice(1);
+    })
+    .join('');
+}
+
+function getSistemasAiRaLegendItems() {
+  const features = Array.isArray(sistemasAiGeoJson?.features) ? sistemasAiGeoJson.features : [];
+  const items = new Map();
+
+  features.forEach((feature) => {
+    const properties = feature?.properties || {};
+    const label = formatRaLegendName(properties.ra_nome);
+    const style = getSistemaAiStyle(properties.sistema);
+    const key = `${style.color}|${label}`;
+    if (!items.has(key)) {
+      items.set(key, { label, color: style.color, order: style.order });
+    }
+  });
+
+  return [...items.values()].sort((a, b) => {
+    if (a.order !== b.order) return a.order - b.order;
+    return a.label.localeCompare(b.label, 'pt-BR');
+  });
 }
 
 function renderSistemasAiLegendItems() {
+  const raItems = getSistemasAiRaLegendItems();
+  const legendRows = raItems.length
+    ? raItems.map((item) => `
+        <div class="flex items-center gap-2">
+          <div class="w-4 h-4 shrink-0 rounded-sm border border-white/40" style="background:${item.color};opacity:0.72;"></div>
+          <span class="text-xs text-slate-400">${escapeHtml(item.label)}</span>
+        </div>
+      `).join('')
+    : '<p class="text-xs text-slate-500">Carregando RAs...</p>';
+
   return `
     <div class="pt-2 mt-2 border-t border-slate-700/70">
-      <p class="text-[11px] text-slate-500 mb-2">Sistemas AI</p>
-      ${SISTEMAS_AI_STYLES.map((item) => `
-        <div class="flex items-center gap-2">
-          <div class="w-4 h-4 rounded-sm border border-white/40" style="background:${item.color};opacity:0.72;"></div>
-          <span class="text-xs text-slate-400">${item.labelHtml}</span>
-        </div>
-      `).join('')}
+      <p class="text-[11px] text-slate-500 mb-2">RA - Região Administrativa</p>
+      <div class="max-h-56 overflow-y-auto custom-scrollbar pr-1 space-y-1">
+        ${legendRows}
+      </div>
     </div>
   `;
 }
 
 function createSistemasAiPopupContent(feature) {
   const properties = feature?.properties || {};
-  const sistema = escapeHtml(properties.sistema || 'Sistema AI');
-  const regiao = escapeHtml(formatDisplayText(properties.ra_nome || 'Regiao nao informada'));
+  const sistema = escapeHtml(formatDisplayText(properties.sistema || 'Sistema AI'));
+  const regiao = escapeHtml(formatRaLegendName(properties.ra_nome));
 
   return `
     <div style="padding: 14px; font-family: 'Manrope', sans-serif; min-width: 190px;">
-      <div style="font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #38bdf8; margin-bottom: 8px;">Sistema AI</div>
+      <div style="font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #38bdf8; margin-bottom: 8px;">RA - Região Administrativa</div>
       <div style="font-weight: 800; font-size: 15px; color: #e2e8f0; margin-bottom: 8px;">${regiao}</div>
-      <div style="color: #cbd5e1; font-size: 13px;"><strong>Sistema:</strong> ${sistema}</div>
+      <div style="color: #cbd5e1; font-size: 13px;"><strong>Sistema AI:</strong> ${sistema}</div>
     </div>
   `;
 }
@@ -2026,7 +2085,7 @@ async function loadSistemasAiLayer() {
   })
     .then((response) => {
       if (!response.ok) {
-        throw new Error('Nao foi possivel carregar os poligonos dos Sistemas AI.');
+        throw new Error('Nao foi possivel carregar os poligonos das RAs.');
       }
       return response.json();
     })
@@ -2034,6 +2093,7 @@ async function loadSistemasAiLayer() {
       sistemasAiGeoJson = geojson;
       sistemasAiLayer = createSistemasAiLayer(sistemasAiGeoJson);
       updateSistemasAiLayerVisibility();
+      updateMapLegend();
 
       if (Object.keys(markers).length === 0) {
         const bounds = sistemasAiLayer.getBounds();
@@ -2072,12 +2132,12 @@ function renderMapLayerControls() {
       { key: 'obra_sem_pct', label: 'Sem percentual' }
     ]
     : [
-      { key: 'em_andamento', label: 'Em Andamento' },
-      { key: 'concluida', label: 'Concluída' },
-      { key: 'pendente', label: 'Pendente' }
+      { key: 'em_andamento', label: 'em andamento' },
+      { key: 'concluida', label: 'concluída' },
+      { key: 'pendente', label: 'pendente' }
     ];
   const controls = [
-    { key: 'sistemas_ai', label: 'Poligonos Sistemas AI' },
+    { key: 'sistemas_ai', label: 'RA - Região Administrativa' },
     ...pointControls
   ];
 
@@ -2193,15 +2253,15 @@ function updateMapLegend() {
   items.innerHTML = `
     <div class="flex items-center gap-2">
       <div class="w-4 h-4 rounded-full bg-gradient-to-br from-yellow-400 to-amber-500"></div>
-      <span class="text-xs text-slate-400">Em Andamento</span>
+      <span class="text-xs text-slate-400">em andamento</span>
     </div>
     <div class="flex items-center gap-2">
       <div class="w-4 h-4 rounded-full bg-gradient-to-br from-emerald-400 to-green-500"></div>
-      <span class="text-xs text-slate-400">Concluída</span>
+      <span class="text-xs text-slate-400">concluída</span>
     </div>
     <div class="flex items-center gap-2">
       <div class="w-4 h-4 rounded-full bg-gradient-to-br from-red-400 to-rose-500"></div>
-      <span class="text-xs text-slate-400">Pendente</span>
+      <span class="text-xs text-slate-400">pendente</span>
     </div>
     ${renderSistemasAiLegendItems()}
   `;
@@ -2275,7 +2335,7 @@ function updateDataViewUI() {
   }
 
   if (filterRegiao?.previousElementSibling) {
-    filterRegiao.previousElementSibling.textContent = isObras ? 'Local' : 'Região Administrativa';
+    filterRegiao.previousElementSibling.textContent = isObras ? 'RA - Região Administrativa' : 'Região Administrativa';
   }
   if (filterSituacao?.previousElementSibling) {
     filterSituacao.previousElementSibling.textContent = isObras ? 'Situação do Contrato' : 'Situação';
@@ -2293,7 +2353,7 @@ function updateDataViewUI() {
   if (searchInput) {
     searchInput.placeholder = isAcoes
       ? 'ID, processo, objetivo...'
-      : (isObras ? 'Item, local, ação, fornecedor...' : 'ID, Processo, Destinatário...');
+      : (isObras ? 'Item, RA, ação, fornecedor...' : 'ID, Processo, Destinatário...');
   }
   if (subtitle) {
     subtitle.textContent = isAcoes
@@ -2452,13 +2512,7 @@ document.addEventListener('keydown', (e) => {
 
 // ======== Markers ========
 function createMarkerIcon(situacao) {
-  let color;
-  switch (situacao) {
-    case 'Em Andamento': color = '#f59e0b'; break;
-    case 'Concluida': color = '#10b981'; break;
-    case 'Pendente': color = '#ef4444'; break;
-    default: color = '#3b82f6';
-  }
+  const { color } = getFiscalizacaoStatusMeta(situacao);
 
   return L.divIcon({
     className: 'custom-marker fiscalizacao-marker',
@@ -2557,10 +2611,10 @@ function updateMapMarkers() {
 }
 
 function createPopupContent(fisc) {
-  const statusClass = fisc.situacao === 'Em Andamento' ? 'status-andamento' :
-                      fisc.situacao === 'Concluida' ? 'status-concluida' : 'status-pendente';
+  const statusMeta = getFiscalizacaoStatusMeta(fisc.situacao);
+  const statusClass = statusMeta.className;
   const idLabel = escapeHtml(fisc.id || '-');
-  const statusLabel = escapeHtml(formatDisplayText(fisc.situacao || '-'));
+  const statusLabel = escapeHtml(statusMeta.label);
   const regiaoLabel = escapeHtml(formatDisplayText(fisc.regiao_administrativa || '-'));
   const processoLabel = escapeHtml(fisc.processo_sei || '-');
   const conformidade = parseLocalizedNumber(fisc.indice_conformidade);
@@ -2614,7 +2668,7 @@ function createObraPopupContent(obra) {
         <span style="font-size:11px;padding:4px 8px;border-radius:999px;background:${color};color:white;">${progressLabel}</span>
       </div>
       <div style="color:#64748b;font-size:13px;margin-bottom:8px;">
-        <strong>Local:</strong> ${localLabel}
+        <strong>RA:</strong> ${localLabel}
       </div>
       <div style="color:#64748b;font-size:13px;margin-bottom:8px;">
         <strong>Situação:</strong> ${situacaoLabel}
@@ -2731,7 +2785,7 @@ function updateFiltersOptions() {
 
     const regiaoSelect = document.getElementById('filter-regiao');
     const currentLocal = regiaoSelect.value;
-    regiaoSelect.innerHTML = '<option value="">Todos os Locais</option>';
+    regiaoSelect.innerHTML = '<option value="">Todas as RAs</option>';
     locais.forEach((local) => {
       const option = document.createElement('option');
       option.value = local;
@@ -2824,7 +2878,9 @@ function populateMapFocusOptions(regioesOuLocais, situacoes) {
   const currentRegion = regionSelect.value;
   const currentStatus = statusSelect.value;
 
-    regionSelect.innerHTML = '<option value="">Todas as regiões/locais</option>';
+  regionSelect.innerHTML = currentView === 'obras'
+    ? '<option value="">Todas as RAs</option>'
+    : '<option value="">Todas as regiões</option>';
   regioesOuLocais.forEach((value) => {
     const option = document.createElement('option');
     option.value = value;
@@ -3039,10 +3095,10 @@ function renderFiscalizacoesList() {
   const pageItems = paginateRecords(sorted);
 
   container.innerHTML = pageItems.map((fisc) => {
-    const statusClass = fisc.situacao === 'Em Andamento' ? 'status-andamento' :
-                        fisc.situacao === 'Concluida' ? 'status-concluida' : 'status-pendente';
+    const statusMeta = getFiscalizacaoStatusMeta(fisc.situacao);
+    const statusClass = statusMeta.className;
     const idLabel = escapeHtml(fisc.id || '-');
-    const statusLabel = escapeHtml(formatDisplayText(fisc.situacao || '-'));
+    const statusLabel = escapeHtml(statusMeta.label);
     const regiaoLabel = escapeHtml(formatDisplayText(fisc.regiao_administrativa || 'Sem regiao'));
     const conformidade = Number.isFinite(Number(fisc.indice_conformidade))
       ? Number(fisc.indice_conformidade)
@@ -3109,7 +3165,7 @@ function renderObrasList() {
     const color = getObraMarkerColor(obra);
     const progress = getObraProgressValue(obra);
     const itemLabel = escapeHtml(obra.item || 'Obra');
-    const localLabel = escapeHtml(obra.local || 'Sem local informado');
+    const localLabel = escapeHtml(formatDisplayText(obra.local || 'RA não informada'));
     const situacaoLabel = escapeHtml(obra.situacao_contrato || 'Sem situacao');
     const chipLabel = progress != null ? formatPercent(progress) : (hasObraCoordinates(obra) ? 'Sem %' : 'Sem coord.');
 
@@ -3184,8 +3240,9 @@ function showDetailPanel(fisc) {
   const panel = document.getElementById('detail-panel');
   const content = document.getElementById('detail-content');
 
-  const statusClass = fisc.situacao === 'Em Andamento' ? 'status-andamento' :
-                      fisc.situacao === 'Concluida' ? 'status-concluida' : 'status-pendente';
+  const statusMeta = getFiscalizacaoStatusMeta(fisc.situacao);
+  const statusClass = statusMeta.className;
+  const statusLabel = escapeHtml(statusMeta.label);
   const safeImage = getSafeImageSrc(fisc.imagem);
 
   setDetailPanelActionsVisible(true);
@@ -3195,7 +3252,7 @@ function showDetailPanel(fisc) {
   content.innerHTML = `
     <div class="space-y-6">
       <div class="flex items-center justify-center">
-        <span class="${statusClass} text-base">${formatDisplayText(fisc.situacao)}</span>
+        <span class="${statusClass} text-base">${statusLabel}</span>
       </div>
 
       <div class="space-y-3">
@@ -3289,7 +3346,7 @@ function showObraDetailPanel(obra) {
         <h3 class="text-sm font-semibold text-emerald-400 uppercase tracking-wider">Identificação</h3>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           ${createDetailField('Item', obra.item)}
-          ${createDetailField('Local', formatDisplayText(obra.local))}
+          ${createDetailField('RA - Região Administrativa', formatDisplayText(obra.local))}
           ${createDetailField('Sistema', obra.sistema)}
           ${createDetailField('Tipo', obra.tipo)}
           ${createDetailField('Programa', obra.programa)}
@@ -4081,7 +4138,7 @@ function updateDashboard() {
       senaryLabel: 'Valor Total',
       septenaryLabel: 'Executado 2025',
       statusChartTitle: 'Distribuição por Situação do Contrato',
-      regionChartTitle: 'Por Local'
+      regionChartTitle: 'Por RA - Região Administrativa'
     });
 
     document.getElementById('metric-total').textContent = total;
@@ -4115,7 +4172,7 @@ function updateDashboard() {
 
     const localCounts = {};
     allObras.forEach((obra) => {
-      const local = String(obra.local || '').trim() || 'Sem local informado';
+      const local = String(obra.local || '').trim() || 'RA não informada';
       localCounts[local] = (localCounts[local] || 0) + 1;
     });
 
@@ -4125,7 +4182,7 @@ function updateDashboard() {
     document.getElementById('chart-regiao').innerHTML = sortedLocais.length > 0
       ? sortedLocais.map(([local, count]) => `
         <div class="flex items-center gap-3">
-          <span class="text-xs text-slate-400 w-32 truncate">${local}</span>
+          <span class="text-xs text-slate-400 w-32 truncate">${escapeHtml(formatDisplayText(local))}</span>
           <div class="flex-1 h-5 bg-slate-700 rounded-full overflow-hidden">
             <div class="h-full bg-gradient-to-r from-emerald-600 to-emerald-400 rounded-full transition-all duration-500"
                  style="width: ${(count / maxLocal) * 100}%"></div>
@@ -4151,9 +4208,9 @@ function updateDashboard() {
   });
 
   const total = allFiscalizacoes.length;
-  const andamento = allFiscalizacoes.filter(f => f.situacao === 'Em Andamento').length;
-  const concluida = allFiscalizacoes.filter(f => f.situacao === 'Concluida').length;
-  const pendente = allFiscalizacoes.filter(f => f.situacao === 'Pendente').length;
+  const andamento = allFiscalizacoes.filter(f => getFiscalizacaoStatusKey(f.situacao) === 'em_andamento').length;
+  const concluida = allFiscalizacoes.filter(f => getFiscalizacaoStatusKey(f.situacao) === 'concluida').length;
+  const pendente = allFiscalizacoes.filter(f => getFiscalizacaoStatusKey(f.situacao) === 'pendente').length;
 
   const conformidades = allFiscalizacoes.filter(f => f.indice_conformidade).map(f => f.indice_conformidade);
   const avgConformidade = conformidades.length > 0
@@ -4191,9 +4248,9 @@ function updateDashboard() {
 
   const maxStatus = Math.max(andamento, concluida, pendente, 1);
   document.getElementById('chart-situacao').innerHTML = [
-    buildDashboardBar(andamento, maxStatus, 'bg-gradient-to-t from-amber-500 to-yellow-400', 'text-amber-400', 'Andamento'),
-    buildDashboardBar(concluida, maxStatus, 'bg-gradient-to-t from-emerald-500 to-green-400', 'text-emerald-400', 'Concluída'),
-    buildDashboardBar(pendente, maxStatus, 'bg-gradient-to-t from-red-500 to-rose-400', 'text-red-400', 'Pendente')
+    buildDashboardBar(andamento, maxStatus, 'bg-gradient-to-t from-amber-500 to-yellow-400', 'text-amber-400', 'em andamento'),
+    buildDashboardBar(concluida, maxStatus, 'bg-gradient-to-t from-emerald-500 to-green-400', 'text-emerald-400', 'concluída'),
+    buildDashboardBar(pendente, maxStatus, 'bg-gradient-to-t from-red-500 to-rose-400', 'text-red-400', 'pendente')
   ].join('');
 
   const regionCounts = {};
