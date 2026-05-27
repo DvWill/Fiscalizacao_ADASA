@@ -2294,22 +2294,6 @@ function updateMapLegend() {
   if (currentView === 'obras') {
     title.textContent = 'Legenda de Obras';
     items.innerHTML = `
-      <div class="flex items-center gap-2">
-        <div class="w-4 h-4 rounded-full bg-gradient-to-br from-emerald-400 to-green-500"></div>
-        <span class="text-xs text-slate-400">Execução >= 80%</span>
-      </div>
-      <div class="flex items-center gap-2">
-        <div class="w-4 h-4 rounded-full bg-gradient-to-br from-yellow-400 to-amber-500"></div>
-        <span class="text-xs text-slate-400">Execução entre 40% e 79%</span>
-      </div>
-      <div class="flex items-center gap-2">
-        <div class="w-4 h-4 rounded-full bg-gradient-to-br from-red-400 to-rose-500"></div>
-        <span class="text-xs text-slate-400">Execução abaixo de 40%</span>
-      </div>
-      <div class="flex items-center gap-2">
-        <div class="w-4 h-4 rounded-full bg-gradient-to-br from-sky-400 to-blue-500"></div>
-        <span class="text-xs text-slate-400">Sem percentual informado</span>
-      </div>
       ${renderSistemasAiLegendItems()}
     `;
     renderMapLayerControls();
