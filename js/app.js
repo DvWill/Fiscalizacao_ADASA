@@ -2303,18 +2303,6 @@ function updateMapLegend() {
 
   title.textContent = 'Legenda';
   items.innerHTML = `
-    <div class="flex items-center gap-2">
-      <div class="w-4 h-4 rounded-full bg-gradient-to-br from-yellow-400 to-amber-500"></div>
-      <span class="text-xs text-slate-400">em andamento</span>
-    </div>
-    <div class="flex items-center gap-2">
-      <div class="w-4 h-4 rounded-full bg-gradient-to-br from-emerald-400 to-green-500"></div>
-      <span class="text-xs text-slate-400">concluída</span>
-    </div>
-    <div class="flex items-center gap-2">
-      <div class="w-4 h-4 rounded-full bg-gradient-to-br from-red-400 to-rose-500"></div>
-      <span class="text-xs text-slate-400">pendente</span>
-    </div>
     ${renderSistemasAiLegendItems()}
   `;
   renderMapLayerControls();
