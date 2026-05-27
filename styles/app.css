@@ -1198,16 +1198,17 @@ body.app-page .detail-shell {
 .marker-cluster-small,
 .marker-cluster-medium,
 .marker-cluster-large {
-  background-color: rgba(31, 41, 55, 0.14) !important;
-  background-color: color-mix(in srgb, var(--surface-solid) 16%, transparent) !important;
+  background-color: rgba(15, 23, 42, 0.22) !important;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.24);
 }
 
 .marker-cluster-small div,
 .marker-cluster-medium div,
 .marker-cluster-large div {
-  background: linear-gradient(180deg, #1f2937, #0f172a) !important;
+  background: linear-gradient(180deg, #111827, #020617) !important;
   color: #ffffff !important;
   font-weight: 700 !important;
+  border: 1px solid rgba(255, 255, 255, 0.72);
 }
 
 .leaflet-popup-content-wrapper {
@@ -3338,15 +3339,15 @@ html[data-theme="light"] .app-toast {
 html[data-theme="light"] .marker-cluster-small,
 html[data-theme="light"] .marker-cluster-medium,
 html[data-theme="light"] .marker-cluster-large {
-  background-color: rgba(37, 99, 235, 0.12) !important;
+  background-color: rgba(15, 23, 42, 0.22) !important;
 }
 
 html[data-theme="light"] .marker-cluster-small div,
 html[data-theme="light"] .marker-cluster-medium div,
 html[data-theme="light"] .marker-cluster-large div {
-  background: linear-gradient(180deg, #ffffff, #e2e8f0) !important;
-  color: #172033 !important;
-  border: 1px solid rgba(71, 85, 105, 0.16);
+  background: linear-gradient(180deg, #111827, #020617) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.72);
 }
 
 @media (min-width: 640px) {

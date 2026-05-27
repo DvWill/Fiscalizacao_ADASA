@@ -2579,8 +2579,21 @@ document.addEventListener('keydown', (e) => {
 });
 
 // ======== Markers ========
+function getDarkMapPointColor(color) {
+  const normalized = String(color || '').toLowerCase();
+  const darkColors = {
+    '#f59e0b': '#92400e',
+    '#10b981': '#065f46',
+    '#ef4444': '#991b1b',
+    '#3b82f6': '#1e3a8a'
+  };
+
+  return darkColors[normalized] || '#1f2937';
+}
+
 function createMarkerIcon(situacao) {
   const { color } = getFiscalizacaoStatusMeta(situacao);
+  const markerColor = getDarkMapPointColor(color);
 
   return L.divIcon({
     className: 'custom-marker fiscalizacao-marker',
@@ -2589,12 +2602,12 @@ function createMarkerIcon(situacao) {
         <svg width="30" height="34" viewBox="0 0 30 34" fill="none" aria-hidden="true">
           <path
             d="M15 1.5C9.75 1.5 5.5 5.75 5.5 11C5.5 17.62 12.31 25.66 14.24 27.77C14.64 28.21 15.36 28.21 15.76 27.77C17.69 25.66 24.5 17.62 24.5 11C24.5 5.75 20.25 1.5 15 1.5Z"
-            fill="${color}"
+            fill="${markerColor}"
             stroke="white"
             stroke-width="2"
           />
           <rect x="11" y="8.5" width="8" height="9" rx="1.5" fill="white" />
-          <path d="M13 11.5H17M13 14.5H17" stroke="${color}" stroke-width="1.5" stroke-linecap="round" />
+          <path d="M13 11.5H17M13 14.5H17" stroke="${markerColor}" stroke-width="1.5" stroke-linecap="round" />
         </svg>
       </div>
     `,
@@ -2605,7 +2618,7 @@ function createMarkerIcon(situacao) {
 }
 
 function createObraMarkerIcon(obra) {
-  const color = getObraMarkerColor(obra);
+  const color = getDarkMapPointColor(getObraMarkerColor(obra));
 
   return L.divIcon({
     className: 'custom-marker obra-marker',
