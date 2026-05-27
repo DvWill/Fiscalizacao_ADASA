@@ -5214,12 +5214,17 @@ function resetRvfFilters() {
 }
 window.resetRvfFilters = resetRvfFilters;
 
+function isRvfVisibleRelatorio(relatorio) {
+  return normalizePlainText(relatorio?.status_link) !== 'erro';
+}
+
 function applyRvfFilters(options = {}) {
   const focusSnapshot = options.preserveFocus ? captureActiveTextControl() : null;
   const filters = rvfFilterState;
   const search = normalizePlainText(filters.search);
 
   filteredRvfRelatorios = allRvfRelatorios.filter((relatorio) => {
+    if (!isRvfVisibleRelatorio(relatorio)) return false;
     if (search) {
       const haystack = normalizePlainText([
         relatorio.titulo,
@@ -5266,8 +5271,6 @@ function getRvfMetrics(records = allRvfRelatorios) {
   return {
     total: records.length,
     ativos: records.filter((item) => item.status_link === 'ativo').length,
-    erros: records.filter((item) => item.status_link === 'erro').length,
-    pendentes: records.filter((item) => item.status_link === 'pendente').length,
     ultimoAno: years.length ? Math.max(...years) : null,
     ultimaAtualizacao: updates.length ? new Date(Math.max(...updates)).toISOString() : rvfLastUpdatedAt
   };
@@ -5350,18 +5353,19 @@ function renderRvfView() {
 
   const filters = rvfFilterState;
   const records = filteredRvfRelatorios || [];
-  const metrics = getRvfMetrics(allRvfRelatorios);
-  const anos = [...new Set(allRvfRelatorios.map((item) => item.ano).filter(Boolean).map(String))].sort((a, b) => Number(b) - Number(a));
-  const meses = [...new Set(allRvfRelatorios.map((item) => item.mes).filter(Boolean))].sort((a, b) => {
+  const visibleRvfRelatorios = allRvfRelatorios.filter(isRvfVisibleRelatorio);
+  const metrics = getRvfMetrics(visibleRvfRelatorios);
+  const anos = [...new Set(visibleRvfRelatorios.map((item) => item.ano).filter(Boolean).map(String))].sort((a, b) => Number(b) - Number(a));
+  const meses = [...new Set(visibleRvfRelatorios.map((item) => item.mes).filter(Boolean))].sort((a, b) => {
     const left = ACOES_MONTH_NAMES.indexOf(normalizePlainText(a));
     const right = ACOES_MONTH_NAMES.indexOf(normalizePlainText(b));
     return (left === -1 ? 99 : left) - (right === -1 ? 99 : right);
   });
-  const statuses = [...new Set(allRvfRelatorios.map((item) => item.status_link).filter(Boolean))].sort();
+  const statuses = [...new Set(visibleRvfRelatorios.map((item) => item.status_link).filter(Boolean))].sort();
 
-  const emptyState = allRvfRelatorios.length === 0 ? `
+  const emptyState = visibleRvfRelatorios.length === 0 ? `
     <div class="module-empty-state">
-      <p class="text-lg font-bold text-slate-900">Nenhum relatorio RVF sincronizado</p>
+      <p class="text-lg font-bold text-slate-900">Nenhum relatorio RF sincronizado</p>
       <p class="mt-2 text-sm text-slate-600">Use a sincronizacao para importar os links oficiais da ADASA.</p>
     </div>
   ` : '';
@@ -5391,7 +5395,6 @@ function renderRvfView() {
       <section class="module-summary-grid">
         ${renderAcoesKpiCard('Total de relatorios', formatAcoesNumber(metrics.total), `${records.length} filtrados`, 'default')}
         ${renderAcoesKpiCard('Links ativos', formatAcoesNumber(metrics.ativos), `${metrics.total ? Math.round((metrics.ativos / metrics.total) * 100) : 0}% validados`, 'success')}
-        ${renderAcoesKpiCard('Links com erro', formatAcoesNumber(metrics.erros), `${metrics.pendentes} pendentes`, 'danger')}
         ${renderAcoesKpiCard('Ultimo ano disponivel', metrics.ultimoAno || '-', `${anos.length} anos no acervo`, 'default')}
         ${renderAcoesKpiCard('Ultima atualizacao', formatDateShortDisplay(metrics.ultimaAtualizacao), formatDateTimeDisplay(metrics.ultimaAtualizacao), 'default')}
       </section>
@@ -5399,7 +5402,7 @@ function renderRvfView() {
       <section class="module-filter-panel">
         <div class="module-filter-grid rvf-filter-grid">
           <label>
-            <span>Palavra-chave</span>
+            <span>Pesquisa</span>
             <input id="rvf-filter-search" value="${escapeHtml(filters.search)}" oninput="setRvfFilter('search', this.value)" placeholder="Titulo, dominio, status..." class="module-control">
           </label>
           <label>
@@ -6105,7 +6108,8 @@ function exportToCSV() {
 
     filename = `acoes_${new Date().toISOString().split('T')[0]}.csv`;
   } else if (currentView === 'rvf') {
-    if (allRvfRelatorios.length === 0) {
+    const exportableRvfRelatorios = allRvfRelatorios.filter(isRvfVisibleRelatorio);
+    if (exportableRvfRelatorios.length === 0) {
       showToast('Nenhum relatorio RVF para exportar', 'warning');
       return;
     }
@@ -6115,7 +6119,7 @@ function exportToCSV() {
       'Dominio', 'Data Importacao', 'Data Atualizacao'
     ];
 
-    rows = allRvfRelatorios.map((relatorio) => [
+    rows = exportableRvfRelatorios.map((relatorio) => [
       relatorio.ano,
       relatorio.mes,
       relatorio.titulo,
