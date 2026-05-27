@@ -148,6 +148,19 @@ body.app-page .app-shell {
 
 .app-header {
   border-radius: 28px;
+  align-items: stretch !important;
+}
+
+.app-brand {
+  min-width: 0;
+  flex: 1 1 360px;
+}
+
+.app-toolbar {
+  min-width: 0;
+  flex: 999 1 760px;
+  justify-content: flex-end;
+  row-gap: 0.5rem;
 }
 
 .app-brand-mark,
@@ -254,6 +267,35 @@ body.auth-page .auth-card-mark {
   box-shadow:
     0 10px 24px rgba(0, 0, 0, 0.22),
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+@media (min-width: 641px) {
+  .app-toolbar {
+    flex-wrap: wrap;
+    overflow: visible !important;
+  }
+}
+
+@media (max-width: 1280px) {
+  .app-header {
+    align-items: flex-start !important;
+  }
+
+  .app-brand,
+  .app-toolbar {
+    width: 100% !important;
+  }
+
+  .app-toolbar {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 640px) {
+  .app-toolbar {
+    flex-wrap: nowrap;
+    overflow-x: auto !important;
+  }
 }
 
 .theme-icon {
@@ -1157,6 +1199,7 @@ body.app-page .detail-shell {
 .marker-cluster-medium,
 .marker-cluster-large {
   background-color: rgba(31, 41, 55, 0.14) !important;
+  background-color: color-mix(in srgb, var(--surface-solid) 16%, transparent) !important;
 }
 
 .marker-cluster-small div,
@@ -1181,6 +1224,92 @@ body.app-page .detail-shell {
 
 .leaflet-popup-content {
   margin: 0 !important;
+}
+
+.map-popup-content {
+  min-width: 190px;
+  padding: 16px;
+  font-family: "Manrope", sans-serif;
+  color: var(--text-body);
+}
+
+.map-popup-content-compact {
+  padding: 14px;
+}
+
+.map-popup-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 12px;
+}
+
+.map-popup-title {
+  min-width: 0;
+  color: var(--text-strong);
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.map-popup-title-spaced {
+  margin-bottom: 8px;
+}
+
+.map-popup-kicker {
+  margin-bottom: 8px;
+  color: var(--accent-soft);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.map-popup-row {
+  margin-bottom: 8px;
+  color: var(--text-body);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.map-popup-row strong,
+.map-popup-progress-labels span:last-child {
+  color: var(--text-strong);
+}
+
+.map-popup-progress {
+  margin-top: 12px;
+}
+
+.map-popup-progress-labels {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 4px;
+  color: var(--text-body);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.map-popup-progress-track {
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.24);
+  background: color-mix(in srgb, var(--text-muted) 24%, transparent);
+}
+
+.map-popup-progress-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #3b82f6, #2563eb);
+}
+
+.map-popup-note {
+  margin-top: 12px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .leaflet-container {
@@ -3201,9 +3330,23 @@ html[data-theme="light"] .leaflet-popup-content-wrapper,
 html[data-theme="light"] .leaflet-popup-tip,
 html[data-theme="light"] .leaflet-bar a,
 html[data-theme="light"] .app-toast {
-  background: rgba(255, 255, 255, 0.96);
-  color: var(--text-strong);
-  border-color: var(--border-soft);
+  background: rgba(255, 255, 255, 0.96) !important;
+  color: var(--text-strong) !important;
+  border-color: var(--border-soft) !important;
+}
+
+html[data-theme="light"] .marker-cluster-small,
+html[data-theme="light"] .marker-cluster-medium,
+html[data-theme="light"] .marker-cluster-large {
+  background-color: rgba(37, 99, 235, 0.12) !important;
+}
+
+html[data-theme="light"] .marker-cluster-small div,
+html[data-theme="light"] .marker-cluster-medium div,
+html[data-theme="light"] .marker-cluster-large div {
+  background: linear-gradient(180deg, #ffffff, #e2e8f0) !important;
+  color: #172033 !important;
+  border: 1px solid rgba(71, 85, 105, 0.16);
 }
 
 @media (min-width: 640px) {

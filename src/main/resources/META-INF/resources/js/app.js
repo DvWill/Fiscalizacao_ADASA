@@ -698,6 +698,15 @@ function updateThemeToggleUI(theme = getActiveTheme()) {
   label.textContent = isDark ? 'Claro' : 'Escuro';
 }
 
+function refreshMapAfterThemeChange() {
+  if (!map) return;
+
+  requestAnimationFrame(() => {
+    map.invalidateSize();
+    markerClusterGroup?.refreshClusters?.();
+  });
+}
+
 function applyTheme(theme, options = {}) {
   const nextTheme = theme === 'light' ? 'light' : 'dark';
   document.documentElement.dataset.theme = nextTheme;
@@ -711,6 +720,7 @@ function applyTheme(theme, options = {}) {
   }
 
   updateThemeToggleUI(nextTheme);
+  refreshMapAfterThemeChange();
 }
 
 function initTheme() {
@@ -2074,10 +2084,10 @@ function createSistemasAiPopupContent(feature) {
   const regiao = escapeHtml(formatRaLegendName(properties.ra_nome));
 
   return `
-    <div style="padding: 14px; font-family: 'Manrope', sans-serif; min-width: 190px;">
-      <div style="font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #38bdf8; margin-bottom: 8px;">RA - Região Administrativa</div>
-      <div style="font-weight: 800; font-size: 15px; color: #e2e8f0; margin-bottom: 8px;">${regiao}</div>
-      <div style="color: #cbd5e1; font-size: 13px;"><strong>Local:</strong> ${sistema}</div>
+    <div class="map-popup-content map-popup-content-compact">
+      <div class="map-popup-kicker">RA - Região Administrativa</div>
+      <div class="map-popup-title map-popup-title-spaced">${regiao}</div>
+      <div class="map-popup-row"><strong>Local:</strong> ${sistema}</div>
     </div>
   `;
 }
@@ -2683,25 +2693,25 @@ function createPopupContent(fisc) {
     : '';
 
   return `
-    <div style="padding: 16px; font-family: 'Manrope', sans-serif;">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-        <span style="font-weight:700;font-size:16px;color:#1e293b;">${idLabel}</span>
+    <div class="map-popup-content">
+      <div class="map-popup-header">
+        <span class="map-popup-title">${idLabel}</span>
         <span class="${statusClass}" style="font-size:11px;padding:3px 8px;">${statusLabel}</span>
       </div>
-      <div style="color:#64748b;font-size:13px;margin-bottom:8px;">
+      <div class="map-popup-row">
         <strong>Região:</strong> ${regiaoLabel}
       </div>
-      <div style="color:#64748b;font-size:13px;margin-bottom:8px;">
+      <div class="map-popup-row">
         <strong>Processo:</strong> ${processoLabel}
       </div>
       ${hasConformidade ? `
-        <div style="margin-top:12px;">
-          <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
-            <span style="font-size:12px;color:#64748b;">Conformidade</span>
-            <span style="font-size:12px;font-weight:600;color:#1e293b;">${conformidadeDisplay}</span>
+        <div class="map-popup-progress">
+          <div class="map-popup-progress-labels">
+            <span>Conformidade</span>
+            <span>${conformidadeDisplay}</span>
           </div>
-          <div style="background:#e2e8f0;border-radius:4px;height:6px;overflow:hidden;">
-            <div style="background:linear-gradient(90deg,#3b82f6,#2563eb);height:100%;width:${conformidadePct}%;"></div>
+          <div class="map-popup-progress-track">
+            <div class="map-popup-progress-fill" style="width:${conformidadePct}%;"></div>
           </div>
         </div>
       ` : ''}
@@ -2720,22 +2730,22 @@ function createObraPopupContent(obra) {
   const objetoContratoLabel = escapeHtml(obra.objeto_contrato || '');
 
   return `
-    <div style="padding: 16px; font-family: 'Manrope', sans-serif;">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:8px;">
-        <span style="font-weight:700;font-size:15px;color:#1e293b;">${itemLabel}</span>
+    <div class="map-popup-content">
+      <div class="map-popup-header">
+        <span class="map-popup-title">${itemLabel}</span>
         <span style="font-size:11px;padding:4px 8px;border-radius:999px;background:${color};color:white;">${progressLabel}</span>
       </div>
-      <div style="color:#64748b;font-size:13px;margin-bottom:8px;">
+      <div class="map-popup-row">
         <strong>RA:</strong> ${localLabel}
       </div>
-      <div style="color:#64748b;font-size:13px;margin-bottom:8px;">
+      <div class="map-popup-row">
         <strong>Situação:</strong> ${situacaoLabel}
       </div>
-      <div style="color:#64748b;font-size:13px;margin-bottom:8px;">
+      <div class="map-popup-row">
         <strong>Ação:</strong> ${acaoLabel}
       </div>
       ${obra.objeto_contrato ? `
-        <div style="margin-top:12px;color:#475569;font-size:12px;line-height:1.4;">
+        <div class="map-popup-note">
           ${objetoContratoLabel}
         </div>
       ` : ''}
