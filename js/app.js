@@ -156,6 +156,7 @@ const ACOES_STORAGE_KEY = 'acoes_dashboard_storage_v1';
 const ACOES_LOCAIS_STORAGE_KEY = 'acoes_dashboard_locais_storage_v1';
 const RVF_STORAGE_KEY = 'rvf_relatorios_storage_v1';
 const VIEW_MODE_KEY = 'fiscalizacoes_data_view';
+const ADASA_COORDINATES = [-15.775102, -47.94036];
 
 const defaultConfig = {
   app_title: 'Painel de Fiscalizações',
@@ -558,21 +559,6 @@ function inferCoordinatesFromLocal(local) {
   return null;
 }
 
-function getStableCoordinateOffset(seed) {
-  const text = String(seed || '');
-  let hash = 0;
-  for (let index = 0; index < text.length; index += 1) {
-    hash = ((hash << 5) - hash + text.charCodeAt(index)) | 0;
-  }
-
-  const latSeed = Math.abs(hash % 1000) / 1000;
-  const lngSeed = Math.abs(Math.trunc(hash / 1000) % 1000) / 1000;
-  return [
-    (latSeed - 0.5) * 0.02,
-    (lngSeed - 0.5) * 0.02
-  ];
-}
-
 function getFiscalizacaoCoordinates(record) {
   const latitude = sanitizeCoordinate(record?.latitude, 'lat');
   const longitude = sanitizeCoordinate(record?.longitude, 'lng');
@@ -580,24 +566,9 @@ function getFiscalizacaoCoordinates(record) {
     return { latitude, longitude, inferred: false };
   }
 
-  const regiao = String(record?.regiao_administrativa || '').trim();
-  const coordinateRegion = !regiao || normalizePlainText(regiao) === 'distrito federal'
-    ? 'Plano Piloto'
-    : regiao;
-  const inferredCoords = inferCoordinatesFromLocal(coordinateRegion);
-  if (!inferredCoords) return null;
-
-  const [latOffset, lngOffset] = getStableCoordinateOffset([
-    record?.__backendId,
-    record?.id,
-    record?.processo_sei,
-    record?.ano,
-    regiao
-  ].join('|'));
-
   return {
-    latitude: inferredCoords[0] + latOffset,
-    longitude: inferredCoords[1] + lngOffset,
+    latitude: ADASA_COORDINATES[0],
+    longitude: ADASA_COORDINATES[1],
     inferred: true
   };
 }
@@ -6700,22 +6671,10 @@ function parseImportRecordFromCells(cells) {
 
   let lat = null;
   let lng = null;
-  const coordinateRegion = !regiao
-    ? 'Plano Piloto'
-    : (/^distrito\s*federal$/i.test(regiaoRaw) ? 'Plano Piloto' : regiao);
-  const inferredCoords = inferCoordinatesFromLocal(coordinateRegion);
-  if (inferredCoords) {
-    const [baseLat, baseLng] = inferredCoords;
-    lat = baseLat + (Math.random() - 0.5) * 0.02;
-    lng = baseLng + (Math.random() - 0.5) * 0.02;
-    if (!regiao) {
-      rowResult.status = rowResult.status === 'error' ? 'error' : 'warning';
-      rowResult.notes.push('Região vazia; marcador posicionado no centro do DF.');
-    }
-  } else {
-    rowResult.status = rowResult.status === 'error' ? 'error' : 'warning';
-    rowResult.notes.push('Região sem coordenada base; o mapa pode ficar sem foco local.');
-  }
+  lat = ADASA_COORDINATES[0];
+  lng = ADASA_COORDINATES[1];
+  rowResult.status = rowResult.status === 'error' ? 'error' : 'warning';
+  rowResult.notes.push('Sem coordenadas na planilha; marcador posicionado na ADASA.');
 
   rowResult.id = id;
   rowResult.regiao = regiao;
