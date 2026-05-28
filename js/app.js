@@ -2039,6 +2039,65 @@ function renderSistemasAiLegendItems() {
   `;
 }
 
+function getMapYearFilterOptions() {
+  if (currentView !== 'fiscalizacoes') return [];
+
+  return [...new Set(
+    allFiscalizacoes
+      .map((record) => Number(record?.ano))
+      .filter((year) => Number.isFinite(year) && year > 0)
+      .map((year) => Math.trunc(year))
+  )].sort((a, b) => b - a);
+}
+
+function renderMapYearFilter() {
+  if (currentView !== 'fiscalizacoes') return '';
+
+  const years = getMapYearFilterOptions();
+  const currentYear = String(document.getElementById('filter-ano')?.value || '');
+  const options = years.length
+    ? years.map((year) => `
+      <option value="${escapeHtml(year)}" ${String(year) === currentYear ? 'selected' : ''}>${escapeHtml(year)}</option>
+    `).join('')
+    : '';
+
+  return `
+    <div class="pt-2 mt-2 border-t border-slate-700/70">
+      <label for="map-year-filter" class="mb-2 block text-[11px] text-slate-500">Filtrar por ano</label>
+      <select id="map-year-filter"
+        onchange="setMapYearFilter(this.value)"
+        class="input-field w-full px-2 py-1.5 rounded-lg bg-slate-800 border border-slate-600 text-slate-200 text-xs"
+        ${years.length ? '' : 'disabled'}>
+        <option value="">${years.length ? 'Todos os anos' : 'Sem anos cadastrados'}</option>
+        ${options}
+      </select>
+      ${currentYear ? `
+        <button type="button" onclick="setMapYearFilter('')" class="mt-2 rounded px-1.5 py-0.5 text-[11px] font-medium text-blue-200 hover:bg-blue-500/15">
+          Limpar ano
+        </button>
+      ` : ''}
+    </div>
+  `;
+}
+
+function syncMapYearFilterValue(value = '') {
+  const yearSelect = document.getElementById('map-year-filter');
+  if (!yearSelect) return;
+  yearSelect.value = String(value || '');
+}
+
+function setMapYearFilter(value = '') {
+  if (currentView !== 'fiscalizacoes') return;
+
+  const yearSelect = document.getElementById('filter-ano');
+  if (!yearSelect) return;
+
+  yearSelect.value = String(value || '');
+  applyFilters();
+  updateMapLegend();
+}
+window.setMapYearFilter = setMapYearFilter;
+
 function shouldRenderSistemaAiFeature(feature) {
   if (!selectedSistemasAiRaKey) return true;
   return getSistemaAiRaKey(feature?.properties?.ra_nome) === selectedSistemasAiRaKey;
@@ -2293,9 +2352,7 @@ function updateMapLegend() {
 
   if (currentView === 'obras') {
     title.textContent = 'Legenda de Obras';
-    items.innerHTML = `
-      ${renderSistemasAiLegendItems()}
-    `;
+    items.innerHTML = '';
     renderMapLayerControls();
     updateMapLegendCollapseUI();
     return;
@@ -2303,7 +2360,7 @@ function updateMapLegend() {
 
   title.textContent = 'Legenda';
   items.innerHTML = `
-    ${renderSistemasAiLegendItems()}
+    ${renderMapYearFilter()}
   `;
   renderMapLayerControls();
   updateMapLegendCollapseUI();
@@ -2959,6 +3016,8 @@ function applyFilters(options = {}) {
   const ano = document.getElementById('filter-ano').value;
   const conformidade = parseInt(document.getElementById('filter-conformidade').value, 10);
   const normalizedSearch = normalizePlainText(search);
+
+  syncMapYearFilterValue(ano);
 
   if (!preservePage) {
     listPage = 1;
