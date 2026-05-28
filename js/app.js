@@ -2329,34 +2329,15 @@ async function loadSistemasAiLayer() {
 }
 
 function canRenderMarker(record) {
-  if (currentView === 'obras') {
-    const layerKey = getObraLayerKey(record);
-    return Boolean(mapLayerVisibility[layerKey]);
-  }
-
-  const layerKey = getFiscalizacaoLayerKey(record.situacao);
-  return Boolean(mapLayerVisibility[layerKey]);
+  return true;
 }
 
 function renderMapLayerControls() {
   const container = document.getElementById('map-layer-toggles');
   if (!container) return;
 
-  const pointControls = currentView === 'obras'
-    ? [
-      { key: 'obra_alta', label: 'Execução >= 80%' },
-      { key: 'obra_media', label: 'Execução 40%-79%' },
-      { key: 'obra_baixa', label: 'Execução < 40%' },
-      { key: 'obra_sem_pct', label: 'Sem percentual' }
-    ]
-    : [
-      { key: 'em_andamento', label: 'em andamento' },
-      { key: 'concluida', label: 'concluída' },
-      { key: 'pendente', label: 'pendente' }
-    ];
   const controls = [
     { key: 'sistemas_ai', label: 'RA - Região Administrativa' },
-    ...pointControls
   ];
 
   container.innerHTML = controls.map((control) => `
@@ -2448,7 +2429,7 @@ function updateMapLegend() {
   if (currentView === 'obras') {
     title.textContent = 'Legenda de Obras';
     items.innerHTML = `
-      ${renderMapYearFilter()}
+      ${renderSistemasAiLegendItems()}
     `;
     renderMapLayerControls();
     updateMapLegendCollapseUI();
@@ -2457,7 +2438,7 @@ function updateMapLegend() {
 
   title.textContent = 'Legenda';
   items.innerHTML = `
-    ${renderMapYearFilter()}
+    ${renderSistemasAiLegendItems()}
   `;
   renderMapLayerControls();
   updateMapLegendCollapseUI();
