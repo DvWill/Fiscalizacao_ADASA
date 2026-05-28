@@ -557,10 +557,83 @@ function buildObraId(seed, index) {
   return `obra-${index + 1}-${base || 'item'}`;
 }
 
+function coerceYear(value) {
+  if (value == null || value === '') return null;
+
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    const year = Math.trunc(value);
+    return year >= 1900 && year <= 2100 ? year : null;
+  }
+
+  const text = String(value).trim();
+  if (!text) return null;
+
+  const numeric = Number(text);
+  if (Number.isFinite(numeric)) {
+    const year = Math.trunc(numeric);
+    if (year >= 1900 && year <= 2100) return year;
+  }
+
+  const match = text.match(/(?:^|[^0-9])(19\d{2}|20\d{2}|2100)(?:$|[^0-9])/);
+  if (!match) return null;
+
+  const year = Number(match[1]);
+  return year >= 1900 && year <= 2100 ? year : null;
+}
+
+function getRecordYear(record) {
+  if (!record || typeof record !== 'object') return null;
+
+  const explicitFields = ['ano', 'year', 'exercicio', 'ano_referencia', 'ano_ref'];
+  for (const field of explicitFields) {
+    const year = coerceYear(record[field]);
+    if (year) return year;
+  }
+
+  const dateFields = [
+    'data',
+    'data_acao',
+    'data_fiscalizacao',
+    'data_inicio',
+    'data_termino',
+    'execucao_inicio',
+    'execucao_termino',
+    'created_at',
+    'updated_at'
+  ];
+  for (const field of dateFields) {
+    const year = coerceYear(record[field]);
+    if (year) return year;
+  }
+
+  for (const key of Object.keys(record)) {
+    const keyYear = coerceYear(key);
+    if (keyYear) return keyYear;
+  }
+
+  for (const value of Object.values(record)) {
+    if (typeof value !== 'string') continue;
+    const year = coerceYear(value);
+    if (year) return year;
+  }
+
+  return null;
+}
+
+function getRecordYears(records = []) {
+  return [...new Set(
+    (records || [])
+      .map(getRecordYear)
+      .filter((year) => Number.isFinite(year))
+  )].sort((a, b) => b - a);
+}
+
 function normalizeObraRecord(record, index) {
+  const normalizedRecord = record || {};
   return {
-    __obraId: record?.__obraId || buildObraId(record?.item || record?.local || record?.objeto_contrato, index),
-    ...record
+    __obraId: normalizedRecord.__obraId || buildObraId(normalizedRecord.item || normalizedRecord.local || normalizedRecord.objeto_contrato, index),
+    ...normalizedRecord,
+    ano: getRecordYear(normalizedRecord)
   };
 }
 
@@ -2040,18 +2113,13 @@ function renderSistemasAiLegendItems() {
 }
 
 function getMapYearFilterOptions() {
-  if (currentView !== 'fiscalizacoes') return [];
-
-  return [...new Set(
-    allFiscalizacoes
-      .map((record) => Number(record?.ano))
-      .filter((year) => Number.isFinite(year) && year > 0)
-      .map((year) => Math.trunc(year))
-  )].sort((a, b) => b - a);
+  if (currentView === 'obras') return getRecordYears(allObras);
+  if (currentView === 'fiscalizacoes') return getRecordYears(allFiscalizacoes);
+  return [];
 }
 
 function renderMapYearFilter() {
-  if (currentView !== 'fiscalizacoes') return '';
+  if (currentView !== 'fiscalizacoes' && currentView !== 'obras') return '';
 
   const years = getMapYearFilterOptions();
   const currentYear = String(document.getElementById('filter-ano')?.value || '');
@@ -2352,7 +2420,9 @@ function updateMapLegend() {
 
   if (currentView === 'obras') {
     title.textContent = 'Legenda de Obras';
-    items.innerHTML = '';
+    items.innerHTML = `
+      ${renderMapYearFilter()}
+    `;
     renderMapLayerControls();
     updateMapLegendCollapseUI();
     return;
@@ -2438,7 +2508,7 @@ function updateDataViewUI() {
     filterSituacao.previousElementSibling.textContent = isObras ? 'Situação do Contrato' : 'Situação';
   }
   if (filterAno?.previousElementSibling) {
-    filterAno.previousElementSibling.textContent = isObras ? 'Sistema' : 'Ano';
+    filterAno.previousElementSibling.textContent = 'Ano';
   }
 
   const conformidadeGroup = filterConformidade?.parentElement?.parentElement;
@@ -2891,7 +2961,7 @@ function updateFiltersOptions() {
   } else if (currentView === 'obras') {
     const locais = [...new Set(allObras.map(o => o.local).filter(Boolean))].sort();
     const situacoes = [...new Set(allObras.map(o => o.situacao_contrato).filter(Boolean))].sort();
-    const sistemas = [...new Set(allObras.map(o => o.sistema).filter(Boolean))].sort();
+    const anos = getRecordYears(allObras);
 
     const regiaoSelect = document.getElementById('filter-regiao');
     const currentLocal = regiaoSelect.value;
@@ -2915,21 +2985,24 @@ function updateFiltersOptions() {
       situacaoSelect.appendChild(option);
     });
 
-    const sistemaSelect = document.getElementById('filter-ano');
-    const currentSistema = sistemaSelect.value;
-    sistemaSelect.innerHTML = '<option value="">Todos os Sistemas</option>';
-    sistemas.forEach((sistema) => {
+    const anoSelect = document.getElementById('filter-ano');
+    const currentAno = anoSelect.value;
+    anoSelect.innerHTML = '<option value="">Todos os Anos</option>';
+    anos.forEach((ano) => {
       const option = document.createElement('option');
-      option.value = sistema;
-      option.textContent = sistema;
-      if (sistema === currentSistema) option.selected = true;
-      sistemaSelect.appendChild(option);
+      option.value = ano;
+      option.textContent = ano;
+      if (String(ano) === currentAno) option.selected = true;
+      anoSelect.appendChild(option);
     });
+    if (currentAno && !anos.some((ano) => String(ano) === currentAno)) {
+      anoSelect.value = '';
+    }
 
     populateMapFocusOptions(locais, situacoes);
   } else {
     const regioes = [...new Set(allFiscalizacoes.map(f => f.regiao_administrativa).filter(Boolean))].sort();
-    const anos = [...new Set(allFiscalizacoes.map(f => f.ano).filter(Boolean))].sort((a, b) => b - a);
+    const anos = getRecordYears(allFiscalizacoes);
     const situacoes = [...new Set(allFiscalizacoes.map(f => f.situacao).filter(Boolean))].sort();
 
     const regiaoSelect = document.getElementById('filter-regiao');
@@ -2953,12 +3026,16 @@ function updateFiltersOptions() {
       if (String(a) === currentAno) option.selected = true;
       anoSelect.appendChild(option);
     });
+    if (currentAno && !anos.some((ano) => String(ano) === currentAno)) {
+      anoSelect.value = '';
+    }
 
     populateMapFocusOptions(regioes, situacoes);
   }
 
   renderQuickFilterButtons();
   populateSortFieldOptions();
+  updateMapLegend();
 }
 
 function populateSortFieldOptions() {
@@ -3055,7 +3132,7 @@ function applyFilters(options = {}) {
 
       if (regiao && obra.local !== regiao) return false;
       if (situacao && obra.situacao_contrato !== situacao) return false;
-      if (ano && obra.sistema !== ano) return false;
+      if (ano && String(getRecordYear(obra) || '') !== ano) return false;
       return true;
     });
 
@@ -3081,7 +3158,7 @@ function applyFilters(options = {}) {
 
       if (regiao && f.regiao_administrativa !== regiao) return false;
       if (situacao && f.situacao !== situacao) return false;
-      if (ano && String(f.ano) !== ano) return false;
+      if (ano && String(getRecordYear(f) || '') !== ano) return false;
       if (conformidade && (!f.indice_conformidade || f.indice_conformidade < conformidade)) return false;
       return true;
     });
