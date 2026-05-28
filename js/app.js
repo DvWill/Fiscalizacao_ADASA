@@ -195,7 +195,10 @@ const regionCoordinates = {
   'Vicente Pires': [-15.8000, -48.0333],
   'Fercal': [-15.6000, -47.9000],
   'Sol Nascente/Por do Sol': [-15.8000, -48.1333],
-  'Arniqueira': [-15.8500, -48.0333]
+  'Arniqueira': [-15.8500, -48.0333],
+  'Valparaiso de Goias': [-16.0650, -47.9750],
+  'Luziania': [-16.2525, -47.9500],
+  'Novo Gama': [-16.0590, -48.0410]
 };
 
 const DISPLAY_TEXT_OVERRIDES = new Map([
@@ -210,6 +213,8 @@ const DISPLAY_TEXT_OVERRIDES = new Map([
   ['Varjao', 'Varjão'],
   ['Jardim Botanico', 'Jardim Botânico'],
   ['Itapoa', 'Itapoã'],
+  ['Valparaiso de Goias', 'Valparaíso de Goiás'],
+  ['Luziania', 'Luziânia'],
   ['Nao Programada', 'Não Programada'],
   ['Sem regiao', 'Sem região'],
   ['Sem situacao', 'Sem situação'],
@@ -540,7 +545,10 @@ function inferCoordinatesFromLocal(local) {
     ['jardim botanico', 'Jardim Botanico'],
     ['varjao', 'Varjao'],
     ['brazlandia', 'Brazlandia'],
-    ['candangolandia', 'Candangolandia']
+    ['candangolandia', 'Candangolandia'],
+    ['valparaiso', 'Valparaiso de Goias'],
+    ['luziania', 'Luziania'],
+    ['novo gama', 'Novo Gama']
   ];
 
   for (const [alias, region] of aliases) {
@@ -6643,10 +6651,18 @@ function parseImportRecordFromCells(cells) {
 
   let lat = null;
   let lng = null;
-  if (regiao && regionCoordinates[regiao]) {
-    const [baseLat, baseLng] = regionCoordinates[regiao];
+  const coordinateRegion = !regiao
+    ? 'Plano Piloto'
+    : (/^distrito\s*federal$/i.test(regiaoRaw) ? 'Plano Piloto' : regiao);
+  const inferredCoords = inferCoordinatesFromLocal(coordinateRegion);
+  if (inferredCoords) {
+    const [baseLat, baseLng] = inferredCoords;
     lat = baseLat + (Math.random() - 0.5) * 0.02;
     lng = baseLng + (Math.random() - 0.5) * 0.02;
+    if (!regiao) {
+      rowResult.status = rowResult.status === 'error' ? 'error' : 'warning';
+      rowResult.notes.push('Região vazia; marcador posicionado no centro do DF.');
+    }
   } else {
     rowResult.status = rowResult.status === 'error' ? 'error' : 'warning';
     rowResult.notes.push('Região sem coordenada base; o mapa pode ficar sem foco local.');
