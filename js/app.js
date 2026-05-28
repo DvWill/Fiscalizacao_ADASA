@@ -558,6 +558,50 @@ function inferCoordinatesFromLocal(local) {
   return null;
 }
 
+function getStableCoordinateOffset(seed) {
+  const text = String(seed || '');
+  let hash = 0;
+  for (let index = 0; index < text.length; index += 1) {
+    hash = ((hash << 5) - hash + text.charCodeAt(index)) | 0;
+  }
+
+  const latSeed = Math.abs(hash % 1000) / 1000;
+  const lngSeed = Math.abs(Math.trunc(hash / 1000) % 1000) / 1000;
+  return [
+    (latSeed - 0.5) * 0.02,
+    (lngSeed - 0.5) * 0.02
+  ];
+}
+
+function getFiscalizacaoCoordinates(record) {
+  const latitude = sanitizeCoordinate(record?.latitude, 'lat');
+  const longitude = sanitizeCoordinate(record?.longitude, 'lng');
+  if (Number.isFinite(latitude) && Number.isFinite(longitude)) {
+    return { latitude, longitude, inferred: false };
+  }
+
+  const regiao = String(record?.regiao_administrativa || '').trim();
+  const coordinateRegion = !regiao || normalizePlainText(regiao) === 'distrito federal'
+    ? 'Plano Piloto'
+    : regiao;
+  const inferredCoords = inferCoordinatesFromLocal(coordinateRegion);
+  if (!inferredCoords) return null;
+
+  const [latOffset, lngOffset] = getStableCoordinateOffset([
+    record?.__backendId,
+    record?.id,
+    record?.processo_sei,
+    record?.ano,
+    regiao
+  ].join('|'));
+
+  return {
+    latitude: inferredCoords[0] + latOffset,
+    longitude: inferredCoords[1] + lngOffset,
+    inferred: true
+  };
+}
+
 function buildObraId(seed, index) {
   const base = normalizePlainText(seed || `obra-${index + 1}`)
     .replace(/[^a-z0-9]+/g, '-')
@@ -2399,8 +2443,12 @@ function applyMapFocus() {
     return;
   }
 
-  const filtered = filteredFiscalizacoes.filter((fisc) => {
-    if (!(Number.isFinite(Number(fisc.latitude)) && Number.isFinite(Number(fisc.longitude)))) return false;
+  const filtered = filteredFiscalizacoes.map((fisc) => ({
+    record: fisc,
+    coordinates: getFiscalizacaoCoordinates(fisc)
+  })).filter((item) => {
+    if (!item.coordinates) return false;
+    const fisc = item.record;
     if (region && fisc.regiao_administrativa !== region) return false;
     if (status && fisc.situacao !== status) return false;
     return true;
@@ -2416,7 +2464,7 @@ function applyMapFocus() {
     return;
   }
 
-  const bounds = L.latLngBounds(filtered.map((fisc) => [fisc.latitude, fisc.longitude]));
+  const bounds = L.latLngBounds(filtered.map((item) => [item.coordinates.latitude, item.coordinates.longitude]));
   map.fitBounds(bounds, { padding: [70, 70], maxZoom: 14 });
 }
 window.applyMapFocus = applyMapFocus;
@@ -2773,9 +2821,10 @@ function updateMapMarkers() {
     });
   } else {
     filteredFiscalizacoes.forEach(fisc => {
-      if (fisc.latitude && fisc.longitude) {
+      const coordinates = getFiscalizacaoCoordinates(fisc);
+      if (coordinates) {
         if (!canRenderMarker(fisc)) return;
-        const marker = L.marker([fisc.latitude, fisc.longitude], {
+        const marker = L.marker([coordinates.latitude, coordinates.longitude], {
           icon: createMarkerIcon(fisc.situacao)
         });
 
