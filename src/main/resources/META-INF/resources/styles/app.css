@@ -298,6 +298,19 @@ body.auth-page .auth-card-mark {
 }
 
 @media (max-width: 640px) {
+  body.app-page .app-header {
+    align-items: stretch !important;
+    gap: 0.75rem;
+    max-height: calc(100dvh - 24px);
+    overflow: hidden;
+  }
+
+  body.app-page .app-brand,
+  body.app-page .app-toolbar {
+    flex: 0 0 auto;
+    width: 100% !important;
+  }
+
   .app-toolbar {
     flex-wrap: nowrap;
     overflow-x: auto !important;
@@ -3458,6 +3471,7 @@ html[data-theme="light"] .marker-cluster-large div {
   }
 
   .app-brand {
+    flex: 0 0 auto;
     gap: 0.75rem !important;
   }
 
