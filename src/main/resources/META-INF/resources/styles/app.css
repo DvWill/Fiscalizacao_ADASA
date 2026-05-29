@@ -117,8 +117,9 @@ body.public-page .public-shell {
 }
 
 body.app-page .app-shell {
-  padding: clamp(12px, 2vw, 24px);
-  gap: clamp(12px, 2vw, 18px);
+  padding: 0;
+  gap: 0;
+  overflow: hidden;
 }
 
 .app-header,
@@ -147,6 +148,11 @@ body.app-page .app-shell {
 }
 
 .app-header {
+  position: absolute;
+  top: clamp(12px, 2vw, 24px);
+  left: clamp(12px, 2vw, 24px);
+  right: clamp(12px, 2vw, 24px);
+  z-index: 1200;
   border-radius: 28px;
   align-items: stretch !important;
 }
@@ -315,10 +321,31 @@ html[data-theme="light"] .theme-icon-moon {
 }
 
 body.app-page .app-stage {
-  border-radius: 34px;
-  background: rgba(15, 23, 42, 0.56);
-  border: 1px solid var(--border-soft);
-  box-shadow: var(--shadow-xl);
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+body.app-page #map-stage,
+body.app-page #map {
+  width: 100%;
+  height: 100%;
+}
+
+body.app-page #map-stage .leaflet-top.leaflet-left {
+  top: calc(clamp(12px, 2vw, 24px) + 130px);
+  left: clamp(12px, 2vw, 24px);
+}
+
+body.app-page #map-stage .leaflet-top.leaflet-right {
+  top: calc(clamp(12px, 2vw, 24px) + 130px);
+  right: clamp(12px, 2vw, 24px);
 }
 
 body.app-page .app-filters-drawer,
@@ -2098,6 +2125,7 @@ body.public-page .public-header {
 body.app-page #acoes-dashboard-view,
 body.app-page #rvf-view {
   background: transparent !important;
+  padding-top: calc(clamp(12px, 2vw, 24px) + 130px) !important;
 }
 
 body:is(.app-page, .public-page, .auth-page) .text-slate-950,
@@ -3401,18 +3429,24 @@ html[data-theme="light"] .marker-cluster-large div {
     min-height: 44px;
   }
 
-  body.app-page .app-shell,
   body.public-page .public-shell {
     padding: 12px;
   }
 
+  body.app-page .app-shell {
+    padding: 0;
+  }
+
   body.app-page .app-header,
   body.public-page .public-header-bar,
-  body.app-page .app-stage,
   body.public-page .public-sidebar,
   body.public-page .public-map-shell,
   body.auth-page .auth-card {
     border-radius: 24px;
+  }
+
+  body.app-page .app-stage {
+    border-radius: 0;
   }
 
   body.auth-page .auth-points {

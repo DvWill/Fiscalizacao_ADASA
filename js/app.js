@@ -2178,7 +2178,7 @@ function syncMapYearFilterValue(value = '') {
 }
 
 function setMapYearFilter(value = '') {
-  if (currentView !== 'fiscalizacoes') return;
+  if (currentView !== 'fiscalizacoes' && currentView !== 'obras') return;
 
   const yearSelect = document.getElementById('filter-ano');
   if (!yearSelect) return;
@@ -2430,6 +2430,7 @@ function updateMapLegend() {
     title.textContent = 'Legenda de Obras';
     items.innerHTML = `
       ${renderSistemasAiLegendItems()}
+      ${renderMapYearFilter()}
     `;
     renderMapLayerControls();
     updateMapLegendCollapseUI();
@@ -2439,6 +2440,7 @@ function updateMapLegend() {
   title.textContent = 'Legenda';
   items.innerHTML = `
     ${renderSistemasAiLegendItems()}
+    ${renderMapYearFilter()}
   `;
   renderMapLayerControls();
   updateMapLegendCollapseUI();
