@@ -55,7 +55,7 @@
       </div>
 
       <!-- Botoes (rolagem horizontal no mobile) -->
-      <div class="app-toolbar flex items-center gap-2 sm:gap-3 w-full sm:w-auto overflow-x-auto sm:overflow-visible pb-1 sm:pb-0">
+      <div id="app-actions-menu" class="app-toolbar flex items-center gap-2 sm:gap-3 w-full sm:w-auto overflow-x-auto sm:overflow-visible pb-1 sm:pb-0">
         <div class="view-switch shrink-0 flex items-center gap-1 rounded-lg bg-slate-800/80 border border-slate-700 p-1">
           <button id="view-fiscalizacoes-btn" onclick="switchDataView('fiscalizacoes')"
             class="px-3 py-1.5 rounded-md bg-blue-600 text-white text-xs sm:text-sm font-medium transition-colors">
@@ -170,6 +170,7 @@
             <path d="M20.5 14.5A8.5 8.5 0 119.5 3.5a6.7 6.7 0 0011 11z"></path>
           </svg>
           <span id="theme-toggle-text" class="hidden sm:inline">Claro</span>
+          <span class="sm:hidden">Tema</span>
         </button>
 
         <div id="auth-user-badge" class="shrink-0 hidden md:flex items-center gap-1.5 rounded-lg bg-slate-800/80 border border-slate-700 px-2.5 py-1.5">
@@ -207,6 +208,112 @@
         </button>
       </div>
     </header>
+
+    <div id="mobile-actions-backdrop" class="mobile-actions-backdrop" onclick="toggleMobileActionsMenu(false)" aria-hidden="true"></div>
+    <div id="mobile-actions-panel" class="mobile-actions-panel" role="dialog" aria-label="Menu de acoes" aria-hidden="true">
+      <div class="mobile-view-switch" aria-label="Alternar visualizacao">
+        <button type="button" class="mobile-action-btn mobile-view-btn" data-mobile-view="fiscalizacoes" onclick="switchDataView('fiscalizacoes')">Fiscaliza&ccedil;&otilde;es</button>
+        <button type="button" class="mobile-action-btn mobile-view-btn" data-mobile-view="obras" onclick="switchDataView('obras')">Obras</button>
+        <button type="button" class="mobile-action-btn mobile-view-btn" data-mobile-view="acoes" onclick="switchDataView('acoes')">A&ccedil;&otilde;es</button>
+        <button type="button" class="mobile-action-btn mobile-view-btn" data-mobile-view="rvf" onclick="switchDataView('rvf')">RF</button>
+      </div>
+
+      <button id="mobile-filters-btn" type="button" class="mobile-action-btn" onclick="toggleFiltersPanel(true)">
+        <svg class="icon-min w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M4 6h16" />
+          <path d="M7 12h10" />
+          <path d="M10 18h4" />
+        </svg>
+        <span>Filtros</span>
+      </button>
+      <button id="mobile-dashboard-btn" type="button" class="mobile-action-btn" onclick="toggleDashboard()">
+        <svg class="icon-min w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M5 18V11" />
+          <path d="M12 18V7" />
+          <path d="M19 18V13" />
+          <path d="M3 18h18" />
+        </svg>
+        <span>Dashboard</span>
+      </button>
+      <button id="mobile-import-fiscalizacoes-btn" type="button" class="mobile-action-btn" onclick="openImportModal()">
+        <svg class="icon-min w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 15V6" />
+          <path d="M9 9l3-3 3 3" />
+          <rect x="5" y="15" width="14" height="4" rx="1.5" />
+        </svg>
+        <span>Importar</span>
+      </button>
+      <button id="mobile-upload-obras-btn" type="button" class="mobile-action-btn hidden" onclick="openObrasUploadModal()">
+        <svg class="icon-min w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M6 18h12" />
+          <path d="M12 6v9" />
+          <path d="M9 12l3 3 3-3" />
+        </svg>
+        <span>Upload Obras</span>
+      </button>
+      <button id="mobile-upload-acoes-btn" type="button" class="mobile-action-btn hidden" onclick="openAcoesUploadModal()">
+        <svg class="icon-min w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M6 18h12" />
+          <path d="M12 6v9" />
+          <path d="M9 12l3 3 3-3" />
+        </svg>
+        <span>Upload A&ccedil;&otilde;es</span>
+      </button>
+      <button id="mobile-export-data-btn" type="button" class="mobile-action-btn" onclick="exportToCSV()">
+        <svg class="icon-min w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 6v9" />
+          <path d="M9 12l3 3 3-3" />
+          <path d="M5 18h14" />
+        </svg>
+        <span>Exportar</span>
+      </button>
+      <a id="mobile-telao-link" class="mobile-action-btn" href="/telao.html" target="_blank" rel="noopener noreferrer">
+        <svg class="icon-min w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <rect x="3" y="5" width="18" height="12" rx="2" />
+          <path d="M8 21h8" />
+          <path d="M12 17v4" />
+        </svg>
+        <span>Tel&atilde;o</span>
+      </a>
+      <button id="mobile-theme-toggle-btn" type="button" class="mobile-action-btn" onclick="toggleTheme()">
+        <svg class="icon-min w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="12" r="4"></circle>
+          <path d="M12 2v2"></path>
+          <path d="M12 20v2"></path>
+          <path d="M4.93 4.93l1.41 1.41"></path>
+          <path d="M17.66 17.66l1.41 1.41"></path>
+          <path d="M2 12h2"></path>
+          <path d="M20 12h2"></path>
+          <path d="M6.34 17.66l-1.41 1.41"></path>
+          <path d="M19.07 4.93l-1.41 1.41"></path>
+        </svg>
+        <span>Tema</span>
+      </button>
+      <button id="mobile-add-fiscalizacao-btn" type="button" class="mobile-action-btn mobile-action-btn-primary" onclick="openAddModal()">
+        <svg class="icon-min w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="12" r="8" />
+          <path d="M12 8v8" />
+          <path d="M8 12h8" />
+        </svg>
+        <span>Nova</span>
+      </button>
+      <button id="mobile-logout-btn" type="button" class="mobile-action-btn">
+        <svg class="icon-min w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M10 17l5-5-5-5"></path>
+          <path d="M15 12H4"></path>
+          <path d="M13 4h5a2 2 0 012 2v12a2 2 0 01-2 2h-5"></path>
+        </svg>
+        <span>Sair</span>
+      </button>
+    </div>
+    <button id="mobile-actions-toggle" type="button" class="mobile-actions-toggle" onclick="toggleMobileActionsMenu()" aria-controls="mobile-actions-panel" aria-expanded="false" aria-label="Abrir menu de acoes">
+      <svg class="icon-min w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M4 7h16" />
+        <path d="M4 12h16" />
+        <path d="M4 17h16" />
+      </svg>
+      <span>Menu</span>
+    </button>
 
     <!-- Main Content -->
     <div class="app-stage flex-1 relative overflow-hidden">

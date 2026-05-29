@@ -1925,6 +1925,7 @@ async function logoutSession() {
 function initAuthSessionUI() {
   const userLabel = document.getElementById('auth-user-name');
   const logoutBtn = document.getElementById('logout-btn');
+  const mobileLogoutBtn = document.getElementById('mobile-logout-btn');
   const authBadge = document.getElementById('auth-user-badge');
 
   const login = String(window.APP_AUTH_USER || '').trim();
@@ -1934,6 +1935,10 @@ function initAuthSessionUI() {
   if (logoutBtn && !logoutBtn.dataset.bound) {
     logoutBtn.dataset.bound = '1';
     logoutBtn.addEventListener('click', logoutSession);
+  }
+  if (mobileLogoutBtn && !mobileLogoutBtn.dataset.bound) {
+    mobileLogoutBtn.dataset.bound = '1';
+    mobileLogoutBtn.addEventListener('click', logoutSession);
   }
 }
 
@@ -2490,6 +2495,15 @@ function updateDataViewUI() {
   if (dashboardBtn) {
     dashboardBtn.classList.toggle('hidden', isAcoes || isRvf);
   }
+  document.querySelectorAll('[data-mobile-view]').forEach((button) => {
+    button.classList.toggle('is-active', button.dataset.mobileView === currentView);
+  });
+  document.getElementById('mobile-filters-btn')?.classList.toggle('hidden', isAcoes || isRvf);
+  document.getElementById('mobile-dashboard-btn')?.classList.toggle('hidden', isAcoes || isRvf);
+  document.getElementById('mobile-import-fiscalizacoes-btn')?.classList.toggle('hidden', isObras || isAcoes || isRvf);
+  document.getElementById('mobile-upload-obras-btn')?.classList.toggle('hidden', !isObras);
+  document.getElementById('mobile-upload-acoes-btn')?.classList.toggle('hidden', !isAcoes);
+  document.getElementById('mobile-add-fiscalizacao-btn')?.classList.toggle('hidden', isObras || isAcoes || isRvf);
   mapStage?.classList.toggle('hidden', isAcoes || isRvf);
   acoesDashboardView?.classList.toggle('hidden', !isAcoes);
   rvfView?.classList.toggle('hidden', !isRvf);
@@ -2606,8 +2620,40 @@ function toggleFiltersPanel(open) {
 }
 window.toggleFiltersPanel = toggleFiltersPanel;
 
+function setMobileActionsMenu(open) {
+  const shouldOpen = Boolean(open);
+  const toggle = document.getElementById('mobile-actions-toggle');
+  const panel = document.getElementById('mobile-actions-panel');
+
+  document.body.classList.toggle('mobile-actions-open', shouldOpen);
+  if (panel) {
+    panel.setAttribute('aria-hidden', shouldOpen ? 'false' : 'true');
+  }
+  if (toggle) {
+    toggle.setAttribute('aria-expanded', shouldOpen ? 'true' : 'false');
+    toggle.setAttribute('aria-label', shouldOpen ? 'Fechar menu de acoes' : 'Abrir menu de acoes');
+  }
+}
+
+function toggleMobileActionsMenu(forceOpen) {
+  const shouldOpen = typeof forceOpen === 'boolean'
+    ? forceOpen
+    : !document.body.classList.contains('mobile-actions-open');
+  setMobileActionsMenu(shouldOpen);
+}
+window.toggleMobileActionsMenu = toggleMobileActionsMenu;
+
+function closeMobileActionsMenu() {
+  setMobileActionsMenu(false);
+}
+
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
+    if (document.body.classList.contains('mobile-actions-open')) {
+      closeMobileActionsMenu();
+      return;
+    }
+
     if (isModalOpen('form-modal')) {
       closeModal();
       return;
@@ -3247,6 +3293,7 @@ function initEnhancedControls() {
   const next = document.getElementById('pagination-next');
   const mapFocusApply = document.getElementById('map-focus-apply');
   const saveFavoriteBtn = document.getElementById('save-filter-favorite-btn');
+  const mobileActionsPanel = document.getElementById('mobile-actions-panel');
 
   sortField?.addEventListener('change', onSortOrPageSettingsChanged);
   sortDirection?.addEventListener('change', onSortOrPageSettingsChanged);
@@ -3255,6 +3302,11 @@ function initEnhancedControls() {
   next?.addEventListener('click', () => goToPage(1));
   mapFocusApply?.addEventListener('click', applyMapFocus);
   saveFavoriteBtn?.addEventListener('click', saveCurrentFilterFavorite);
+  mobileActionsPanel?.addEventListener('click', (event) => {
+    if (!window.matchMedia('(max-width: 640px)').matches) return;
+    if (!event.target?.closest('button, a')) return;
+    closeMobileActionsMenu();
+  });
 }
 
 function updateConformidadeLabel() {
